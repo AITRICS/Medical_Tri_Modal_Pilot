@@ -14,7 +14,7 @@ from builder.models.src.swin_transformer import swin_t_m, Swin_T_Weights
 
 # early fusion
 
-class TRI_MT_V1(nn.Module):
+class FEATURE_TEMPORAL_MT_V1(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
