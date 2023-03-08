@@ -1,0 +1,17 @@
+## Datasets
+DATASET=MIMICED
+
+# local path
+PROJ_HOME=`cd ../..; pwd`
+MODULE=dump-rawdata
+
+RAWDATA=/mnt/aitrics_ext/ext01/MedicalAI/rawdata/${DATASET}
+
+# external path
+RAWDATA_ORG_SERVER=211.115.110.140
+RAWDATA_ORG_ROOT=${RAWDATA_ORG_SERVER}:/mnt/aitrics_ext/ext01/MedicalAI/VC_data/original
+
+RAWDATA_ORG_SVRC=${RAWDATA_ORG_ROOT}/severance/SVRC
+RAWDATA_ORG_MIMIC=${RAWDATA_ORG_ROOT}/public/MIMIC-IV
+RAWDATA_ORG_MIMICED=${RAWDATA_ORG_ROOT}/public/MIMIC-IV_ED/physionet.org/files/mimic-iv-ed/1.0/ed
+
