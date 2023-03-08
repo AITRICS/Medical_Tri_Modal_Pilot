@@ -1,1 +1,1 @@
-# Medical_Multi_Modal_V2
+# Medical_Tri_Modal_Pilot
