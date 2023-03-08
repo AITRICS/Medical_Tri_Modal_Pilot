@@ -38,8 +38,8 @@ parser.add_argument('--fullmodal-definition', type=str, default="txt1", choices=
 # Data path setting
 parser.add_argument('--train-data-path', type=str, default="/home/destin/training_data_0113/mimic_icu/train")
 parser.add_argument('--test-data-path', type=str, default="/home/destin/training_data_0113/mimic_icu/test")
-parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/destin/multimodal/final_result")
-parser.add_argument('--image-data-path', type=str, default="/home/claire/")
+parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/destin/multimodal/MLHC_result")
+parser.add_argument('--image-data-path', type=str, default="/home/destin/")
 
 # Data Parameters
 parser.add_argument('--cross-fold-val', type=int, default=1, choices=[1, 0], help="1: k-fold, 0: seed-average")
