@@ -525,7 +525,7 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
         
-        imgs = []
+        img_time = -1
         if (("img" in args.input_types and "img1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and type_list in [0,2,3,5] and "img" in args.input_types)) and ('cxr_input' in data_pkl):
             cxr_li = [i for i in data_pkl['cxr_input'] if i[0] <= selectedKey] 
             if not cxr_li and ('train-full' in args.modality_inclusion): 
@@ -535,34 +535,54 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 img = torch.zeros(self.image_size).unsqueeze(0)
                 missing.append(True)
             else:
-                init_time = selectedKey - randLength
-                if cxr_li[-1][0] < init_time:
-                    cxr_path_list = sorted(cxr_li)
-                    cxr_path = cxr_path_list[-1][1]
-                    image = Image.open(self.image_data_path + cxr_path)
-                    image = F_t.equalize(image)
-                    imgs.append(self.transform(image))
-                else:
-                    cxr_path_list = sorted([i for i in cxr_li if init_time <= i[0]])
-                    cxr_path_list_before = sorted([i for i in cxr_li if init_time > i[0]])
-                    if len(cxr_path_list_before) > 0:
-                        cxr_path_list.append(cxr_path_list_before[-1])
-                    print("1: ", cxr_path_list)
-                    cxr_path_list = sorted(cxr_path_list)
-                    print("2: ", cxr_path_list)
-                    for cxr_path in cxr_path_list:
-                        image = Image.open(self.image_data_path + cxr_path[1])
-                        image = F_t.equalize(image)
-                        imgs.append(self.transform(image))
-                        print("imgs: ", cxr_path[0])
-                    print("selectedKey: ", selectedKey)
-                    print("randLength: ", randLength)
-                    print(" ")
+                cxr_time, cxr_path = sorted(cxr_li)[-1]
+                image = Image.open(self.image_data_path + cxr_path)
+                image = F_t.equalize(image)
+                img = self.transform(image)
                 missing.append(False)
-            imgs = torch.stack(imgs)
+                img_time = cxr_time - (selectedKey - randLength + 1)
         else:
-            imgs = torch.zeros(self.image_size).unsqueeze(0)
+            img = torch.zeros(self.image_size).unsqueeze(0)
             missing.append(True)
+        
+        # imgs = []
+        # if (("img" in args.input_types and "img1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and type_list in [0,2,3,5] and "img" in args.input_types)) and ('cxr_input' in data_pkl):
+        #     cxr_li = [i for i in data_pkl['cxr_input'] if i[0] <= selectedKey] 
+        #     if not cxr_li and ('train-full' in args.modality_inclusion): 
+        #         print("collate cxr error")
+        #         exit(1)
+        #     elif not cxr_li and ('train-missing' in args.modality_inclusion): 
+        #         imgs.append(torch.zeros(self.image_size).unsqueeze(0))
+        #         missing.append(True)
+        #     else:
+        #         init_time = selectedKey - randLength
+        #         if cxr_li[-1][0] < init_time:
+        #             cxr_path_list = sorted(cxr_li)
+        #             cxr_path = cxr_path_list[-1][1]
+        #             image = Image.open(self.image_data_path + cxr_path)
+        #             image = F_t.equalize(image)
+        #             imgs.append(self.transform(image))
+        #         else:
+        #             cxr_path_list = sorted([i for i in cxr_li if init_time <= i[0]])
+        #             cxr_path_list_before = sorted([i for i in cxr_li if init_time > i[0]])
+        #             if len(cxr_path_list_before) > 0:
+        #                 cxr_path_list.append(cxr_path_list_before[-1])
+        #             cxr_path_list = sorted(cxr_path_list)
+                    
+        #             for cxr_path in cxr_path_list:
+        #                 image = Image.open(self.image_data_path + cxr_path[1])
+        #                 image = F_t.equalize(image)
+        #                 imgs.append(self.transform(image))
+                        
+        #             # print("1: ", [i[0] for i in cxr_path_list])
+        #             # print("selectedKey: ", selectedKey)
+        #             # print("randLength: ", randLength)
+        #             # print(" ")
+        #         missing.append(False)
+        #     imgs = torch.stack(imgs)
+        # else:
+        #     imgs = torch.zeros(self.image_size).unsqueeze(0)
+        #     missing.append(True)
             
         if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
             tokens = self.txtDict[(int(data_pkl['pat_id']), int(data_pkl['chid']))]
@@ -584,7 +604,7 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             textLength = 0
             missing.append(True)
         missing = torch.Tensor(missing)
-        return final_seqs, static_inputs, multi_target, inputLength, imgs, tokens, textLength, missing, f_indices
+        return final_seqs, static_inputs, multi_target, inputLength, img, tokens, textLength, img_time, missing, f_indices
 
 class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
 
@@ -1056,6 +1076,7 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
 
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
         
+        img_time = -1
         if (("img" in args.input_types and "img1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and type_list in [0,2,3,5] and "img" in args.input_types)) and ('cxr_input' in data_pkl):
             cxr_li = [i for i in data_pkl['cxr_input'] if i[0] <= selectedKey] 
             if not cxr_li and ('test-full' in args.modality_inclusion): 
@@ -1065,14 +1086,53 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                 img = torch.zeros(self.image_size).unsqueeze(0)
                 missing.append(True)
             else:
-                cxr_path = sorted(cxr_li)[-1][1]
+                cxr_time, cxr_path = sorted(cxr_li)[-1]
                 image = Image.open(self.image_data_path + cxr_path)
                 image = F_t.equalize(image)
                 img = self.transform(image)
                 missing.append(False)
+                img_time = cxr_time - (selectedKey - randLength + 1)
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             missing.append(True)
+            
+        # imgs = []
+        # if (("img" in args.input_types and "img1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and type_list in [0,2,3,5] and "img" in args.input_types)) and ('cxr_input' in data_pkl):
+        #     cxr_li = [i for i in data_pkl['cxr_input'] if i[0] <= selectedKey] 
+        #     if not cxr_li and ('test-full' in args.modality_inclusion): 
+        #         print("collate cxr error")
+        #         exit(1)
+        #     elif not cxr_li and ('test-missing' in args.modality_inclusion): 
+        #         imgs.append(torch.zeros(self.image_size).unsqueeze(0))
+        #         missing.append(True)
+        #     else:
+        #         init_time = selectedKey - randLength
+        #         if cxr_li[-1][0] < init_time:
+        #             cxr_path_list = sorted(cxr_li)
+        #             cxr_path = cxr_path_list[-1][1]
+        #             image = Image.open(self.image_data_path + cxr_path)
+        #             image = F_t.equalize(image)
+        #             imgs.append(self.transform(image))
+        #         else:
+        #             cxr_path_list = sorted([i for i in cxr_li if init_time <= i[0]])
+        #             cxr_path_list_before = sorted([i for i in cxr_li if init_time > i[0]])
+        #             if len(cxr_path_list_before) > 0:
+        #                 cxr_path_list.append(cxr_path_list_before[-1])
+        #             cxr_path_list = sorted(cxr_path_list)
+                    
+        #             for cxr_path in cxr_path_list:
+        #                 image = Image.open(self.image_data_path + cxr_path[1])
+        #                 image = F_t.equalize(image)
+        #                 imgs.append(self.transform(image))
+                        
+        #             # print("1: ", [i[0] for i in cxr_path_list])
+        #             # print("selectedKey: ", selectedKey)
+        #             # print("randLength: ", randLength)
+        #             # print(" ")
+        #         missing.append(False)
+        # else:
+        #     imgs = torch.zeros(self.image_size).unsqueeze(0)
+        #     missing.append(True)
         
         if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
             tokens = self.txtDict[(int(data_pkl['pat_id']), int(data_pkl['chid']))]
@@ -1094,7 +1154,7 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
             textLength = 0
             missing.append(True)
         missing = torch.Tensor(missing)
-        return final_seqs, static_inputs, multi_target, inputLength, img, tokens, textLength, missing, f_indices
+        return final_seqs, static_inputs, multi_target, inputLength, img, tokens, textLength, img_time, missing, f_indices
 
 class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
 
@@ -1496,6 +1556,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
         
+        img_time = -1
         if (("img" in args.input_types and "img1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and type_list in [0,2,3,5] and "img" in args.input_types)) and ('cxr_input' in data_pkl):
             cxr_li = [i for i in data_pkl['cxr_input'] if i[0] <= selectedKey] 
             if not cxr_li and ('train-full' in args.modality_inclusion): 
@@ -1505,11 +1566,12 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 img = torch.zeros(self.image_size).unsqueeze(0)
                 missing.append(True)
             else:
-                cxr_path = sorted(cxr_li)[-1][1]
+                cxr_time, cxr_path = sorted(cxr_li)[-1]
                 image = Image.open(self.image_data_path + cxr_path)
                 image = F_t.equalize(image)
                 img = self.transform(image)
                 missing.append(False)
+                img_time = cxr_time - (selectedKey - randLength + 1)
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             missing.append(True)
@@ -1534,7 +1596,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
             textLength = 0
             missing.append(True)
         missing = torch.Tensor(missing)  
-        return final_seqs, static_inputs, multi_target, inputLength, img, tokens, textLength, missing, f_indices
+        return final_seqs, static_inputs, multi_target, inputLength, img, tokens, textLength, img_time, missing, f_indices
 
 class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
 
@@ -2021,7 +2083,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
 
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
         
-        imgs = []
+        img_time = -1
         if (("img" in args.input_types and "img1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and type_list in [0,2,3,5] and "img" in args.input_types)) and ('cxr_input' in data_pkl):
             cxr_li = [i for i in data_pkl['cxr_input'] if i[0] <= selectedKey] 
             if not cxr_li and ('test-full' in args.modality_inclusion): 
@@ -2031,13 +2093,12 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 img = torch.zeros(self.image_size).unsqueeze(0)
                 missing.append(True)
             else:
-                print("possible_indices_keys: ", possible_indices_keys)
-                print("cxr_li: ", cxr_li)
-                cxr_path = sorted(cxr_li)[-1][1]
+                cxr_time, cxr_path = sorted(cxr_li)[-1]
                 image = Image.open(self.image_data_path + cxr_path)
                 image = F_t.equalize(image)
                 img = self.transform(image)
                 missing.append(False)
+                img_time = cxr_time - (selectedKey - randLength + 1)
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             missing.append(True)
@@ -2062,4 +2123,4 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             textLength = 0
             missing.append(True)
         missing = torch.Tensor(missing)
-        return final_seqs, static_inputs, multi_target, inputLength, img, tokens, textLength, missing, f_indices
+        return final_seqs, static_inputs, multi_target, inputLength, img, tokens, textLength, img_time, missing, f_indices
