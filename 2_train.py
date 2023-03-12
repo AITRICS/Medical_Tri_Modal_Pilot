@@ -75,8 +75,9 @@ for k_indx, seed_num in enumerate(args.seed_list):
     
     train_loader, val_loader, test_loader = get_data_loader(args, patient_dict, keys_list, k_indx)
     # exit(1)
-    # for train_batch in train_loader:
-    #     train_x, static_x, train_y, input_lengths, train_img, train_txt, txt_lengths, missing, f_indices = train_batch
+    for train_batch in train_loader:
+        train_x, static_x, train_y, input_lengths, train_img, train_txt, txt_lengths, missing, f_indices = train_batch
+        print("train_img: ", train_img)
 
     # print("done without any error - Train loader")
     # for train_batch in val_loader:
@@ -86,8 +87,8 @@ for k_indx, seed_num in enumerate(args.seed_list):
     # for train_batch in test_loader:
     #     train_x, static_x, train_y, input_lengths, train_img, train_txt, txt_lengths, missing, f_indices = train_batch
 
-    # print("done without any error - Test loader")
-    # exit(1)
+    print("done without any error - Test loader")
+    exit(1)
 
     # get model
     model = get_model(args) 

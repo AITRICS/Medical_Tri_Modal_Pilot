@@ -12,19 +12,15 @@ from monai.networks.blocks.patchembedding import PatchEmbeddingBlock
 from builder.models.src.vision_transformer import vit_b_16_m, ViT_B_16_Weights
 from builder.models.src.swin_transformer import swin_t_m, Swin_T_Weights
 
-# early fusion
-
-class FEATURE_TEMPORAL_MT_V1(nn.Module):
+class FEATURE_TEMPORAL_T_LSTM(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
-        # self.idx_order = torch.range(0, args.batch_size-1).type(torch.LongTensor)
-        ##### Configuration
+        self.temporal_config = args.temporal
         self.num_layers = args.transformer_num_layers
         self.num_heads = args.transformer_num_head
         self.model_dim = args.transformer_dim
         self.dropout = args.dropout
-        self.multitoken = args.multitoken
         self.num_nodes = len(args.vitalsign_labtest)
         self.t_len = args.window_size
 
@@ -44,22 +40,38 @@ class FEATURE_TEMPORAL_MT_V1(nn.Module):
         ])
         self.relu = self.activations[activation]
         
-        ##### Encoders
+        ########## ########## Encoders ########## ##########
+        ########## Spatio ##########
+        # sharing VSLT encoder
         self.vslt_enc = nn.Sequential(
-                            nn.Linear(self.num_nodes+2, self.model_dim),
-                            nn.LayerNorm(self.model_dim),
-                            nn.ReLU(inplace=True),
-                            nn.Linear(self.model_dim, self.model_dim),
-                            nn.LayerNorm(self.model_dim),
-                            nn.ReLU(inplace=True),
-        )
-    
+                                    nn.Linear(self.t_len, self.model_dim),
+                                    nn.LayerNorm(self.model_dim),
+                                    nn.ReLU(inplace=True),
+                                    nn.Linear(self.model_dim, self.model_dim),
+                                    nn.LayerNorm(self.model_dim),
+                                    nn.ReLU(inplace=True),
+                    )
+        
+        self.instance_graph_transformer = TransformerEncoder(
+                                        d_input=self.model_dim,
+                                        n_layers=self.num_layers,
+                                        n_head=self.num_heads,
+                                        d_model=self.model_dim,
+                                        d_ff=self.model_dim*4,
+                                        dropout=self.dropout,
+                                        pe_maxlen=25,
+                                        use_pe=False,
+                                        classification=True,
+                                        mask=False)
+        
+        # TXT encoder
         datasetType = args.train_data_path.split("/")[-2]
         if datasetType == "mimic_icu": # BERT
             self.txt_embedding = nn.Embedding(30000, self.model_dim)
         elif datasetType == "sev_icu":
             raise NotImplementedError
         
+        # Image encoder
         self.img_model_type = args.img_model_type
         self.img_pretrain = args.img_pretrain
         if self.img_model_type == "vit":
@@ -83,37 +95,54 @@ class FEATURE_TEMPORAL_MT_V1(nn.Module):
             dropout_rate=0,
             spatial_dims=2,
             )           
-        self.linear = nn.Linear(768,256)     
+        self.linear = nn.Linear(768,self.model_dim)     
         self.flatten = nn.Flatten(1,2)
         
-        ##### Fusion Part
-        self.fusion_transformer = TrimodalTransformerEncoder_MT(
-            batch_size = args.batch_size,
-            d_input = self.model_dim,
-            n_layers = self.num_layers,
-            n_head = self.num_heads,
-            d_model = self.model_dim,
-            d_ff = self.model_dim * 4,
-            n_modality = self.n_modality,
-            dropout = self.dropout,
-            pe_maxlen = 2000,
-            use_pe = True,
-            txt_idx = 2,
-            multitoken = self.multitoken,
-        )
+        ########## Temporal ##########
+        if self.temporal_config == "LSTM":
+            self.temporal = nn.LSTM(input_size=self.model_dim, hidden_size=self.model_dim,
+                            num_layers=2, batch_first=True)
+            
+        elif self.temporal_config == "BLSTM":
+            self.temporal = nn.LSTM(input_size=self.model_dim, hidden_size=self.model_dim,
+                            num_layers=2, batch_first=True, bidirectional=True)
+            
+        elif self.temporal_config == "transformer":
+            self.temporal = TransformerEncoder(
+                d_input=self.model_dim,
+                                        n_layers=self.num_layers,
+                                        n_head=self.num_heads,
+                                        d_model=self.model_dim,
+                                        d_ff=self.model_dim*4,
+                                        dropout=self.dropout,
+                                        pe_maxlen=5000,
+                                        use_pe=True,
+                                        classification=True,
+                                        mask=True
+            )
+        elif self.temporal_config == "transformer_triangular":
+            self.temporal = TransformerEncoder_Triangular(
+                d_input=self.model_dim,
+                                        n_layers=self.num_layers,
+                                        n_head=self.num_heads,
+                                        d_model=self.model_dim,
+                                        d_ff=self.model_dim*4,
+                                        dropout=self.dropout,
+                                        pe_maxlen=5000,
+                                        use_pe=True,
+                                        classification=True,
+                                        mask=True
+            )
 
         ##### Classifier
         self.layer_norm_final = nn.LayerNorm(self.model_dim)
-        self.fc_list = nn.ModuleList()
-        for _ in range(12):
-            self.fc_list.append(nn.Sequential(
+        self.fc_list = nn.Sequential(
             nn.Linear(in_features=self.model_dim, out_features= self.classifier_nodes, bias=True),
             # nn.BatchNorm1d(self.classifier_nodes),
             nn.LayerNorm(self.classifier_nodes),
             self.relu,
-            nn.Linear(in_features=self.classifier_nodes, out_features= 1,  bias=True)))
+            nn.Linear(in_features=self.classifier_nodes, out_features= 1,  bias=True))
         
-        self.fixed_lengths = [0, 25]
         
     def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices):
         age = age.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
@@ -134,25 +163,20 @@ class FEATURE_TEMPORAL_MT_V1(nn.Module):
         else:
             img_embedding = self.patch_embedding(img)
             
-        context_vector, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding, txt_embedding], 
-            fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1), txt_embedding.size(1)],
-            varying_lengths = [input_lengths, torch.tensor(img_embedding.size(1)).repeat(img_embedding.size(0)), txt_lengths+2],
-            fusion_idx = None,
-            missing=missing
-        )
-        if self.multitoken == 0:
-            final_cls_output = context_vector[:,0,:]
-        else:
-            final_vslt_output = context_vector[:,3,:]
-            final_vsltimg_output = context_vector[:,1,:]
-            final_vslttxt_output = context_vector[:,2,:]
-            final_vsltimgtxt_output = context_vector[:,0,:]
-            final_cls_output = torch.stack([final_vsltimgtxt_output, final_vsltimg_output, final_vslttxt_output, final_vslt_output])
-            # final_cls_output = final_cls_output[missing, self.idx_order, :]
             
-        context_vector = self.layer_norm_final(final_cls_output)
-        multitask_vectors = []
-        for i, fc in enumerate(self.fc_list):
-                multitask_vectors.append(fc(context_vector))
-        output = torch.stack(multitask_vectors) # torch.Size([12, 64, 1])
+        if self.temporal_config == "LSTM":
+            pass
+        elif self.temporal_config == "BLSTM":
+            pass
+        elif self.temporal_config == "transformer" or self.temporal_config == "transformer_triangular":
+            context_vector, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding, txt_embedding], 
+                fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1), txt_embedding.size(1)],
+                varying_lengths = [input_lengths, torch.tensor(img_embedding.size(1)).repeat(img_embedding.size(0)), txt_lengths+2],
+                fusion_idx = None,
+                missing=missing
+            )
+            
+        context_vector = self.layer_norm_final(context_vector)
+        output = self.fc_list(context_vector)
+        
         return output, None

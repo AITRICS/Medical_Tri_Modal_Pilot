@@ -42,7 +42,7 @@ parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/de
 parser.add_argument('--image-data-path', type=str, default="/home/destin/")
 
 # Data Parameters
-parser.add_argument('--cross-fold-val', type=int, default=1, choices=[1, 0], help="1: k-fold, 0: seed-average")
+parser.add_argument('--cross-fold-val', type=int, default=0, choices=[1, 0], help="1: k-fold, 0: seed-average")
 parser.add_argument('--val-data-ratio', type=float, default=0.1)
 parser.add_argument('--carry-back', type=bool, default=True)
 
@@ -102,6 +102,9 @@ parser.add_argument('--image-size', type=int, default=224, choices=[224,512])
 parser.add_argument('--image-train-type', type=str, default="random", choices=["random", "resize", "resize_crop", "resize_affine_crop", "randaug"])
 parser.add_argument('--image-test-type', type=str, default="center", choices=["center", "resize", "resize_crop", "resize_larger"])#center: shorter로 resize 후, center crop, resize: aspect ratio 고려 없이 정사각형 resize
 parser.add_argument('--image-norm-type', type=str, default="HE", choices=["HE", "CLAHE"])
+
+# temporal method
+parser.add_argument('--temporal', type=str, default="LSTM", choices=["LSTM", "BLSTM", "transformer", "transformer_triangular"])
 
 # cross Model Parameters
 parser.add_argument('--cross-transformer-dim', type=int, default=256)

@@ -22,45 +22,16 @@ from builder.data.dataset_new import *
 # 2-2. test-missing의 기준: vslt
 
 
-def get_pretraindata_loader(args):
-    train_dir = search_walk({'path': args.train_data_path, 'extension': ".pkl"})
-    random.shuffle(train_dir)
-    args.vslt_mask = [True if i not in args.vitalsign_labtest else False for i in VITALSIGN_LABTEST] # True to remove
-    
-    if args.trainer == "seq_pretrain":
-        train_data = SelfSupervisedLearning_dataset(args, data=train_dir, data_type="training dataset")
-    else:
-        raise NotImplementedError("This dataset only for pretraining task")
-
-    # feature data stats - min, max, mean
-    args.feature_mins     = torch.Tensor(train_data.train_min)
-    args.feature_maxs     = torch.Tensor(train_data.train_max)
-    args.feature_max_mins = args.feature_maxs - args.feature_mins
-    args.feature_means    = torch.Tensor(train_data.feature_means)
-    
-    # check: vslt - feature mask
-    if "vslt" in args.input_types:
-        args.feature_means = np.delete(args.feature_means, args.vslt_mask, axis = 0) 
-        
-    if args.predict_type == "seq_pretrain":
-        train_loader = DataLoader(train_data, batch_size=args.batch_size, drop_last=True,
-                                  num_workers=args.num_workers, pin_memory=True, shuffle=True, 
-                                  collate_fn=collate_seq2seq)               
-    else:
-        raise NotImplementedError("This dataset only for pretraining task")
-    
-    return train_loader
-        
 def get_data_loader(args, patient_dict, keys_list, k_indx):
-    if args.cross_fold_val == 1:
-        folds       = list(range(len(args.seed_list)))
-        folds_val   = folds.pop(k_indx)
-        train_keys  = [keys_list[fold] for fold in folds]
-        train_keys  = [item for sublist in train_keys for item in sublist]
-        val_keys    = keys_list[folds_val]
-    else:
-        train_keys  = keys_list[0]
-        val_keys    = keys_list[1]
+    # if args.cross_fold_val == 1:
+    #     folds       = list(range(len(args.seed_list)))
+    #     folds_val   = folds.pop(k_indx)
+    #     train_keys  = [keys_list[fold] for fold in folds]
+    #     train_keys  = [item for sublist in train_keys for item in sublist]
+    #     val_keys    = keys_list[folds_val]
+    # else:
+    train_keys  = keys_list[0]
+    val_keys    = keys_list[1]
     # flatten to data list & shuffle train set (again)
     val_data_list   = [patient_dict[key] for key in val_keys]
     val_data_list   = [item for sublist in val_data_list for item in sublist]
@@ -73,6 +44,9 @@ def get_data_loader(args, patient_dict, keys_list, k_indx):
     test_dir = search_walk({'path': args.test_data_path, 'extension': ".pkl"})
     args.vslt_mask = [True if i not in args.vitalsign_labtest else False for i in VITALSIGN_LABTEST] # True to remove
 
+    print("train_data_list: ", len(train_data_list))
+    print("val_data_list: ", len(val_data_list))
+    print("test_dir: ", len(test_dir))
     # train_data_list = train_data_list[:12800]
     # val_data_list = val_data_list[:1024]
     # test_dir = test_dir[:128]
@@ -91,12 +65,6 @@ def get_data_loader(args, patient_dict, keys_list, k_indx):
             train_data        = Multiple_Outbreaks_Training_Dataset(args, data=train_data_list, data_type="training dataset")
             val_data          = Multiple_Outbreaks_Test_Dataset(args, data=val_data_list, data_type="validation dataset")
             test_data         = Multiple_Outbreaks_Test_Dataset(args, data=test_dir, data_type="test dataset")
-    
-        elif args.output_type == "all":
-            train_data        = Multitask_Training_Dataset(args, data=train_data_list, data_type="training dataset")
-            val_data          = Multitask_Test_Dataset(args, data=val_data_list, data_type="validation dataset")
-            test_data         = Multitask_Test_Dataset(args, data=test_dir, data_type="test dataset")
-    
     
     # set sampler - target type (0: negative, 1: positive, 2: currently negative)
     if args.output_type != "seq":

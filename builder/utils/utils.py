@@ -107,7 +107,7 @@ def patient_wise_ordering(args):
     else:
         random.seed(args.seed)
         random.shuffle(keys)
-        train, val = np.split(keys, [int(len(keys)*(args.val_data_ratio/0.9))])
+        val, train = np.split(keys, [int(len(keys)*(args.val_data_ratio/0.9))])
         keys_list = [train, val]
     
     return patient_dict, keys_list
