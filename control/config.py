@@ -104,7 +104,7 @@ parser.add_argument('--image-test-type', type=str, default="center", choices=["c
 parser.add_argument('--image-norm-type', type=str, default="HE", choices=["HE", "CLAHE"])
 
 # temporal method
-parser.add_argument('--temporal-config', type=str, default="LSTM", choices=["LSTM", "BLSTM", "transformer"])
+parser.add_argument('--temporal-config', type=str, default="transformer", choices=["LSTM", "BLSTM", "transformer"])
 parser.add_argument('--graph-config', type=str, default="gtransformer", choices=["gtransformer", "cnn1d"])
 
 # cross Model Parameters

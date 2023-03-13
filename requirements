@@ -11,3 +11,6 @@ tensorboardX
 scikit-learn
 bpe
 transformers
+pandas
+h5py
+transformers==3.0.0

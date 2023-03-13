@@ -583,7 +583,7 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         # else:
         #     imgs = torch.zeros(self.image_size).unsqueeze(0)
         #     missing.append(True)
-            
+        # print("data_pkl: ", data_pkl)
         if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
             tokens = self.txtDict[(int(data_pkl['pat_id']), int(data_pkl['chid']))]
             if len(tokens) == 0:

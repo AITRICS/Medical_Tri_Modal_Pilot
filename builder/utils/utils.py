@@ -105,8 +105,9 @@ def patient_wise_ordering(args):
     if args.cross_fold_val == 1:
         keys_list = sorted(partition(keys, len(args.seed_list)))
     else:
-        random.seed(args.seed)
-        random.shuffle(keys)
+        # random.seed(args.seed)
+        # random.shuffle(keys)
+        keys = sorted(keys)
         val, train = np.split(keys, [int(len(keys)*(args.val_data_ratio/0.9))])
         keys_list = [train, val]
     

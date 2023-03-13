@@ -91,7 +91,9 @@ class FEATURE_TEMPORAL_V1(nn.Module):
                 self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
             else:
                 self.img_encoder = swin_t_m(weights = None)
-            # self.linear = nn.Linear(768*7*7,self.model_dim)     
+                
+            self.norm = nn.LayerNorm(768)
+            self.avgpool = nn.AdaptiveAvgPool2d(1)
             self.linear = nn.Linear(768,self.model_dim)     
 
         else:
@@ -106,8 +108,8 @@ class FEATURE_TEMPORAL_V1(nn.Module):
             spatial_dims=2,
             )           
         
-        self.flatten = nn.Flatten(1,2)
-        # self.flatten = nn.Flatten()
+        # self.flatten = nn.Flatten(1,2)
+        self.flatten = nn.Flatten()
         
         ########## Temporal ##########
         if self.temporal_config == "LSTM":
@@ -176,17 +178,21 @@ class FEATURE_TEMPORAL_V1(nn.Module):
         
         if self.img_model_type == "vit":
             img_embedding = self.img_encoder(img)[:,0,:]#[16, 1000] #ViT_B_16_Weights.IMAGENET1K_V1
-            img_embedding = self.linear(img_embedding) # torch.Size([4, 256])
+            img_embedding = self.linear(img_embedding) 
+            # torch.Size([4, 256])
         elif self.img_model_type == "swin":
             img_embedding = self.img_encoder(img)
+            img_embedding = self.norm(img_embedding)
+            img_embedding = self.avgpool(img_embedding.permute(0, 3, 1, 2))
             img_embedding = self.flatten(img_embedding)
-            img_embedding = self.linear(img_embedding) # torch.Size([4, 49, 256])    
+            img_embedding = self.linear(img_embedding) 
+            # torch.Size([4, 256])    
         else:
             img_embedding = self.patch_embedding(img)
             
-        # print("vslt_embedding: ", vslt_embedding.shape) 
-        # print("txt_embedding: ", txt_embedding.shape) 
-        # print("img_embedding: ", img_embedding.shape) 
+        print("vslt_embedding: ", vslt_embedding.shape) 
+        print("txt_embedding: ", txt_embedding.shape) 
+        print("img_embedding: ", img_embedding.shape) 
         # exit(1)
         
         if self.temporal_config == "LSTM":
