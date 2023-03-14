@@ -203,21 +203,22 @@ class FEATURE_TEMPORAL_V1(nn.Module):
         # print("img_embedding: ", img_embedding.shape) 
         # exit(1)
         
+        feature_output = torch.cat([txt_embedding.unsqueeze(1), img_embedding.unsqueeze(1), vslt_embedding], dim=1)
+        
         if self.temporal_config == "LSTM":
-            pass
+            context_vector, (hn, cn) = self.lstm(feature_output)#, (h_0, c_0))
+            context_vector = context_vector[:,-1,:]
         elif self.temporal_config == "BLSTM":
-            pass
+            context_vector, (hn, cn) = self.lstm(feature_output)#, (h_0, c_0))
+            context_vector = context_vector[:,-1,:]
         elif self.temporal_config == "transformer" or self.temporal_config == "transformer_triangular":
-            context_vector, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding, txt_embedding], 
-                fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1), txt_embedding.size(1)],
-                varying_lengths = [input_lengths, torch.tensor(img_embedding.size(1)).repeat(img_embedding.size(0)), txt_lengths+2],
-                fusion_idx = None,
-                missing=missing
-            )
+            context_vector, _ = self.fusion_transformer(feature_output)
             
         print("context_vector: ", context_vector.shape)
         
         context_vector = self.layer_norm_final(context_vector)
         output = self.fc_list(context_vector)
+        print(output.shape)
+        exit(1)
         
         return output, None
