@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 
 from builder.utils.utils import *
 from builder.data.collate_fn import *
-from builder.data.collate_fn_old import * # temporary
+# from builder.data.collate_fn_old import * # temporary
 # from builder.data.dataset import *
 from builder.data.dataset_new import *
 

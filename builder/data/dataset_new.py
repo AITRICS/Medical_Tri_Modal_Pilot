@@ -27,6 +27,7 @@ import torchvision.transforms.functional as F_t
 from control.config import args
 from builder.utils.utils import *
 from builder.data.collate_fn import *
+import h5py
 
 VITALSIGN_LABTEST = ['HR', 'RR', 'BT', 'SBP', 'DBP', 'Sat', 'GCS', 
                      'Hematocrit', 'PLT', 'WBC', 'Bilirubin', 'pH', 'HCO3', 
@@ -84,7 +85,6 @@ def xray_image_transform_train():
     
     return transform
 
-
 def xray_image_transform_center_val():
     # transform (load jpeg img, add channel, rescale 0~1, random rotation)
     """
@@ -114,7 +114,6 @@ def xray_image_transform_resize_val():
                 ])
     
     return transform
-
 
 def clinical_note_transform(tokens):
     if args.txt_tokenization == "word":
@@ -180,11 +179,16 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         self.image_size = [args.image_size, args.image_size]
         self.input_types = args.input_types
         self.image_data_path = args.image_data_path
-        self.token_max_length = args.bert_token_max_length
-        self.txtDict = txtDictLoad("train")
         
         class2dict_missing = {3:1, 6:2, 9:3, 2:4, 8:6, 11:7, 1:4, 4:5, 7:6, 10:7}
         class2dict_full = {2:0}
+        
+        self.txtDict = txtDictLoad("train")
+        if args.berttype == "biobert":
+            self.bioemb = h5py.File(args.biobert_path, 'r')
+            self.token_max_length = 768
+        else:
+            self.token_max_length = args.bert_token_max_length
                 
         # real-time x-ray image transform function
         if ("img" in self.input_types or 'train-missing' in args.modality_inclusion):
@@ -485,11 +489,6 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         data_pkl['data'] = np.divide(data_pkl['data'], pklFeatureMinMaxs)
 
         windowIndex = self.window_size - 1
-        
-        # if 'train-full' in args.modality_inclusion:
-        #     earliest_img_time = min([j[0] for j in data_pkl['cxr_input']])
-        #     possible_indices_keys= list([i for i in possible_indices_keys if earliest_img_time<=i])
-        
         selectedKey = random.choice(possible_indices_keys)
         randLength = random.choice(win_sizes[selectedKey])
         
@@ -545,64 +544,43 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             img = torch.zeros(self.image_size).unsqueeze(0)
             missing.append(True)
         
-        # imgs = []
-        # if (("img" in args.input_types and "img1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and type_list in [0,2,3,5] and "img" in args.input_types)) and ('cxr_input' in data_pkl):
-        #     cxr_li = [i for i in data_pkl['cxr_input'] if i[0] <= selectedKey] 
-        #     if not cxr_li and ('train-full' in args.modality_inclusion): 
-        #         print("collate cxr error")
-        #         exit(1)
-        #     elif not cxr_li and ('train-missing' in args.modality_inclusion): 
-        #         imgs.append(torch.zeros(self.image_size).unsqueeze(0))
-        #         missing.append(True)
-        #     else:
-        #         init_time = selectedKey - randLength
-        #         if cxr_li[-1][0] < init_time:
-        #             cxr_path_list = sorted(cxr_li)
-        #             cxr_path = cxr_path_list[-1][1]
-        #             image = Image.open(self.image_data_path + cxr_path)
-        #             image = F_t.equalize(image)
-        #             imgs.append(self.transform(image))
-        #         else:
-        #             cxr_path_list = sorted([i for i in cxr_li if init_time <= i[0]])
-        #             cxr_path_list_before = sorted([i for i in cxr_li if init_time > i[0]])
-        #             if len(cxr_path_list_before) > 0:
-        #                 cxr_path_list.append(cxr_path_list_before[-1])
-        #             cxr_path_list = sorted(cxr_path_list)
-                    
-        #             for cxr_path in cxr_path_list:
-        #                 image = Image.open(self.image_data_path + cxr_path[1])
-        #                 image = F_t.equalize(image)
-        #                 imgs.append(self.transform(image))
-                        
-        #             # print("1: ", [i[0] for i in cxr_path_list])
-        #             # print("selectedKey: ", selectedKey)
-        #             # print("randLength: ", randLength)
-        #             # print(" ")
-        #         missing.append(False)
-        #     imgs = torch.stack(imgs)
-        # else:
-        #     imgs = torch.zeros(self.image_size).unsqueeze(0)
-        #     missing.append(True)
-        # print("data_pkl: ", data_pkl)
-        if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
-            tokens = self.txtDict[(int(data_pkl['pat_id']), int(data_pkl['chid']))]
-            if len(tokens) == 0:
+        if args.berttype == "biobert" and args.txt_tokenization == "bert":
+            if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
+                text_data = data_pkl['txt_input'].strip()
+                if len(text_data) == 0:
+                    tokens = torch.zeros(self.token_max_length)
+                    textLength = 0
+                    missing.append(True)
+                else:
+                    textLength = 1 # single cls token
+                    tokens = torch.Tensor(self.bioemb[text_data]['embedding'][:])
+                    missing.append(False)
+            else:    
                 tokens = torch.zeros(self.token_max_length)
                 textLength = 0
                 missing.append(True)
-            else:
-                textLength = len(tokens)
-                # UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
-                # EX) 2 {Sentence Tokens} {1 Padding} 3
-                # Add Beginnning of Sentence Token
-                tokens.insert(0, 2)
-                tokens = torch.Tensor(clinical_note_transform(tokens))
-                tokens[tokens==1] = 0
-                missing.append(False)
-        else:    
-            tokens = torch.zeros(self.token_max_length)
-            textLength = 0
-            missing.append(True)
+        else:
+            if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
+                tokens = self.txtDict[(int(data_pkl['pat_id']), int(data_pkl['chid']))]
+                if len(tokens) == 0:
+                    tokens = torch.zeros(self.token_max_length)
+                    textLength = 0
+                    missing.append(True)
+                else:
+                    textLength = len(tokens)
+                    # UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
+                    # EX) 2 {Sentence Tokens} {1 Padding} 3
+                    # Add Beginnning of Sentence Token
+                    tokens.insert(0, 2)
+                    tokens = torch.Tensor(clinical_note_transform(tokens))
+                    tokens[tokens==1] = 0
+                    missing.append(False)
+            else:    
+                tokens = torch.zeros(self.token_max_length)
+                textLength = 0
+                missing.append(True)
+
+                
         missing = torch.Tensor(missing)
         return final_seqs, static_inputs, multi_target, inputLength, img, tokens, textLength, img_time, missing, f_indices
 
@@ -656,6 +634,11 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
             self.txtDict = txtDictLoad("train")
         else:
             self.txtDict = txtDictLoad("test")
+        if args.berttype == "biobert":
+            self.bioemb = h5py.File(args.biobert_path, 'r')
+            self.token_max_length = 768
+        else:
+            self.token_max_length = args.bert_token_max_length
 
         if data_type == "test dataset":
             if  os.path.exists(test_index_file) and os.path.exists(test_winsize_file) and data_type == "test dataset":
@@ -1095,64 +1078,43 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             missing.append(True)
-            
-        # imgs = []
-        # if (("img" in args.input_types and "img1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and type_list in [0,2,3,5] and "img" in args.input_types)) and ('cxr_input' in data_pkl):
-        #     cxr_li = [i for i in data_pkl['cxr_input'] if i[0] <= selectedKey] 
-        #     if not cxr_li and ('test-full' in args.modality_inclusion): 
-        #         print("collate cxr error")
-        #         exit(1)
-        #     elif not cxr_li and ('test-missing' in args.modality_inclusion): 
-        #         imgs.append(torch.zeros(self.image_size).unsqueeze(0))
-        #         missing.append(True)
-        #     else:
-        #         init_time = selectedKey - randLength
-        #         if cxr_li[-1][0] < init_time:
-        #             cxr_path_list = sorted(cxr_li)
-        #             cxr_path = cxr_path_list[-1][1]
-        #             image = Image.open(self.image_data_path + cxr_path)
-        #             image = F_t.equalize(image)
-        #             imgs.append(self.transform(image))
-        #         else:
-        #             cxr_path_list = sorted([i for i in cxr_li if init_time <= i[0]])
-        #             cxr_path_list_before = sorted([i for i in cxr_li if init_time > i[0]])
-        #             if len(cxr_path_list_before) > 0:
-        #                 cxr_path_list.append(cxr_path_list_before[-1])
-        #             cxr_path_list = sorted(cxr_path_list)
-                    
-        #             for cxr_path in cxr_path_list:
-        #                 image = Image.open(self.image_data_path + cxr_path[1])
-        #                 image = F_t.equalize(image)
-        #                 imgs.append(self.transform(image))
-                        
-        #             # print("1: ", [i[0] for i in cxr_path_list])
-        #             # print("selectedKey: ", selectedKey)
-        #             # print("randLength: ", randLength)
-        #             # print(" ")
-        #         missing.append(False)
-        # else:
-        #     imgs = torch.zeros(self.image_size).unsqueeze(0)
-        #     missing.append(True)
         
-        if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
-            tokens = self.txtDict[(int(data_pkl['pat_id']), int(data_pkl['chid']))]
-            if len(tokens) == 0:
+        if args.berttype == "biobert" and args.txt_tokenization == "bert":
+            if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
+                text_data = data_pkl['txt_input'].strip()
+                if len(text_data) == 0:
+                    tokens = torch.zeros(self.token_max_length)
+                    textLength = 0
+                    missing.append(True)
+                else:
+                    textLength = 1 # single cls token
+                    tokens = torch.Tensor(self.bioemb[text_data]['embedding'][:])
+                    missing.append(False)
+            else:    
                 tokens = torch.zeros(self.token_max_length)
                 textLength = 0
                 missing.append(True)
-            else:
-                textLength = len(tokens)
-                # UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
-                # EX) 2 {Sentence Tokens} {1 Padding} 3
-                # Add Beginnning of Sentence Token
-                tokens.insert(0, 2)
-                tokens = torch.Tensor(clinical_note_transform(tokens))
-                tokens[tokens==1] = 0
-                missing.append(False)
-        else:    
-            tokens = torch.zeros(self.token_max_length)
-            textLength = 0
-            missing.append(True)
+        else:
+            if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
+                tokens = self.txtDict[(int(data_pkl['pat_id']), int(data_pkl['chid']))]
+                if len(tokens) == 0:
+                    tokens = torch.zeros(self.token_max_length)
+                    textLength = 0
+                    missing.append(True)
+                else:
+                    textLength = len(tokens)
+                    # UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
+                    # EX) 2 {Sentence Tokens} {1 Padding} 3
+                    # Add Beginnning of Sentence Token
+                    tokens.insert(0, 2)
+                    tokens = torch.Tensor(clinical_note_transform(tokens))
+                    tokens[tokens==1] = 0
+                    missing.append(False)
+            else:    
+                tokens = torch.zeros(self.token_max_length)
+                textLength = 0
+                missing.append(True)
+                
         missing = torch.Tensor(missing)
         return final_seqs, static_inputs, multi_target, inputLength, img, tokens, textLength, img_time, missing, f_indices
 
@@ -1184,7 +1146,13 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         self.input_types = args.input_types
         self.image_data_path = args.image_data_path
         self.token_max_length = args.bert_token_max_length
+        
         self.txtDict = txtDictLoad("train")
+        if args.berttype == "biobert":
+            self.bioemb = h5py.File(args.biobert_path, 'r')
+            self.token_max_length = 768
+        else:
+            self.token_max_length = args.bert_token_max_length
         
         class2dict_missing = {3:1, 6:2, 9:3, 2:4, 8:6, 11:7, 1:4, 4:5, 7:6, 10:7}
         class2dict_full = {2:0}
@@ -1576,25 +1544,42 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
             img = torch.zeros(self.image_size).unsqueeze(0)
             missing.append(True)
         
-        if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
-            tokens = self.txtDict[(int(data_pkl['pat_id']), int(data_pkl['chid']))]
-            if len(tokens) == 0:
+        if args.berttype == "biobert" and args.txt_tokenization == "bert":
+            if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
+                text_data = data_pkl['txt_input'].strip()
+                if len(text_data) == 0:
+                    tokens = torch.zeros(self.token_max_length)
+                    textLength = 0
+                    missing.append(True)
+                else:
+                    textLength = 1 # single cls token
+                    tokens = torch.Tensor(self.bioemb[text_data]['embedding'][:])
+                    missing.append(False)
+            else:    
                 tokens = torch.zeros(self.token_max_length)
                 textLength = 0
                 missing.append(True)
-            else:
-                textLength = len(tokens)
-                # UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
-                # EX) 2 {Sentence Tokens} {1 Padding} 3
-                # Add Beginnning of Sentence Token
-                tokens.insert(0, 2)
-                tokens = torch.Tensor(clinical_note_transform(tokens))
-                tokens[tokens==1] = 0
-                missing.append(False)
-        else:    
-            tokens = torch.zeros(self.token_max_length)
-            textLength = 0
-            missing.append(True)
+        else:
+            if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
+                tokens = self.txtDict[(int(data_pkl['pat_id']), int(data_pkl['chid']))]
+                if len(tokens) == 0:
+                    tokens = torch.zeros(self.token_max_length)
+                    textLength = 0
+                    missing.append(True)
+                else:
+                    textLength = len(tokens)
+                    # UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
+                    # EX) 2 {Sentence Tokens} {1 Padding} 3
+                    # Add Beginnning of Sentence Token
+                    tokens.insert(0, 2)
+                    tokens = torch.Tensor(clinical_note_transform(tokens))
+                    tokens[tokens==1] = 0
+                    missing.append(False)
+            else:    
+                tokens = torch.zeros(self.token_max_length)
+                textLength = 0
+                missing.append(True)
+                
         missing = torch.Tensor(missing)  
         return final_seqs, static_inputs, multi_target, inputLength, img, tokens, textLength, img_time, missing, f_indices
 
@@ -1654,6 +1639,11 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             self.txtDict = txtDictLoad("train")
         else:
             self.txtDict = txtDictLoad("test")
+        if args.berttype == "biobert":
+            self.bioemb = h5py.File(args.biobert_path, 'r')
+            self.token_max_length = 768
+        else:
+            self.token_max_length = args.bert_token_max_length
 
         if data_type == "test dataset":
             if  os.path.exists(test_index_file) and os.path.exists(test_winsize_file) and data_type == "test dataset":
@@ -2103,24 +2093,83 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             img = torch.zeros(self.image_size).unsqueeze(0)
             missing.append(True)
         
-        if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
-            tokens = self.txtDict[(int(data_pkl['pat_id']), int(data_pkl['chid']))]
-            if len(tokens) == 0:
+        if args.berttype == "biobert" and args.txt_tokenization == "bert":
+            if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
+                text_data = data_pkl['txt_input'].strip()
+                if len(text_data) == 0:
+                    tokens = torch.zeros(self.token_max_length)
+                    textLength = 0
+                    missing.append(True)
+                else:
+                    textLength = 1 # single cls token
+                    tokens = torch.Tensor(self.bioemb[text_data]['embedding'][:])
+                    missing.append(False)
+            else:    
                 tokens = torch.zeros(self.token_max_length)
                 textLength = 0
                 missing.append(True)
-            else:
-                textLength = len(tokens)
-                # UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
-                # EX) 2 {Sentence Tokens} {1 Padding} 3
-                # Add Beginnning of Sentence Token
-                tokens.insert(0, 2)
-                tokens = torch.Tensor(clinical_note_transform(tokens))
-                tokens[tokens==1] = 0
-                missing.append(False)
-        else:    
-            tokens = torch.zeros(self.token_max_length)
-            textLength = 0
-            missing.append(True)
+        else:
+            if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
+                tokens = self.txtDict[(int(data_pkl['pat_id']), int(data_pkl['chid']))]
+                if len(tokens) == 0:
+                    tokens = torch.zeros(self.token_max_length)
+                    textLength = 0
+                    missing.append(True)
+                else:
+                    textLength = len(tokens)
+                    # UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
+                    # EX) 2 {Sentence Tokens} {1 Padding} 3
+                    # Add Beginnning of Sentence Token
+                    tokens.insert(0, 2)
+                    tokens = torch.Tensor(clinical_note_transform(tokens))
+                    tokens[tokens==1] = 0
+                    missing.append(False)
+            else:    
+                tokens = torch.zeros(self.token_max_length)
+                textLength = 0
+                missing.append(True)
+                
         missing = torch.Tensor(missing)
         return final_seqs, static_inputs, multi_target, inputLength, img, tokens, textLength, img_time, missing, f_indices
+
+
+
+        # imgs = []
+        # if (("img" in args.input_types and "img1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and type_list in [0,2,3,5] and "img" in args.input_types)) and ('cxr_input' in data_pkl):
+        #     cxr_li = [i for i in data_pkl['cxr_input'] if i[0] <= selectedKey] 
+        #     if not cxr_li and ('train-full' in args.modality_inclusion): 
+        #         print("collate cxr error")
+        #         exit(1)
+        #     elif not cxr_li and ('train-missing' in args.modality_inclusion): 
+        #         imgs.append(torch.zeros(self.image_size).unsqueeze(0))
+        #         missing.append(True)
+        #     else:
+        #         init_time = selectedKey - randLength
+        #         if cxr_li[-1][0] < init_time:
+        #             cxr_path_list = sorted(cxr_li)
+        #             cxr_path = cxr_path_list[-1][1]
+        #             image = Image.open(self.image_data_path + cxr_path)
+        #             image = F_t.equalize(image)
+        #             imgs.append(self.transform(image))
+        #         else:
+        #             cxr_path_list = sorted([i for i in cxr_li if init_time <= i[0]])
+        #             cxr_path_list_before = sorted([i for i in cxr_li if init_time > i[0]])
+        #             if len(cxr_path_list_before) > 0:
+        #                 cxr_path_list.append(cxr_path_list_before[-1])
+        #             cxr_path_list = sorted(cxr_path_list)
+                    
+        #             for cxr_path in cxr_path_list:
+        #                 image = Image.open(self.image_data_path + cxr_path[1])
+        #                 image = F_t.equalize(image)
+        #                 imgs.append(self.transform(image))
+                        
+        #             # print("1: ", [i[0] for i in cxr_path_list])
+        #             # print("selectedKey: ", selectedKey)
+        #             # print("randLength: ", randLength)
+        #             # print(" ")
+        #         missing.append(False)
+        #     imgs = torch.stack(imgs)
+        # else:
+        #     imgs = torch.zeros(self.image_size).unsqueeze(0)
+        #     missing.append(True)
+        # print("data_pkl: ", data_pkl)

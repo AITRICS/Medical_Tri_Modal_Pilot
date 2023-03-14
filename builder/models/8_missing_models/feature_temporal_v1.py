@@ -70,11 +70,16 @@ class FEATURE_TEMPORAL_V1(nn.Module):
             pass
         
         # TXT encoder
-        datasetType = args.train_data_path.split("/")[-2]
-        if datasetType == "mimic_icu": # BERT
-            self.txt_embedding = nn.Embedding(30000, self.model_dim)
-        elif datasetType == "sev_icu":
-            raise NotImplementedError
+        if self.args.berttype == "biobert" and self.args.txt_tokenization == "bert":
+            self.txt_emb_type = "biobert"
+            self.txt_embedding = nn.Linear(768, self.model_dim)
+        else:
+            self.txt_emb_type = "bert"
+            datasetType = args.train_data_path.split("/")[-2]
+            if datasetType == "mimic_icu": # BERT
+                self.txt_embedding = nn.Embedding(30000, self.model_dim)
+            elif datasetType == "sev_icu":
+                raise NotImplementedError
         
         # Image encoder
         self.img_model_type = args.img_model_type
@@ -173,8 +178,11 @@ class FEATURE_TEMPORAL_V1(nn.Module):
             vslt_embedding = vslt_embedding[:,0,:]
             vslt_embedding = vslt_embedding.reshape(-1, 24, self.model_dim)
             
-        txts = txts.type(torch.IntTensor).to(self.device) 
-        txt_embedding = self.txt_embedding(txts) # torch.Size([4, 128, 256])
+        if self.txt_emb_type == "biobert":
+            txt_embedding = self.txt_embedding(txts)
+        else:
+            txts = txts.type(torch.IntTensor).to(self.device) 
+            txt_embedding = self.txt_embedding(txts) # torch.Size([4, 128, 256])
         
         if self.img_model_type == "vit":
             img_embedding = self.img_encoder(img)[:,0,:]#[16, 1000] #ViT_B_16_Weights.IMAGENET1K_V1
@@ -190,9 +198,9 @@ class FEATURE_TEMPORAL_V1(nn.Module):
         else:
             img_embedding = self.patch_embedding(img)
             
-        print("vslt_embedding: ", vslt_embedding.shape) 
-        print("txt_embedding: ", txt_embedding.shape) 
-        print("img_embedding: ", img_embedding.shape) 
+        # print("vslt_embedding: ", vslt_embedding.shape) 
+        # print("txt_embedding: ", txt_embedding.shape) 
+        # print("img_embedding: ", img_embedding.shape) 
         # exit(1)
         
         if self.temporal_config == "LSTM":
