@@ -72,7 +72,9 @@ class FEATURE_TEMPORAL_V1(nn.Module):
         # TXT encoder
         if self.args.berttype == "biobert" and self.args.txt_tokenization == "bert":
             self.txt_emb_type = "biobert"
+            self.txtnorm = nn.LayerNorm(768)
             self.txt_embedding = nn.Linear(768, self.model_dim)
+            
         else:
             self.txt_emb_type = "bert"
             datasetType = args.train_data_path.split("/")[-2]
@@ -179,13 +181,15 @@ class FEATURE_TEMPORAL_V1(nn.Module):
             vslt_embedding = vslt_embedding.reshape(-1, 24, self.model_dim)
             
         if self.txt_emb_type == "biobert":
-            txt_embedding = self.txt_embedding(txts)
+            txt_embedding = self.txtnorm(txts)
+            txt_embedding = self.txt_embedding(txt_embedding)
         else:
             txts = txts.type(torch.IntTensor).to(self.device) 
             txt_embedding = self.txt_embedding(txts) # torch.Size([4, 128, 256])
         
         if self.img_model_type == "vit":
             img_embedding = self.img_encoder(img)[:,0,:]#[16, 1000] #ViT_B_16_Weights.IMAGENET1K_V1
+            img_embedding = self.norm(img_embedding)
             img_embedding = self.linear(img_embedding) 
             # torch.Size([4, 256])
         elif self.img_model_type == "swin":
@@ -204,15 +208,18 @@ class FEATURE_TEMPORAL_V1(nn.Module):
         # exit(1)
         
         feature_output = torch.cat([txt_embedding.unsqueeze(1), img_embedding.unsqueeze(1), vslt_embedding], dim=1)
-        
+        print("feature_output: ", feature_output.shape)
         if self.temporal_config == "LSTM":
-            context_vector, (hn, cn) = self.lstm(feature_output)#, (h_0, c_0))
+            context_vector, (hn, cn) = self.temporal(feature_output)#, (h_0, c_0))
+            print("context_vector: ", context_vector.shape)
             context_vector = context_vector[:,-1,:]
         elif self.temporal_config == "BLSTM":
-            context_vector, (hn, cn) = self.lstm(feature_output)#, (h_0, c_0))
+            context_vector, (hn, cn) = self.temporal(feature_output)#, (h_0, c_0))
+            print("context_vector: ", context_vector.shape)
             context_vector = context_vector[:,-1,:]
         elif self.temporal_config == "transformer" or self.temporal_config == "transformer_triangular":
-            context_vector, _ = self.fusion_transformer(feature_output)
+            context_vector, _ = self.temporal(feature_output)
+            print("context_vector: ", context_vector.shape)
             
         print("context_vector: ", context_vector.shape)
         
