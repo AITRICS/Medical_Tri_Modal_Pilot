@@ -1051,10 +1051,9 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
         final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
 
         if target == 0:
-            multi_target = self.neg_multi_target
+            multi_target = 0
         else:
-            firstOnset = ceil(labels_by_dict[selectedKey][0][0] // self.intv_len)
-            multi_target = [0] * (firstOnset) + [1] * (12 - firstOnset)
+            multi_target = 1
         multi_target = torch.tensor(multi_target)
 
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
@@ -1074,7 +1073,7 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                 image = F_t.equalize(image)
                 img = self.transform(image)
                 missing.append(False)
-                img_time = cxr_time - (selectedKey - randLength + 1)
+                img_time = cxr_time - (selectedKey - win_size + 1)
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             missing.append(True)
@@ -1516,10 +1515,9 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
 
         if target == 0:
-            multi_target = self.neg_multi_target
+            multi_target = 0
         else:
-            firstOnset = ceil(labels_by_dict[selectedKey][0][0] // self.intv_len)
-            multi_target = [0] * (firstOnset) + [1] * (12 - firstOnset)
+            multi_target = 1
         multi_target = torch.tensor(multi_target)
         
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
@@ -2063,12 +2061,9 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
         final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
 
         if target == 0:
-            multi_target = self.neg_multi_target
-            # multi_target = 0
+            multi_target = 0
         else:
-            firstOnset = ceil(labels_by_dict[selectedKey][0][0] // self.intv_len)
-            print("firstOnset: ", firstOnset)
-            multi_target = [0] * (firstOnset) + [1] * (12 - firstOnset)
+            multi_target = 1
         multi_target = torch.tensor(multi_target)
 
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
@@ -2088,7 +2083,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 image = F_t.equalize(image)
                 img = self.transform(image)
                 missing.append(False)
-                img_time = cxr_time - (selectedKey - randLength + 1)
+                img_time = cxr_time - (selectedKey - win_size + 1)
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             missing.append(True)

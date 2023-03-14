@@ -46,50 +46,44 @@ class Evaluator(object):
         self.y_pred_multi.append(y_pred_multi.detach())
         self.y_true_multi.append(y_true.detach())
 
-    def performance_metric_multi(self):
-        self.y_true_multi = torch.stack(self.y_true_multi).reshape(-1, 12).type(torch.ByteTensor).cuda()
-        self.y_pred_multi = torch.stack(self.y_pred_multi).reshape(-1, 12).cuda()
+    def performance_metric_binary(self):
+        self.y_true_multi = torch.stack(self.y_true_multi).type(torch.ByteTensor).cuda()
+        self.y_pred_multi = torch.stack(self.y_pred_multi).cuda()
         self.y_pred_multi = torch.nan_to_num(self.y_pred_multi)
         
         # self.y_true_multi = np.concatenate(self.y_true_multi, 0)
         # self.y_pred_multi = np.concatenate(self.y_pred_multi, 0)
         # self.y_pred_multi = np.nan_to_num(self.y_pred_multi)
 
-        scores_list = []
-        for i in range(12):
-            
-            trues = self.y_true_multi[:,i].cuda()
-            preds = self.y_pred_multi[:,i].cuda()
-            auc = self.auroc(preds, trues)
-            apr = self.auprc(preds, trues)
-            
-            f1 = 0
-            for i in range(1, 100):
-                threshold = i / 100.0    
-                temp_output = preds.detach().clone()
-                temp_output[temp_output>=threshold] = 1
-                temp_output[temp_output<threshold] = 0        
-                temp_score = f1_score(temp_output, trues, task="binary", threshold = threshold)
-                if temp_score > f1:
-                    f1 = temp_score
+        trues = self.y_true_multi.cuda()
+        preds = self.y_pred_multi.cuda()
+        auc = self.auroc(preds, trues)
+        apr = self.auprc(preds, trues)
+        
+        f1 = 0
+        for i in range(1, 100):
+            threshold = i / 100.0    
+            temp_output = preds.detach().clone()
+            temp_output[temp_output>=threshold] = 1
+            temp_output[temp_output<threshold] = 0        
+            temp_score = f1_score(temp_output, trues, task="binary", threshold = threshold)
+            if temp_score > f1:
+                f1 = temp_score
                     
-            fpr, tpr, thresholds = self.roc(preds, trues)
-            
-            fnr = 1 - tpr 
-            tnr = 1 - fpr
-            best_threshold = torch.argmax(tpr + tnr)
-            final_tpr = tpr[best_threshold]
-            final_fnr = fnr[best_threshold]
-            final_tnr = tnr[best_threshold]
-            final_fpr = fpr[best_threshold]
-            
-            scores_list.append(list(np.round(np.array([auc.detach().cpu().numpy(), 
-                                                       apr.detach().cpu().numpy(), 
-                                                       f1.detach().cpu().numpy(), 
-                                                       final_tpr.detach().cpu().numpy(), 
-                                                       final_fnr.detach().cpu().numpy(), 
-                                                       final_tnr.detach().cpu().numpy(), 
-                                                       final_fpr.detach().cpu().numpy()]), 3)))
+        fpr, tpr, thresholds = self.roc(preds, trues)
+        
+        fnr = 1 - tpr 
+        tnr = 1 - fpr
+        best_threshold = torch.argmax(tpr + tnr)
+        final_tpr = tpr[best_threshold]
+        final_fnr = fnr[best_threshold]
+        final_tnr = tnr[best_threshold]
+        final_fpr = fpr[best_threshold]
+        result = list(np.round([auc.detach().cpu().numpy(), apr.detach().cpu().numpy(), f1.detach().cpu().numpy()], 3))
+        scores_list = list([result, np.round(np.array([final_tpr.detach().cpu().numpy(), 
+                                            final_fnr.detach().cpu().numpy(), 
+                                            final_tnr.detach().cpu().numpy(), 
+                                            final_fpr.detach().cpu().numpy()]), 3)])
         return scores_list
 
     def reset(self):

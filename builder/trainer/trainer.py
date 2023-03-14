@@ -85,19 +85,11 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
         optimizer.zero_grad()
         with torch.cuda.amp.autocast():
             output, aux_loss = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices)
-            # in order of tri, bi_img, bi_txt, vslt
-            if len(output.shape) >= 4:
-                missing = missing.reshape(-1)                                           
-                output = output.squeeze().permute(2,1,0).reshape(-1,12)                 
-                final_target = final_target[missing == 0]
-                output = output[missing == 0]
-            else:        
-                output = output.squeeze().permute(1,0)
-            
+            output = output.squeeze()
             loss = criterion(output, final_target)
-            # if args.auxiliary_loss_input is not None:
             if aux_loss is not None:
                 loss = loss + (args.auxiliary_loss_weight * aux_loss)
+                
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
@@ -110,25 +102,11 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
         test_loss = []
         with torch.cuda.amp.autocast():
             output, aux_loss = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices)
-            
-            if len(output.shape) >= 4:
-                output = output.squeeze().permute(2,1,0)                # batchsize, 4, 12
-                # output_1 = output[:,0,:]                              # tri
-                # output_2 = output[:,1,:]                              # bi_img
-                # output_3 = output[:,2,:]                              # bi_txt
-                # output_4 = output[:,3,:]                              # vslt
-                # missing = torch.sum(missing, dim=1).unsqueeze(1)      # [64]
-                # output = torch.where(missing<0.5, output_1, output_2)    # [64,12]
-                idx_order = torch.range(0, args.batch_size-1).type(torch.LongTensor).cuda()
-                output = output[idx_order,missing_num,:]
-                
-            else:
-                output = output.squeeze().permute(1,0)
-                
+            output = output.squeeze()
             loss = criterion(output, final_target)
             output = torch.sigmoid(output)
+            
         test_loss.append(loss)
-        # logger.evaluator.add_batch(np.array(final_target.cpu()), np.array(output.cpu()))
         logger.evaluator.add_batch(final_target, output)
 
     return model, loss.item()

@@ -16,8 +16,8 @@ class FEATURE_TEMPORAL_V1(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
-        self.temporal_config = args.temporal_config
-        self.graph_config = args.graph_config
+        self.temporal_config = args.temporal
+        self.graph_config = args.graph
         
         self.num_layers = args.transformer_num_layers
         self.num_heads = args.transformer_num_head
@@ -67,7 +67,14 @@ class FEATURE_TEMPORAL_V1(nn.Module):
                                             classification=True,
                                             mask=False)
         elif self.graph_config == "cnn1d":
-            pass
+            self.init_fc = nn.Sequential(
+                                    nn.Linear(self.num_nodes+2, self.model_dim),
+                                    nn.LayerNorm(self.model_dim),
+                                    nn.ReLU(inplace=True),
+                                    nn.Linear(self.model_dim, self.model_dim),
+                                    nn.LayerNorm(self.model_dim),
+                                    nn.ReLU(inplace=True),
+                )
         
         # TXT encoder
         if self.args.berttype == "biobert" and self.args.txt_tokenization == "bert":
@@ -122,12 +129,13 @@ class FEATURE_TEMPORAL_V1(nn.Module):
         if self.temporal_config == "LSTM":
             self.temporal = nn.LSTM(input_size=self.model_dim, hidden_size=self.model_dim,
                             num_layers=2, batch_first=True)
+            temp_output_dim = self.model_dim
             
         elif self.temporal_config == "BLSTM":
             self.temporal = nn.LSTM(input_size=self.model_dim, hidden_size=self.model_dim,
                             num_layers=2, batch_first=True, bidirectional=True)
-            
-        elif self.temporal_config == "transformer":
+            temp_output_dim = self.model_dim * 2
+        elif self.temporal_config == "TRANSFORMER":
             self.temporal = TransformerEncoder(
                 d_input=self.model_dim,
                                         n_layers=self.num_layers,
@@ -140,7 +148,8 @@ class FEATURE_TEMPORAL_V1(nn.Module):
                                         classification=True,
                                         mask=True
             )
-        elif self.temporal_config == "transformer_triangular":
+            temp_output_dim = self.model_dim
+        elif self.temporal_config == "TRANSFORMER_TRIANGULAR":
             self.temporal = TransformerEncoder_Triangular(
                 d_input=self.model_dim,
                                         n_layers=self.num_layers,
@@ -153,18 +162,21 @@ class FEATURE_TEMPORAL_V1(nn.Module):
                                         classification=True,
                                         mask=True
             )
+            temp_output_dim = self.model_dim
 
         ##### Classifier
-        self.layer_norm_final = nn.LayerNorm(self.model_dim)
+        self.layer_norm_final = nn.LayerNorm(temp_output_dim)
         self.fc_list = nn.Sequential(
-            nn.Linear(in_features=self.model_dim, out_features= self.classifier_nodes, bias=True),
+            nn.Linear(in_features=temp_output_dim, out_features= temp_output_dim, bias=True),
             # nn.BatchNorm1d(self.classifier_nodes),
-            nn.LayerNorm(self.classifier_nodes),
+            nn.LayerNorm(temp_output_dim),
             self.relu,
-            nn.Linear(in_features=self.classifier_nodes, out_features= 1,  bias=True))
+            nn.Linear(in_features=temp_output_dim, out_features= 1,  bias=True))
         
         
     def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices):
+        
+        ################################### vslt_embedding ###################################
         vslt_embedding = []
         if self.graph_config == "gtransformer":
             x = x.reshape(-1, 16)
@@ -179,7 +191,13 @@ class FEATURE_TEMPORAL_V1(nn.Module):
             vslt_embedding, _ = self.instance_graph_transformer(vslt_embedding)
             vslt_embedding = vslt_embedding[:,0,:]
             vslt_embedding = vslt_embedding.reshape(-1, 24, self.model_dim)
+        elif self.graph_config == "cnn1d":
+            age = age.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
+            gen = gen.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
+            x = torch.cat([x, age, gen], axis=2)
+            vslt_embedding = self.init_fc(x)
             
+        ################################### txt_embedding ###################################
         if self.txt_emb_type == "biobert":
             txt_embedding = self.txtnorm(txts)
             txt_embedding = self.txt_embedding(txt_embedding)
@@ -187,6 +205,7 @@ class FEATURE_TEMPORAL_V1(nn.Module):
             txts = txts.type(torch.IntTensor).to(self.device) 
             txt_embedding = self.txt_embedding(txts) # torch.Size([4, 128, 256])
         
+        ################################### img_embedding ###################################
         if self.img_model_type == "vit":
             img_embedding = self.img_encoder(img)[:,0,:]#[16, 1000] #ViT_B_16_Weights.IMAGENET1K_V1
             img_embedding = self.norm(img_embedding)
@@ -202,30 +221,19 @@ class FEATURE_TEMPORAL_V1(nn.Module):
         else:
             img_embedding = self.patch_embedding(img)
             
-        # print("vslt_embedding: ", vslt_embedding.shape) 
-        # print("txt_embedding: ", txt_embedding.shape) 
-        # print("img_embedding: ", img_embedding.shape) 
-        # exit(1)
-        
         feature_output = torch.cat([txt_embedding.unsqueeze(1), img_embedding.unsqueeze(1), vslt_embedding], dim=1)
-        print("feature_output: ", feature_output.shape)
         if self.temporal_config == "LSTM":
             context_vector, (hn, cn) = self.temporal(feature_output)#, (h_0, c_0))
-            print("context_vector: ", context_vector.shape)
-            context_vector = context_vector[:,-1,:]
+            context_vector = context_vector[torch.range(0, x.shape[0]-1).type(torch.LongTensor), input_lengths+1,:]
+            # context_vector = context_vector[:,-1,:]
         elif self.temporal_config == "BLSTM":
             context_vector, (hn, cn) = self.temporal(feature_output)#, (h_0, c_0))
-            print("context_vector: ", context_vector.shape)
             context_vector = context_vector[:,-1,:]
-        elif self.temporal_config == "transformer" or self.temporal_config == "transformer_triangular":
-            context_vector, _ = self.temporal(feature_output)
-            print("context_vector: ", context_vector.shape)
-            
-        print("context_vector: ", context_vector.shape)
-        
+        elif "TRANSFORMER" in self.temporal_config:
+            context_vector, _ = self.temporal(feature_output, input_lengths=input_lengths+2)
+            context_vector = context_vector[:,0,:]
         context_vector = self.layer_norm_final(context_vector)
         output = self.fc_list(context_vector)
-        print(output.shape)
-        exit(1)
-        
+        # print(output.shape)
+        # exit(1)
         return output, None

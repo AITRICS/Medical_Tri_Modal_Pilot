@@ -47,9 +47,9 @@ def get_data_loader(args, patient_dict, keys_list, k_indx):
     print("train_data_list: ", len(train_data_list))
     print("val_data_list: ", len(val_data_list))
     print("test_dir: ", len(test_dir))
-    # train_data_list = train_data_list[:12800]
-    # val_data_list = val_data_list[:1024]
-    # test_dir = test_dir[:128]
+    train_data_list = train_data_list[:12800]
+    val_data_list = val_data_list[:1024]
+    test_dir = test_dir[:128]
 
     # For severance VC dataset, only onset time exist for intubation...!
     # For MIMIC-ER dataset, future 24 hrs of labtest is measured...

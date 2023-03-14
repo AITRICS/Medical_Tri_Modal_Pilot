@@ -14,7 +14,7 @@ parser.add_argument('--multitoken', type=int, default=0)
 
 # General Parameters
 parser.add_argument('--seed', type=int, default=0)
-parser.add_argument('--seed-list', type=list, default=[0, 1004, 2022, 9209, 119]) #[0, 1004, 2022, 9209, 119]
+parser.add_argument('--seed-list', type=list, default=[0, 1004]) #[0, 1004, 2022, 9209, 119]
 parser.add_argument('--device', type=int, default=1, nargs='+')
 parser.add_argument('--cpu', type=int, default=0)
 parser.add_argument('--num-workers', type=int, default=2)
@@ -88,7 +88,7 @@ parser.add_argument('--bert-token-max-length', type=int, default=128)
 parser.add_argument('--enc-depth', type=int, default=3, choices=[1,2,3])
 parser.add_argument('--hidden-size', type=int, default=256)
 parser.add_argument('--transformer-dim', type=int, default=256)
-parser.add_argument('--transformer-num-layers', type=int, default=8)
+parser.add_argument('--transformer-num-layers', type=int, default=2)
 parser.add_argument('--transformer-num-head', type=int, default=4)
 
 # Image Model Parameters
@@ -106,8 +106,8 @@ parser.add_argument('--image-test-type', type=str, default="center", choices=["c
 parser.add_argument('--image-norm-type', type=str, default="HE", choices=["HE", "CLAHE"])
 
 # temporal method
-parser.add_argument('--temporal-config', type=str, default="LSTM", choices=["LSTM", "BLSTM", "TRANSFORMER"])
-parser.add_argument('--graph-config', type=str, default="gtransformer", choices=["gtransformer", "cnn1d"])
+parser.add_argument('--temporal', type=str, default="LSTM", choices=["LSTM", "BLSTM", "TRANSFORMER"])
+parser.add_argument('--graph', type=str, default="gtransformer", choices=["gtransformer", "cnn1d"])
 
 # cross Model Parameters
 parser.add_argument('--cross-transformer-dim', type=int, default=256)
