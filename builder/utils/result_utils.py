@@ -31,14 +31,14 @@ class experiment_results_validation:
     def results_per_cross_fold(self):
         print("##########################################################################################")
         os.system("echo  \'{} fold cross validation results each fold with {} seeds\'".format(str(self.args.seed_list), str(len(self.args.seed_list))))
-        os.system("echo  \'Total mean average -- auc: {}, apr: {}, f1_score: {}, tnr: {}, tpr: {}\'".format(
+        os.system("echo  \'Total validation average -- auc: {}, apr: {}, f1_score: {}, tnr: {}, tpr: {}\'".format(
             str(np.mean(self.auc_final_list)), 
             str(np.mean(self.apr_final_list)), 
             str(np.mean(self.f1_final_list)), 
             str(np.mean(self.tpr_final_list)), 
             str(np.mean(self.tnr_final_list))))
 
-        os.system("echo  \'Total mean std -- auc: {}, apr: {}, f1_score: {}, tnr: {}, tpr: {}\'".format(
+        os.system("echo  \'Total validation std -- auc: {}, apr: {}, f1_score: {}, tnr: {}, tpr: {}\'".format(
             str(np.std(self.auc_final_list)), 
             str(np.std(self.apr_final_list)), 
             str(np.std(self.f1_final_list)), 
@@ -71,14 +71,14 @@ class experiment_results:
 
     def results_per_cross_fold(self):
         os.system("echo  \'{} fold cross validation results each fold with {} seeds\'".format(str(self.args.seed_list), str(len(self.args.seed_list))))
-        os.system("echo  \'Total mean average -- auc: {}, apr: {}, f1_score: {}, tnr: {}, tpr: {}\'".format(
+        os.system("echo  \'Total test average -- auc: {}, apr: {}, f1_score: {}, tnr: {}, tpr: {}\'".format(
             str(np.mean(self.auc_final_list)), 
             str(np.mean(self.apr_final_list)), 
             str(np.mean(self.f1_final_list)), 
             str(np.mean(self.tpr_final_list)), 
             str(np.mean(self.tnr_final_list))))
 
-        os.system("echo  \'Total mean std -- auc: {}, apr: {}, f1_score: {}, tnr: {}, tpr: {}\'".format(
+        os.system("echo  \'Total test std -- auc: {}, apr: {}, f1_score: {}, tnr: {}, tpr: {}\'".format(
             str(np.std(self.auc_final_list)), 
             str(np.std(self.apr_final_list)), 
             str(np.std(self.f1_final_list)), 
