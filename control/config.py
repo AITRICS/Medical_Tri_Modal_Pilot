@@ -36,11 +36,10 @@ parser.add_argument('--modality-inclusion', type=str, default="train-full_test-f
 parser.add_argument('--fullmodal-definition', type=str, default="txt1", choices=["txt1_img1", "img1", "txt1"])
 
 # Data path setting
-parser.add_argument('--train-data-path', type=str, default="/home/destin/training_data_0113/mimic_icu/train")
-parser.add_argument('--test-data-path', type=str, default="/home/destin/training_data_0113/mimic_icu/test")
-parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/destin/multimodal/MLHC_result")
-parser.add_argument('--image-data-path', type=str, default="/home/destin/")
-
+parser.add_argument('--train-data-path', type=str, default="/home/claire/training_data_0113/mimic_icu/train")
+parser.add_argument('--test-data-path', type=str, default="/home/claire/training_data_0113/mimic_icu/test")
+parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/claire/multimodal/MLHC_result")
+parser.add_argument('--image-data-path', type=str, default="/mnt/aitrics_ext/ext01/shared/")
 # Data Parameters
 parser.add_argument('--cross-fold-val', type=int, default=0, choices=[1, 0], help="1: k-fold, 0: seed-average")
 parser.add_argument('--val-data-ratio', type=float, default=0.1)
@@ -152,6 +151,11 @@ parser.add_argument('--PatPosSampleN', type=int, default=5)
 # parser.add_argument('--PatPosSampleN', type=int, default=10)
 parser.add_argument('--best', default=True, action='store_true')
 parser.add_argument('--last', default=False, action='store_true')
+
+parser.add_argument('--fuse-baseline', type=str, default=None, choices=["Medfuse", "MMTM","DAFT","Retain","Multi"])
+parser.add_argument('--mmtm-ratio', type=float, default=4, help='mmtm ratio hyperparameter')
+parser.add_argument('--daft_activation', type=str, default='linear', help='daft activation ')
+parser.add_argument('--fusion-type', type=str, default='fused_ehr', help='train or eval for [fused_ehr, fused_cxr, uni_cxr, uni_ehr]')
 
 args = parser.parse_args()
 args.dir_root = os.getcwd()
