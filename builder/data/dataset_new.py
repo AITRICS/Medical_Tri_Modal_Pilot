@@ -187,6 +187,10 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         if args.berttype == "biobert":
             self.bioemb = h5py.File(args.biobert_path, 'r')
             self.token_max_length = 768
+            if "embedding" in args.biobert_path:
+                self.txt_token_size = 128
+            else:
+                self.txt_token_size = 1
         else:
             self.token_max_length = args.bert_token_max_length
                 
@@ -513,12 +517,8 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
 
         if target == 0:
-            # multi_target = self.neg_multi_target
             multi_target = 0
         else:
-            # firstOnset = ceil(labels_by_dict[selectedKey][0][0] // self.intv_len)
-            # multi_target = [0] * (firstOnset) + [1] * (12 - firstOnset)
-            # print("firstOnset: ", firstOnset)
             multi_target = 1
         multi_target = torch.tensor(multi_target)
         
@@ -545,20 +545,24 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             missing.append(True)
         
         if args.berttype == "biobert" and args.txt_tokenization == "bert":
+            txt_missing = True
             if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
                 text_data = data_pkl['txt_input'].strip()
-                if len(text_data) == 0:
-                    tokens = torch.zeros(self.token_max_length)
-                    textLength = 0
-                    missing.append(True)
-                else:
-                    textLength = 1 # single cls token
+                if len(text_data) != 0:
                     tokens = torch.Tensor(self.bioemb[text_data]['embedding'][:])
-                    missing.append(False)
-            else:    
-                tokens = torch.zeros(self.token_max_length)
+                    if len(tokens.shape) == 1:
+                        textLength = 1 # single cls token
+                    else:
+                        textLength = tokens.size(0) # embedding
+                        zero_padding = torch.zeros([128-textLength, 768])
+                        tokens = torch.cat([tokens, zero_padding], dim=0)
+                    txt_missing = False
+            if txt_missing:
+                tokens = torch.zeros([self.txt_token_size, self.token_max_length]).squeeze()
                 textLength = 0
                 missing.append(True)
+            else:
+                missing.append(False)
         else:
             if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
                 tokens = self.txtDict[(int(data_pkl['pat_id']), int(data_pkl['chid']))]
@@ -637,6 +641,10 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
         if args.berttype == "biobert":
             self.bioemb = h5py.File(args.biobert_path, 'r')
             self.token_max_length = 768
+            if "embedding" in args.biobert_path:
+                self.txt_token_size = 128
+            else:
+                self.txt_token_size = 1
         else:
             self.token_max_length = args.bert_token_max_length
 
@@ -1079,20 +1087,24 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
             missing.append(True)
         
         if args.berttype == "biobert" and args.txt_tokenization == "bert":
+            txt_missing = True
             if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
                 text_data = data_pkl['txt_input'].strip()
-                if len(text_data) == 0:
-                    tokens = torch.zeros(self.token_max_length)
-                    textLength = 0
-                    missing.append(True)
-                else:
-                    textLength = 1 # single cls token
+                if len(text_data) != 0:
                     tokens = torch.Tensor(self.bioemb[text_data]['embedding'][:])
-                    missing.append(False)
-            else:    
-                tokens = torch.zeros(self.token_max_length)
+                    if len(tokens.shape) == 1:
+                        textLength = 1 # single cls token
+                    else:
+                        textLength = tokens.size(0) # embedding
+                        zero_padding = torch.zeros([128-textLength, 768])
+                        tokens = torch.cat([tokens, zero_padding], dim=0)
+                    txt_missing = False
+            if txt_missing:
+                tokens = torch.zeros([self.txt_token_size, self.token_max_length]).squeeze()
                 textLength = 0
                 missing.append(True)
+            else:
+                missing.append(False)
         else:
             if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
                 tokens = self.txtDict[(int(data_pkl['pat_id']), int(data_pkl['chid']))]
@@ -1150,6 +1162,10 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         if args.berttype == "biobert":
             self.bioemb = h5py.File(args.biobert_path, 'r')
             self.token_max_length = 768
+            if "embedding" in args.biobert_path:
+                self.txt_token_size = 128
+            else:
+                self.txt_token_size = 1
         else:
             self.token_max_length = args.bert_token_max_length
         
@@ -1543,22 +1559,26 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
             missing.append(True)
         
         if args.berttype == "biobert" and args.txt_tokenization == "bert":
-            if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
+            txt_missing = True
+            if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
                 text_data = data_pkl['txt_input'].strip()
-                if len(text_data) == 0:
-                    tokens = torch.zeros(self.token_max_length)
-                    textLength = 0
-                    missing.append(True)
-                else:
-                    textLength = 1 # single cls token
+                if len(text_data) != 0:
                     tokens = torch.Tensor(self.bioemb[text_data]['embedding'][:])
-                    missing.append(False)
-            else:    
-                tokens = torch.zeros(self.token_max_length)
+                    if len(tokens.shape) == 1:
+                        textLength = 1 # single cls token
+                    else:
+                        textLength = tokens.size(0) # embedding
+                        zero_padding = torch.zeros([128-textLength, 768])
+                        tokens = torch.cat([tokens, zero_padding], dim=0)
+                    txt_missing = False
+            if txt_missing:
+                tokens = torch.zeros([self.txt_token_size, self.token_max_length]).squeeze()
                 textLength = 0
                 missing.append(True)
+            else:
+                missing.append(False)
         else:
-            if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
+            if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
                 tokens = self.txtDict[(int(data_pkl['pat_id']), int(data_pkl['chid']))]
                 if len(tokens) == 0:
                     tokens = torch.zeros(self.token_max_length)
@@ -1640,9 +1660,13 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
         if args.berttype == "biobert":
             self.bioemb = h5py.File(args.biobert_path, 'r')
             self.token_max_length = 768
+            if "embedding" in args.biobert_path:
+                self.txt_token_size = 128
+            else:
+                self.txt_token_size = 1
         else:
             self.token_max_length = args.bert_token_max_length
-
+            
         if data_type == "test dataset":
             if  os.path.exists(test_index_file) and os.path.exists(test_winsize_file) and data_type == "test dataset":
                 # Open the file and add existing entries to dictionary
@@ -2089,20 +2113,24 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             missing.append(True)
         
         if args.berttype == "biobert" and args.txt_tokenization == "bert":
+            txt_missing = True
             if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
                 text_data = data_pkl['txt_input'].strip()
-                if len(text_data) == 0:
-                    tokens = torch.zeros(self.token_max_length)
-                    textLength = 0
-                    missing.append(True)
-                else:
-                    textLength = 1 # single cls token
+                if len(text_data) != 0:
                     tokens = torch.Tensor(self.bioemb[text_data]['embedding'][:])
-                    missing.append(False)
-            else:    
-                tokens = torch.zeros(self.token_max_length)
+                    if len(tokens.shape) == 1:
+                        textLength = 1 # single cls token
+                    else:
+                        textLength = tokens.size(0) # embedding
+                        zero_padding = torch.zeros([128-textLength, 768])
+                        tokens = torch.cat([tokens, zero_padding], dim=0)
+                    txt_missing = False
+            if txt_missing:
+                tokens = torch.zeros([self.txt_token_size, self.token_max_length]).squeeze()
                 textLength = 0
                 missing.append(True)
+            else:
+                missing.append(False)
         else:
             if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
                 tokens = self.txtDict[(int(data_pkl['pat_id']), int(data_pkl['chid']))]
