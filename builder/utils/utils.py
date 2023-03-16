@@ -25,31 +25,31 @@ def make_setting_file(args) -> None:
 
     settings_file.close()
 
-def name_trainer(args) -> None:
-    # select trainer
-    if args.predict_type == "seq_pretrain":
-        args.trainer = "seq_pretrain"
-        raise ValueError("Use other code for pretraining process...")
+# def name_trainer(args) -> None:
+#     # select trainer
+#     if args.predict_type == "seq_pretrain":
+#         args.trainer = "seq_pretrain"
+#         raise ValueError("Use other code for pretraining process...")
         
-    elif args.input_types == 'vslt':
-        if args.predict_type == "multi_task_within":
-            args.trainer = "multi_task_within_vslt"
+#     elif args.input_types == 'vslt':
+#         if args.predict_type == "multi_task_within":
+#             args.trainer = "multi_task_within_vslt"
     
-    elif args.input_types == "vslt_txt":
-        if args.predict_type == "multi_task_within":
-            args.trainer = "multi_task_within_bi_vslt_txt"
+#     elif args.input_types == "vslt_txt":
+#         if args.predict_type == "multi_task_within":
+#             args.trainer = "multi_task_within_bi_vslt_txt"
 
-    elif args.input_types == "vslt_img":
-        if args.predict_type == "multi_task_within":
-            args.trainer = "multi_task_within_bi_vslt_img"
+#     elif args.input_types == "vslt_img":
+#         if args.predict_type == "multi_task_within":
+#             args.trainer = "multi_task_within_bi_vslt_img"
 
-    elif args.input_types == "vslt_img_txt":
-        if args.predict_type == "multi_task_within":
-            args.trainer = "multi_task_within_tri"
+#     elif args.input_types == "vslt_img_txt":
+#         if args.predict_type == "multi_task_within":
+#             args.trainer = "multi_task_within_tri"
 
-    else:
-        raise NotImplementedError("unimodal: vslt, img, txt / bimodal: vslt_txt")
-    pass
+#     else:
+#         raise NotImplementedError("unimodal: vslt, img, txt / bimodal: vslt_txt")
+#     pass
 
 def set_seeds(args) -> None:
 	torch.manual_seed(args.seed)

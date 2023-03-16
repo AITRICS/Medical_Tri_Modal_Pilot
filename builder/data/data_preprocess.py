@@ -6,8 +6,6 @@ from torch.utils.data import DataLoader
 
 from builder.utils.utils import *
 from builder.data.collate_fn import *
-# from builder.data.collate_fn_old import * # temporary
-# from builder.data.dataset import *
 from builder.data.dataset_new import *
 
 # 실시간 데이터 전처리기 구상도
@@ -47,24 +45,23 @@ def get_data_loader(args, patient_dict, keys_list, k_indx):
     print("train_data_list: ", len(train_data_list))
     print("val_data_list: ", len(val_data_list))
     print("test_dir: ", len(test_dir))
-    train_data_list = train_data_list[:12800]
-    val_data_list = val_data_list[:1024]
-    test_dir = test_dir[:128]
+    # train_data_list = train_data_list[:12800]
+    # val_data_list = val_data_list[:1024]
+    # test_dir = test_dir[:128]
 
     # For severance VC dataset, only onset time exist for intubation...!
     # For MIMIC-ER dataset, future 24 hrs of labtest is measured...
     # For dataset, we load every input data and differentiate target types according to args.predict_type
-    if 'multi_task' in args.trainer:
-        if args.output_type == 'mortality':
-            train_data        = Onetime_Outbreak_Training_Dataset(args, data=train_data_list, data_type="training dataset")
-            val_data          = Onetime_Outbreak_Test_Dataset(args, data=val_data_list, data_type="validation dataset")
-            test_data         = Onetime_Outbreak_Test_Dataset(args, data=test_dir, data_type="test dataset")
+    if args.output_type == 'mortality':
+        train_data        = Onetime_Outbreak_Training_Dataset(args, data=train_data_list, data_type="training dataset")
+        val_data          = Onetime_Outbreak_Test_Dataset(args, data=val_data_list, data_type="validation dataset")
+        test_data         = Onetime_Outbreak_Test_Dataset(args, data=test_dir, data_type="test dataset")
 
-        elif args.output_type == 'cpr' or args.output_type == 'intubation' or\
-             args.output_type == 'vasso' or args.output_type == 'transfer':
-            train_data        = Multiple_Outbreaks_Training_Dataset(args, data=train_data_list, data_type="training dataset")
-            val_data          = Multiple_Outbreaks_Test_Dataset(args, data=val_data_list, data_type="validation dataset")
-            test_data         = Multiple_Outbreaks_Test_Dataset(args, data=test_dir, data_type="test dataset")
+    elif args.output_type == 'cpr' or args.output_type == 'intubation' or\
+            args.output_type == 'vasso' or args.output_type == 'transfer':
+        train_data        = Multiple_Outbreaks_Training_Dataset(args, data=train_data_list, data_type="training dataset")
+        val_data          = Multiple_Outbreaks_Test_Dataset(args, data=val_data_list, data_type="validation dataset")
+        test_data         = Multiple_Outbreaks_Test_Dataset(args, data=test_dir, data_type="test dataset")
     
     # set sampler - target type (0: negative, 1: positive, 2: currently negative)
     if args.output_type != "seq":
@@ -86,7 +83,6 @@ def get_data_loader(args, patient_dict, keys_list, k_indx):
     # For validation dataset, we prioritize full window_size subsequences over smaller ones
     # The indexes for sampling are random for every iteration
     # For testing dataset, we prioritize full window_size subsequences over smaller ones
-    print(f"### Preparing trainer for {args.trainer} ###")
     if args.input_types == 'vslt':
         train_loader = DataLoader(train_data, batch_size=args.batch_size, drop_last=True,
                                 num_workers=args.num_workers, pin_memory=True, sampler=sampler)
@@ -164,11 +160,7 @@ def get_test_data_loader(args):
         elif args.output_type == 'cpr' or args.output_type == 'intubation' or\
              args.output_type == 'vasso' or args.output_type == 'transfer':
             test_data         = Multiple_Outbreaks_Test_Dataset(args, data=test_dir, data_type="test dataset")
-    
-        elif args.output_type == "all":
-            test_data         = Multitask_Test_Dataset(args, data=test_dir, data_type="test dataset")
-    
-    print(f"### Preparing trainer for {args.trainer} ###")    
+        
     if args.input_types == 'vslt':
         test_loader  = DataLoader(test_data, batch_size=args.batch_size, drop_last=True,
                                     num_workers=args.num_workers, pin_memory=True)

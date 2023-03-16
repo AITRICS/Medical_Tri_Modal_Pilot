@@ -36,17 +36,10 @@ parser.add_argument('--modality-inclusion', type=str, default="train-full_test-f
 parser.add_argument('--fullmodal-definition', type=str, default="txt1", choices=["txt1_img1", "img1", "txt1"])
 
 # Data path setting
-<<<<<<< HEAD
 parser.add_argument('--train-data-path', type=str, default="/home/destin/training_data_0113/mimic_icu/train")
 parser.add_argument('--test-data-path', type=str, default="/home/destin/training_data_0113/mimic_icu/test")
 parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/destin/multimodal/MLHC_result")
 parser.add_argument('--image-data-path', type=str, default="/mnt/aitrics_ext/ext01/shared/")
-=======
-parser.add_argument('--train-data-path', type=str, default="/home/claire/training_data_0113/mimic_icu/train")
-parser.add_argument('--test-data-path', type=str, default="/home/claire/training_data_0113/mimic_icu/test")
-parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/claire/multimodal/MLHC_result")
-parser.add_argument('--image-data-path', type=str, default="/home/claire/")
->>>>>>> c2c94105cd282690bc3e3ceefe6bedf9db71cc72
 # Data Parameters
 parser.add_argument('--cross-fold-val', type=int, default=0, choices=[1, 0], help="1: k-fold, 0: seed-average")
 parser.add_argument('--val-data-ratio', type=float, default=0.1)
@@ -84,11 +77,7 @@ parser.add_argument('--txt-classifier-nodes', type=int, default=64)
 
 parser.add_argument('--txt-tokenization', type=str, default="bert", choices=["word", "character", "bpe", "bert"])
 parser.add_argument('--berttype', type=str, default="biobert", choices=["biobert", "bert"])
-<<<<<<< HEAD
 parser.add_argument('--biobert-path', type=str, default="./data/mimic4_embeddings.h5", choices=["mimic4_embeddings.h5", "mimic4_clstoken.h5"])
-=======
-parser.add_argument('--biobert-path', type=str, default="./data/mimic4_clstoken.h5")
->>>>>>> c2c94105cd282690bc3e3ceefe6bedf9db71cc72
 parser.add_argument('--character-token-max-length', type=int, default=512)
 parser.add_argument('--word-token-max-length', type=int, default=128)
 parser.add_argument('--bpe-token-max-length', type=int, default=256)
@@ -164,7 +153,7 @@ parser.add_argument('--best', default=True, action='store_true')
 parser.add_argument('--last', default=False, action='store_true')
 
 parser.add_argument('--fuse-baseline', type=str, default=None, choices=["Medfuse", "MMTM","DAFT","Retain","Multi"])
-parser.add_argument('--mmtm-ratio', type=float, default=6, help='mmtm ratio hyperparameter') #bimodal일 때 4였으나 6으로 바꿈
+parser.add_argument('--mmtm-ratio', type=float, default=4, help='mmtm ratio hyperparameter')
 parser.add_argument('--daft_activation', type=str, default='linear', help='daft activation ')
 parser.add_argument('--fusion-type', type=str, default='fused_ehr', help='train or eval for [fused_ehr, fused_cxr, uni_cxr, uni_ehr]')
 

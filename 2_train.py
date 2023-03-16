@@ -41,7 +41,7 @@ args.seed = 0
 make_setting_file(args)
 if args.cross_fold_val == 1:
     set_seeds(args)
-name_trainer(args)
+# name_trainer(args)
 
 # define result class
 save_valid_results = experiment_results_validation(args)
@@ -75,7 +75,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
     print(args.modality_inclusion)
     
     train_loader, val_loader, test_loader = get_data_loader(args, patient_dict, keys_list, k_indx)
-    # exit(1)
+
     # for train_batch in train_loader:
     #     train_x, static_x, train_y, input_lengths, train_img, train_txt, txt_lengths, img_time, missing, f_indices = train_batch
     #     print("train_txt: ", train_txt.shape)
