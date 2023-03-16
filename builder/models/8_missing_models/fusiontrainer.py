@@ -38,30 +38,27 @@ class FUSIONTRAINER(nn.Module):
         self.cxr_model = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1).to(args.device)#Swin_T_Weights.IMAGENET1K_V1
 
         models = [self.ehr_model, self.cxr_model]
-        # for i in range(len(models)):
-        #     model_dict = models[i].state_dict()
-        #     if i == 0:
-        #         if self.args.output_type == "intubation":
-        #             old_weights=torch.load("/mnt/aitrics_ext/ext01/claire/multimodal/best_result/missing_image_reports_Intub_vslt_lstm_1e-4_75/best_fold0_seed0.pth")['model']
-        #             new_weights=torch.load("/mnt/aitrics_ext/ext01/claire/multimodal/best_result/missing_image_reports_Intub_vslt_lstm_1e-4_75/best_fold0_seed0.pth")['model']
-        #             new_weights = {key.replace('ehr_model.', ''): new_weights.pop(key) for key in old_weights.keys()}
-        #             new_weights = {k: v for k, v in new_weights.items() if k in model_dict}
-        #             model_dict.update(new_weights)
-        #             models[i].load_state_dict(new_weights)
-        #     else:
-        #         old_weights=torch.load("/mnt/aitrics_ext/ext01/claire/multimodal/best_result/image_reports_Intub_swin_1e-6_modify/best_fold0_seed0.pth")['model']
-        #         new_weights=torch.load("/mnt/aitrics_ext/ext01/claire/multimodal/best_result/image_reports_Intub_swin_1e-6_modify/best_fold0_seed0.pth")['model']
-        #         new_weights = {key.replace('img_encoder.', ''): new_weights.pop(key) for key in old_weights.keys()}
-        #         new_weights = {k: v for k, v in new_weights.items() if k in model_dict}
-        #         model_dict.update(new_weights)
-        #         models[i].load_state_dict(new_weights)
         model_dict = models[0].state_dict()
+        if self.args.output_type == "mortality":
+            dir = "/mnt/aitrics_ext/ext01/claire/multimodal/MLHC_result/ehr_lstm_Mortal_1e-4/ckpts/best_fold0_seed0.pth"
+        elif self.args.output_type == "vasso":
+            dir = "/mnt/aitrics_ext/ext01/claire/multimodal/MLHC_result/ehr_lstm_Vasso_1e-5/ckpts/best_fold0_seed0.pth"
+        elif self.args.output_type =="intubation":
+            dir = "/mnt/aitrics_ext/ext01/claire/multimodal/MLHC_result/ehr_lstm_Intub_1e-4/ckpts/best_fold1_seed1004.pth"
+        old_weights=torch.load(dir)['model']
+        new_weights=torch.load(dir)['model']
+        new_weights = {key.replace('ehr_model.', ''): new_weights.pop(key) for key in old_weights.keys()}
+        new_weights = {k: v for k, v in new_weights.items() if k in model_dict}
+        model_dict.update(new_weights)
+        models[0].load_state_dict(new_weights)
+
+        model_dict = models[1].state_dict()
         old_weights=torch.load("/mnt/aitrics_ext/ext01/claire/multimodal/best_result/image_reports_Intub_swin_1e-6_modify/best_fold0_seed0.pth")['model']
         new_weights=torch.load("/mnt/aitrics_ext/ext01/claire/multimodal/best_result/image_reports_Intub_swin_1e-6_modify/best_fold0_seed0.pth")['model']
         new_weights = {key.replace('img_encoder.', ''): new_weights.pop(key) for key in old_weights.keys()}
         new_weights = {k: v for k, v in new_weights.items() if k in model_dict}
         model_dict.update(new_weights)
-        models[0].load_state_dict(new_weights)
+        models[1].load_state_dict(new_weights)
 
         self.cxr_model.feats_dim = 768 #swin 512 #resnet34  
         
@@ -73,9 +70,6 @@ class FUSIONTRAINER(nn.Module):
             self.model = Fusion(args, self.ehr_model, self.cxr_model ).to(self.device)
         elif args.fuse_baseline == "MMTM":
             self.model = FusionMMTM(args, self.ehr_model, self.cxr_model ).to(self.device)
-            self.optimizer_visual = optim.AdamW([{'params': self.model.cxr_model.parameters()},{'params': self.model.mmtm0.parameters()}], args.lr_init, betas=(0.9, 0.9))
-            self.optimizer_ehr = optim.AdamW([{'params': self.model.cxr_model.parameters()},{'params': self.model.mmtm0.parameters()}], args.lr_init, betas=(0.9, 0.9))
-            self.optimizer_joint = optim.AdamW(self.model.parameters(), args.lr_init, betas=(0.9, 0.9))
         elif args.fuse_baseline == "DAFT":
             self.model = FusionDAFT(args, self.ehr_model, self.cxr_model ).to(self.device)
         else:

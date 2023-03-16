@@ -15,17 +15,13 @@ class Fusion(nn.Module):
         self.ehr_model = ehr_model
         self.cxr_model = cxr_model
 
-
         target_classes = 1 #self.args.num_classes
         lstm_in = self.ehr_model.feats_dim
         lstm_out = 768 #self.cxr_model.feats_dim
         projection_in = 768 #self.cxr_model.feats_dim
 
-        
-
         self.projection = nn.Linear(projection_in, lstm_in)
         feats_dim = 3 * self.ehr_model.feats_dim #full 일 때만 가능
-        # feats_dim = self.ehr_model.feats_dim + self.cxr_model.feats_dim
 
         self.fused_cls = nn.Sequential(
             nn.Linear(feats_dim, 1 ),#1: self.args.num_classes
@@ -37,10 +33,6 @@ class Fusion(nn.Module):
             nn.Linear(lstm_out, target_classes),
             nn.Sigmoid()
         ) 
-        
-        self.fc_list = nn.ModuleList()
-        for _ in range(12):
-            self.fc_list.append(self.lstm_fused_cls)
         
 
         self.lstm_fusion_layer = nn.LSTM(
@@ -87,9 +79,7 @@ class Fusion(nn.Module):
         else:
             txts = txts.type(torch.IntTensor).to(self.args.device) 
             txt_embedding = self.txt_embedding(txts) # torch.Size([4, 128, 256])
-        print("txt_embedding",txt_embedding.shape)
         cxr_feats = self.cxr_model(img).squeeze() #_, _ , cxr_feats
-        print(cxr_feats.shape) #([64, 7, 7, 768])
         cxr_feats = cxr_feats.permute(0,3,1,2)
         cxr_feats = self.cxr_model.avgpool(cxr_feats)
         cxr_feats = torch.flatten(cxr_feats, 1)
@@ -98,40 +88,23 @@ class Fusion(nn.Module):
 
         cxr_feats[list(~np.array(pairs))] = 0
         if len(ehr_feats.shape) == 1:
-            # print(ehr_feats.shape, cxr_feats.shape)
-            # import pdb; pdb.set_trace()
             feats = ehr_feats[None,None,:]
-            print(ehr_feats.shape)
-            print(feats.shape)
-            print(cxr_feats.shape)
-            print(cxr_feats[:,None,:].shape)
-            feats = torch.cat([feats, cxr_feats[:,None,:]], dim=1)
+            txt_feats = txt_embedding[:,None,:]
+            feats = torch.cat([txt_feats, feats, cxr_feats[:,None,:]], dim=1)
         else:
             feats = ehr_feats[:,None,:]
             txt_feats = txt_embedding[:,None,:]
-            print(ehr_feats.shape)
-            print(feats.shape)
-            print("txt",txt_feats.shape)
-            print(cxr_feats.shape)
-            print(cxr_feats[:,None,:].shape)
-            feats = torch.cat([feats, cxr_feats[:,None,:], txt_feats], dim=1)
-            print("feats.shape", feats.shape)
-        print("seq_lengths",seq_lengths) #torch.Size([64, 3, 256])
+            feats = torch.cat([txt_feats, feats, cxr_feats[:,None,:]], dim=1)
+
         seq_lengths = np.array([1] * len(seq_lengths)) # full 일 때만 가능
         seq_lengths[pairs] = 3 
-        print("seq_lengths",seq_lengths)
-        print("feats.shape",feats.shape)
-        feats = torch.nn.utils.rnn.pack_padded_sequence(feats, seq_lengths.to("cpu"), batch_first=True, enforce_sorted=False).to(self.args.device)
-        print("feats",feats)
+        feats = torch.nn.utils.rnn.pack_padded_sequence(feats, seq_lengths, batch_first=True, enforce_sorted=False)
+        feats = feats.to(self.args.device)
         x, (ht, _) = self.lstm_fusion_layer(feats)
 
         out = ht.squeeze()
-        multitask_vectors = []
-        for i, fc in enumerate(self.fc_list):
-                multitask_vectors.append(fc(out))
-        output = torch.stack(multitask_vectors)
-        # fused_preds = self.lstm_fused_cls(out)
-        print(output.shape)
+        output = self.lstm_fused_cls(out)
+
 
 
         return output
