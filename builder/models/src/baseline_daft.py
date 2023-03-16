@@ -54,15 +54,11 @@ class FusionDAFT(nn.Module):
             
         cxr_feats = self.cxr_model.features(img)
         cxr_feats = self.cxr_model.norm(cxr_feats)
-        print("cxr_feats.shape",cxr_feats.shape)
         cxr_feats = cxr_feats.permute(0, 3, 1, 2)
-        ehr_unpacked = self.daft_layer_4(cxr_feats, txt_embedding, ehr_unpacked)
+        ehr_unpacked = self.daft_layer_4(txt_embedding, cxr_feats, ehr_unpacked)
 
         cxr_feats = self.avgpool(cxr_feats)
-        print("2. cxr_feats.shape",cxr_feats.shape)
         cxr_feats = torch.flatten(cxr_feats, 1)
-        print("3. cxr_feats.shape",cxr_feats.shape)
-        print("ehr_unpacked",ehr_unpacked.shape)
         ehr = torch.nn.utils.rnn.pack_padded_sequence(ehr_unpacked, seq_lengths.to("cpu"), batch_first=True, enforce_sorted=False)
         ehr = ehr.to(self.args.device)
         ehr, (ht, _)= self.ehr_model.layer1(ehr)
@@ -124,30 +120,16 @@ class DAFTBlock(nn.Module):
         ]
         self.aux = nn.Sequential(OrderedDict(layers))
         
-    def forward(self, feature_map, txt_embedding, x_aux):
-        print(x_aux.shape)
-        print(feature_map.shape)
+    def forward(self, txt_embedding, feature_map, x_aux):
         ehr_avg = torch.mean(x_aux, dim=1)
-        print(ehr_avg.shape)
-        print("txt",txt_embedding.shape)
-        # txt_avg = torch.mean(txt, dim =1)
-        # print("txt_avg",txt_avg.shape)
         squeeze = self.global_pool(feature_map)
-        print(squeeze.shape)
         squeeze = squeeze.view(squeeze.size(0), -1)
-        print(squeeze.shape)
-        squeeze = torch.cat((squeeze, txt_embedding, ehr_avg), dim=1)
-        print(squeeze.shape)
+        squeeze = torch.cat((txt_embedding, squeeze, ehr_avg), dim=1)
         attention = self.aux(squeeze)
-        print("attention.shape", attention.shape)
         if self.scale == self.shift:
             v_scale, v_shift = torch.split(attention, self.split_size, dim=1)
-            # print("v_scale",v_scale.shape)#v_scale torch.Size([64, 256])
-            # print("v_shift",v_shift.shape)
             v_scale = v_scale.view(v_scale.size()[0], 1, v_scale.size()[1]).expand_as(x_aux)
             v_shift = v_shift.view(v_shift.size()[0], 1, v_shift.size()[1]).expand_as(x_aux)
-            # print("v_scale",v_scale.shape)#v_scale torch.Size([64, 24, 256])
-            # print("v_shift",v_shift.shape)
             if self.scale_activation is not None:
                 v_scale = self.scale_activation(v_scale)
         elif self.scale is None:
@@ -164,5 +146,4 @@ class DAFTBlock(nn.Module):
             raise AssertionError(
                 f"Sanity checking on scale and shift failed. Must be of type bool or None: {self.scale}, {self.shift}"
             )
-        print("out",((v_scale * x_aux) + v_shift).shape)
         return (v_scale * x_aux) + v_shift
