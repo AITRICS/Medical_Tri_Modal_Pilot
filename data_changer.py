@@ -45,7 +45,7 @@ import os
                 
                 
                 
-pkl_dirs = search_walk({'path': "/home/destin/training_data_0317/", 'extension': ".pkl"})
+pkl_dirs = search_walk({'path': "/nfs/thena/shared/multi_modal/training_data_0317/", 'extension': ".pkl"})
 with open("margin_dir.pkl","rb") as f:
     margin_dir = pickle.load(f)
     

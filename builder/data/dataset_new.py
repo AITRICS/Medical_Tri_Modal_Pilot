@@ -37,6 +37,7 @@ FEATURE_TYPES = [
         'HEMATOCRIT', 'PLATELET', 'WBC', 'BILIRUBIN', 'pH', 'HCO3', 
         'CREATININE', 'LACTATE', 'POTASSIUM', 'SODIUM', 'CRP'
     ]
+FEATURE_MEANS = [85.93695802, 20.10544135, 36.97378611, 120.00165406, 62.85878326, 96.7560417, 14.58784295, 29.44163972, 200.15499694, 12.11825286, 3.79762327, 7.37816261, 24.38824869, 1.5577265, 2.51239096, 4.12411448, 138.91951009, 88.96706267]
 #margin_dir = search_walk({"path": "/nfs/thena/MedicalAI/ImageData/public/MIMIC_CXR/data/files_margins", "extension": ".jpg"})
 #with open("margin_dir.pkl","wb") as f:
 #    pickle.dump(margin_dir,f)
@@ -176,6 +177,7 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         positive_tpoints = 0
         negative_tpoints = 0
         
+        self.vslt_type = args.vslt_type
         self.vslt_len = len(args.vitalsign_labtest)
         self.neg_multi_target = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.intv_len = int(args.prediction_range // 12)
@@ -183,11 +185,13 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         self.image_size = [args.image_size, args.image_size]
         self.input_types = args.input_types
         self.image_data_path = args.image_data_path
+        self.time_data_array = np.zeros([10000,3])
         
         class2dict_missing = {3:1, 6:2, 9:3, 2:4, 8:6, 11:7, 1:4, 4:5, 7:6, 10:7}
         class2dict_full = {2:0}
         
         self.txtDict = txtDictLoad("train")
+        self.txtDict.update(txtDictLoad("test"))
         if args.berttype == "biobert":
             self.bioemb = h5py.File(args.biobert_path, 'r')
             self.token_max_length = 768
@@ -197,7 +201,8 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 self.txt_token_size = 1
         else:
             self.token_max_length = args.bert_token_max_length
-                
+        
+        # time_len = 0       
         # real-time x-ray image transform function
         if ("img" in self.input_types or 'train-missing' in args.modality_inclusion):
             self.transform = xray_image_transform_train()
@@ -207,6 +212,15 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             
             with open(pkl_path, 'rb') as _f:
                 data_info = pkl.load(_f)
+                
+            # data_in_time = data_info['data_in_time']
+            # if time_len < data_in_time.shape[0]:
+            #     time_len = data_in_time.shape[0]
+            #     print(time_len)
+            
+            if "cxr_input" in data_info:
+                if data_info["cxr_input"] == None:
+                    del data_info["cxr_input"]
                 
             if "cxr_input" in data_info:
                 new_cxr_inputs = [cxr for cxr in data_info["cxr_input"] if float(cxr[1].split("_")[-1].split(".")[0]) >= args.ar_lowerbound and float(cxr[1].split("_")[-1].split(".")[0]) <= args.ar_upperbound]
@@ -430,8 +444,11 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         else:
             ### class 2 방식
             self._type_list = [class2dict_missing[i] if i in class2dict_missing else i for i in self._type_list]
-            
-        self.feature_means = list(data_info['mean'])
+                    
+        # self.feature_means = list(data_info['mean'])
+        self.feature_means = FEATURE_MEANS
+
+        print("max time len: ", time_len)
         print("No Dataset Error: ", len(self._type_list) == len(self._data_list))
         if "train" in data_type:
             self.train_min = np.min(np.array(self.train_min), axis=0)
@@ -475,10 +492,12 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self._data_list)
 
+    def seq_length_(self, p):
+        return len(p[0])
+
     def __getitem__(self, index):
         pkl_path, possible_indices_keys, labels_by_dict, win_sizes, target = self._data_list[index]
         type_list = self._type_list[index]
-        
         file_name = pkl_path.split("/")[-1]
         with open(pkl_path, 'rb') as _f:
             data_pkl = pkl.load(_f)
@@ -489,38 +508,42 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         else:
             gender = 0
         static_inputs = torch.Tensor([gender, data_pkl['age']])
-        time_data = data_pkl['inputs_in_real_time']
-        print("time_data: ", time_data)
         
         # Normalization of Data
         pklFeatureMins = args.feature_mins
         pklFeatureMinMaxs = args.feature_maxs - args.feature_mins
-        data_pkl['data'] = np.subtract(data_pkl['data'], pklFeatureMins)
-        data_pkl['data'] = np.divide(data_pkl['data'], pklFeatureMinMaxs)
 
         windowIndex = self.window_size - 1
         selectedKey = random.choice(possible_indices_keys)
         randLength = random.choice(win_sizes[selectedKey])
         
-        if args.auxiliary_loss_input is None:
-            dataSequence, maskSequence, deltaSequence, inputLength = sequenceGenerator(args, selectedKey, randLength, windowIndex, data_pkl)
-            f_indices = False
-        else:
-            dataSequence, maskSequence, deltaSequence, inputLength, f_indices = sequenceGenerator_pretrain(args, selectedKey, randLength, windowIndex+12, data_pkl)
+        if self.vslt_type == "carryforward":
         
-        if args.carry_back:
-            initStartIdx = data_pkl['initStartIdx']
-            for idx, i in enumerate(initStartIdx):
-                k = i - (selectedKey-randLength) -1
-                
-                if (i <= selectedKey) and (i > selectedKey-randLength):
-                    dataSequence[:k, idx] = dataSequence[k, idx]
+            data_pkl['data'] = np.subtract(data_pkl['data'], pklFeatureMins)
+            data_pkl['data'] = np.divide(data_pkl['data'], pklFeatureMinMaxs)
+
+            if args.auxiliary_loss_input is None:
+                dataSequence, maskSequence, deltaSequence, inputLength = sequenceGenerator(args, selectedKey, randLength, windowIndex, data_pkl)
+                f_indices = False
+            else:
+                dataSequence, maskSequence, deltaSequence, inputLength, f_indices = sequenceGenerator_pretrain(args, selectedKey, randLength, windowIndex+12, data_pkl)
+        
+            if args.carry_back:
+                initStartIdx = data_pkl['initStartIdx']
+                for idx, i in enumerate(initStartIdx):
+                    k = i - (selectedKey-randLength) -1
                     
-        sample_len = dataSequence.shape[0]
-        final_seqs = torch.zeros(3, self.window_size, self.vslt_len)
-        final_seqs[0].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(dataSequence, args.vslt_mask, axis = 1)))
-        final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
-        final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
+                    if (i <= selectedKey) and (i > selectedKey-randLength):
+                        dataSequence[:k, idx] = dataSequence[k, idx]
+            sample_len = dataSequence.shape[0]
+            final_seqs = torch.zeros(3, self.window_size, self.vslt_len)
+            final_seqs[0].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(dataSequence, args.vslt_mask, axis = 1)))
+            final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
+            final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
+            
+        else:
+            time_data = torch.Tensor(data_pkl['data_in_time'])
+            final_seqs = self.time_data_array
 
         if target == 0:
             multi_target = 0
@@ -531,6 +554,11 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
         
         img_time = -1
+        
+        if "cxr_input" in data_pkl:
+            if data_pkl["cxr_input"] == None:
+                del data_pkl["cxr_input"]
+                
         if (("img" in args.input_types and "img1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and type_list in [0,2,3,5] and "img" in args.input_types)) and ('cxr_input' in data_pkl):
             cxr_li = [i for i in data_pkl['cxr_input'] if i[0] <= selectedKey] 
             if not cxr_li and ('train-full' in args.modality_inclusion): 
@@ -553,7 +581,8 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         if args.berttype == "biobert" and args.txt_tokenization == "bert":
             txt_missing = True
             if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
-                text_data = data_pkl['txt_input'].strip()
+
+                text_data = data_pkl['txt_input'][0].strip()
                 if len(text_data) != 0:
                     tokens = torch.Tensor(self.bioemb[text_data]['embedding'][:])
                     if len(tokens.shape) == 1:
@@ -640,10 +669,12 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
         if not os.path.exists("./data/testIndexes"):
             os.makedirs('./data/testIndexes', exist_ok=True)
             
-        if data_type == "validation dataset":
-            self.txtDict = txtDictLoad("train")
-        else:
-            self.txtDict = txtDictLoad("test")
+        # if data_type == "validation dataset":
+        #     self.txtDict = txtDictLoad("train")
+        # else:
+        #     self.txtDict = txtDictLoad("test")
+        self.txtDict = txtDictLoad("train")
+        self.txtDict.update(txtDictLoad("test"))
         if args.berttype == "biobert":
             self.bioemb = h5py.File(args.biobert_path, 'r')
             self.token_max_length = 768
@@ -718,12 +749,15 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
             # else:
             #     print("You need to choose either 224 or 512 as image_size")
                 
-
         for idx, pkl_path in enumerate(tqdm(data, desc="Loading files of {}...".format(data_type))):
             file_name = pkl_path.split("/")[-1]
             
             with open(pkl_path, 'rb') as _f:
                 data_info = pkl.load(_f)
+                
+            if "cxr_input" in data_info:
+                if data_info["cxr_input"] == None:
+                    del data_info["cxr_input"]
             
             if "cxr_input" in data_info:
                 new_cxr_inputs = [cxr for cxr in data_info["cxr_input"] if float(cxr[1].split("_")[-1].split(".")[0]) >= args.ar_lowerbound and float(cxr[1].split("_")[-1].split(".")[0]) <= args.ar_upperbound]
@@ -978,7 +1012,8 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
             with open(test_winsize_file, 'wb') as f:
                 pickle.dump(winDict, f, pickle.HIGHEST_PROTOCOL)
         
-        self.feature_means = list(data_info['mean'])
+        # self.feature_means = list(data_info['mean'])
+        self.feature_means = FEATURE_MEANS
 
         print("No Dataset Error 1st: ", len(_type_list) == len(_data_list))
         print("No Dataset Error 2nd: ", len(self._type_list) == len(self._data_list))
@@ -1072,6 +1107,10 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
 
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
         
+        if "cxr_input" in data_pkl:
+            if data_pkl["cxr_input"] == None:
+                del data_pkl["cxr_input"]
+                
         img_time = -1
         if (("img" in args.input_types and "img1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and type_list in [0,2,3,5] and "img" in args.input_types)) and ('cxr_input' in data_pkl):
             cxr_li = [i for i in data_pkl['cxr_input'] if i[0] <= selectedKey] 
@@ -1095,7 +1134,7 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
         if args.berttype == "biobert" and args.txt_tokenization == "bert":
             txt_missing = True
             if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
-                text_data = data_pkl['txt_input'].strip()
+                text_data = data_pkl['txt_input'][0].strip()
                 if len(text_data) != 0:
                     tokens = torch.Tensor(self.bioemb[text_data]['embedding'][:])
                     if len(tokens.shape) == 1:
@@ -1164,7 +1203,10 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         self.image_data_path = args.image_data_path
         self.token_max_length = args.bert_token_max_length
         
+        # self.txtDict = txtDictLoad("train")
         self.txtDict = txtDictLoad("train")
+        self.txtDict.update(txtDictLoad("test"))
+        
         if args.berttype == "biobert":
             self.bioemb = h5py.File(args.biobert_path, 'r')
             self.token_max_length = 768
@@ -1194,7 +1236,11 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
             
             with open(pkl_path, 'rb') as _f:
                 data_info = pkl.load(_f)
-            
+                
+            if "cxr_input" in data_info:
+                if data_info["cxr_input"] == None:
+                    del data_info["cxr_input"]
+                    
             if "cxr_input" in data_info:
                 new_cxr_inputs = [cxr for cxr in data_info["cxr_input"] if float(cxr[1].split("_")[-1].split(".")[0]) >= args.ar_lowerbound and float(cxr[1].split("_")[-1].split(".")[0]) <= args.ar_upperbound]
                 if len(new_cxr_inputs) > 0:
@@ -1424,7 +1470,9 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
             ### class 2 방식
             self._type_list = [class2dict_missing[i] if i in class2dict_missing else i for i in self._type_list]
             
-        self.feature_means = list(data_info['mean'])
+        # self.feature_means = list(data_info['mean'])
+        self.feature_means = FEATURE_MEANS
+        
         print("No Dataset Error: ", len(self._type_list) == len(self._data_list))
         if "train" in data_type:
             self.train_min = np.min(np.array(self.train_min), axis=0)
@@ -1544,6 +1592,10 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
         
+        if "cxr_input" in data_pkl:
+            if data_pkl["cxr_input"] == None:
+                del data_pkl["cxr_input"]
+                
         img_time = -1
         if (("img" in args.input_types and "img1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and type_list in [0,2,3,5] and "img" in args.input_types)) and ('cxr_input' in data_pkl):
             cxr_li = [i for i in data_pkl['cxr_input'] if i[0] <= selectedKey] 
@@ -1567,7 +1619,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         if args.berttype == "biobert" and args.txt_tokenization == "bert":
             txt_missing = True
             if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
-                text_data = data_pkl['txt_input'].strip()
+                text_data = data_pkl['txt_input'][0].strip()
                 if len(text_data) != 0:
                     tokens = torch.Tensor(self.bioemb[text_data]['embedding'][:])
                     if len(tokens.shape) == 1:
@@ -1659,10 +1711,12 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
         if not os.path.exists("./data/testIndexes"):
             os.makedirs('./data/testIndexes', exist_ok=True)
             
-        if data_type == "validation dataset":
-            self.txtDict = txtDictLoad("train")
-        else:
-            self.txtDict = txtDictLoad("test")
+        self.txtDict = txtDictLoad("train")
+        self.txtDict.update(txtDictLoad("test"))
+        # if data_type == "validation dataset":
+        #     self.txtDict = txtDictLoad("train")
+        # else:
+        #     self.txtDict = txtDictLoad("test")
         if args.berttype == "biobert":
             self.bioemb = h5py.File(args.biobert_path, 'r')
             self.token_max_length = 768
@@ -1725,6 +1779,10 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             
             with open(pkl_path, 'rb') as _f:
                 data_info = pkl.load(_f)
+                
+            if "cxr_input" in data_info:
+                if data_info["cxr_input"] == None:
+                    del data_info["cxr_input"]
             
             if "cxr_input" in data_info:
                 new_cxr_inputs = [cxr for cxr in data_info["cxr_input"] if float(cxr[1].split("_")[-1].split(".")[0]) >= args.ar_lowerbound and float(cxr[1].split("_")[-1].split(".")[0]) <= args.ar_upperbound]
@@ -1985,7 +2043,8 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             with open(test_winsize_file, 'wb') as f:
                 pickle.dump(winDict, f, pickle.HIGHEST_PROTOCOL)
         
-        self.feature_means = list(data_info['mean'])
+        # self.feature_means = list(data_info['mean'])
+        self.feature_means = FEATURE_MEANS
 
         print("No Dataset Error 1st: ", len(_type_list) == len(_data_list))
         print("No Dataset Error 2nd: ", len(self._type_list) == len(self._data_list))
@@ -2098,6 +2157,10 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
 
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
         
+        if "cxr_input" in data_pkl:
+            if data_pkl["cxr_input"] == None:
+                del data_pkl["cxr_input"]
+                
         img_time = -1
         if (("img" in args.input_types and "img1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and type_list in [0,2,3,5] and "img" in args.input_types)) and ('cxr_input' in data_pkl):
             cxr_li = [i for i in data_pkl['cxr_input'] if i[0] <= selectedKey] 
@@ -2121,7 +2184,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
         if args.berttype == "biobert" and args.txt_tokenization == "bert":
             txt_missing = True
             if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
-                text_data = data_pkl['txt_input'].strip()
+                text_data = data_pkl['txt_input'][0].strip()
                 if len(text_data) != 0:
                     tokens = torch.Tensor(self.bioemb[text_data]['embedding'][:])
                     if len(tokens.shape) == 1:

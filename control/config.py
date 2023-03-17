@@ -26,6 +26,7 @@ parser.add_argument('--checkpoint', '-cp', type=bool, default=False)
 parser.add_argument('--prediction-range', type=int, default=12)
 parser.add_argument('--min-inputlen', type=int, default=3)
 parser.add_argument('--window-size', type=int, default=24)
+parser.add_argument('--vslt-type', type=str, default="carryforward", choices=["carryforward", "TIE"])
 parser.add_argument('--ar-lowerbound', type=float, default=0.7)
 parser.add_argument('--ar-upperbound', type=float, default=1.3)
 
@@ -36,8 +37,8 @@ parser.add_argument('--modality-inclusion', type=str, default="train-full_test-f
 parser.add_argument('--fullmodal-definition', type=str, default="txt1", choices=["txt1_img1", "img1", "txt1"])
 
 # Data path setting
-parser.add_argument('--train-data-path', type=str, default="/home/destin/training_data_0113/mimic_icu/train")
-parser.add_argument('--test-data-path', type=str, default="/home/destin/training_data_0113/mimic_icu/test")
+parser.add_argument('--train-data-path', type=str, default="/home/destin/training_data_0318/mimic_icu/train")
+parser.add_argument('--test-data-path', type=str, default="/home/destin/training_data_0318/mimic_icu/test")
 parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/destin/multimodal/MLHC_result")
 parser.add_argument('--image-data-path', type=str, default="/mnt/aitrics_ext/ext01/shared/")
 # Data Parameters

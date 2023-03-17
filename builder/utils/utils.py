@@ -156,14 +156,26 @@ def onetime_outbreak_valdataset_maker(args, patdictPath, winsizePath):
     _data_list = []
     patDict = {}
     winDict = {}
+    # txtDict = txtDictLoad("train")
     txtDict = txtDictLoad("train")
+    txtDict.update(txtDictLoad("test"))
 
+    # time_len = 0
     for idx, pkl_path in enumerate(tqdm(train_dir, desc="Creating fixed indices of validation data...")):
         file_name = pkl_path.split("/")[-1]
         
         with open(pkl_path, 'rb') as _f:
             data_info = pkl.load(_f)
+            
+        # data_in_time = data_info['data_in_time']
+        # if time_len < data_in_time.shape[0]:
+        #     time_len = data_in_time.shape[0]
+        #     print(time_len)
         
+        if "cxr_input" in data_info:
+            if data_info["cxr_input"] == None:
+                del data_info["cxr_input"]
+                    
         if "cxr_input" in data_info:
             new_cxr_inputs = [cxr for cxr in data_info["cxr_input"] if float(cxr[1].split("_")[-1].split(".")[0]) >= args.ar_lowerbound and float(cxr[1].split("_")[-1].split(".")[0]) <= args.ar_upperbound]
             if len(new_cxr_inputs) > 0:
@@ -314,7 +326,6 @@ def onetime_outbreak_valdataset_maker(args, patdictPath, winsizePath):
     with open(winsizePath, 'wb') as f:
         pickle.dump(winDict, f, pickle.HIGHEST_PROTOCOL)
         
-        
 def multiple_outbreaks_valdataset_maker(args, patdictPath, winsizePath):
     train_dir = search_walk({"path": args.train_data_path, "extension": ".pkl"})
     _data_list = []
@@ -327,7 +338,9 @@ def multiple_outbreaks_valdataset_maker(args, patdictPath, winsizePath):
     taskIndex = tmpTasks.index(args.output_type)
     
     # if "txt" in args.input_types:
+    # txtDict = txtDictLoad("train")
     txtDict = txtDictLoad("train")
+    txtDict.update(txtDictLoad("test"))
 
     for idx, pkl_path in enumerate(tqdm(train_dir, desc="Creating fixed indices of validation data...")):
         file_name = pkl_path.split("/")[-1]
@@ -335,6 +348,10 @@ def multiple_outbreaks_valdataset_maker(args, patdictPath, winsizePath):
         with open(pkl_path, 'rb') as _f:
             data_info = pkl.load(_f)
         
+        if "cxr_input" in data_info:
+            if data_info["cxr_input"] == None:
+                del data_info["cxr_input"]
+                
         if "cxr_input" in data_info:
             new_cxr_inputs = [cxr for cxr in data_info["cxr_input"] if float(cxr[1].split("_")[-1].split(".")[0]) >= args.ar_lowerbound and float(cxr[1].split("_")[-1].split(".")[0]) <= args.ar_upperbound]
             if len(new_cxr_inputs) > 0:
