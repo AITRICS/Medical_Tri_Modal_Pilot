@@ -26,13 +26,17 @@ import torchvision.transforms as transforms
 import torchvision.transforms.functional as F_t
 from control.config import args
 from builder.utils.utils import *
-from builder.data.collate_fn import *
+from builder.data.data_utils import *
 import h5py
 
 VITALSIGN_LABTEST = ['HR', 'RR', 'BT', 'SBP', 'DBP', 'Sat', 'GCS', 
                      'Hematocrit', 'PLT', 'WBC', 'Bilirubin', 'pH', 'HCO3', 
                      'Creatinine', 'Lactate', 'Potassium', 'Sodium', 'CRP']
-
+FEATURE_TYPES = [
+        'PULSE', 'RESP', 'TEMP', 'SBP', 'DBP', 'SpO2', 'GCS',
+        'HEMATOCRIT', 'PLATELET', 'WBC', 'BILIRUBIN', 'pH', 'HCO3', 
+        'CREATININE', 'LACTATE', 'POTASSIUM', 'SODIUM', 'CRP'
+    ]
 #margin_dir = search_walk({"path": "/nfs/thena/MedicalAI/ImageData/public/MIMIC_CXR/data/files_margins", "extension": ".jpg"})
 #with open("margin_dir.pkl","wb") as f:
 #    pickle.dump(margin_dir,f)
@@ -485,7 +489,9 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         else:
             gender = 0
         static_inputs = torch.Tensor([gender, data_pkl['age']])
-
+        time_data = data_pkl['inputs_in_real_time']
+        print("time_data: ", time_data)
+        
         # Normalization of Data
         pklFeatureMins = args.feature_mins
         pklFeatureMinMaxs = args.feature_maxs - args.feature_mins

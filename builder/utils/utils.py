@@ -3,7 +3,7 @@ import random
 import torch
 import numpy as np
 from tqdm import tqdm
-from builder.data.collate_fn import *
+from builder.data.data_utils import *
 import pickle5 as pickle
 import math 
 

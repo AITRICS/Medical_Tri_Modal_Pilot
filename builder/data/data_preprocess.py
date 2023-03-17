@@ -5,7 +5,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 
 from builder.utils.utils import *
-from builder.data.collate_fn import *
+from builder.data.data_utils import *
 from builder.data.dataset_new import *
 
 # 실시간 데이터 전처리기 구상도
