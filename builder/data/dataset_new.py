@@ -669,6 +669,7 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
         positive_tpoints = 0
         negative_tpoints = 0
         
+        self.vslt_type = args.vslt_type
         self.vslt_len = len(args.vitalsign_labtest)
         self.neg_multi_target = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.intv_len = int(args.prediction_range // 12)
@@ -1244,6 +1245,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         positive_tpoints = 0
         negative_tpoints = 0
         
+        self.vslt_type = args.vslt_type
         self.vslt_len = len(args.vitalsign_labtest)
         self.neg_multi_target = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.intv_len = int(args.prediction_range // 12)
@@ -1755,6 +1757,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
         positive_tpoints = 0
         negative_tpoints = 0
         
+        self.vslt_type = args.vslt_type
         self.vslt_len = len(args.vitalsign_labtest)
         self.neg_multi_target = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.intv_len = int(args.prediction_range // 12)
