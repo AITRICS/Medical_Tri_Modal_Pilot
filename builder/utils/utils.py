@@ -2,10 +2,38 @@ import os
 import random
 import torch
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
 from builder.data.data_utils import *
 import pickle5 as pickle
 import math 
+
+FEATURE_LIST = [
+    'PULSE', 'RESP', 'TEMP', 'SBP', 'DBP', 'SpO2', 'GCS',
+    'HEMATOCRIT', 'PLATELET', 'WBC', 'BILIRUBIN', 'pH', 'HCO3', 
+    'CREATININE', 'LACTATE', 'POTASSIUM', 'SODIUM', 'CRP',
+]
+
+FEATURE_MEAN = { 
+    'PULSE'     : 85.93695802, 
+    'RESP'      : 20.10544135, 
+    'TEMP'      : 36.97378611, 
+    'SBP'       : 120.00165406, 
+    'DBP'       : 62.85878326, 
+    'SpO2'      : 96.7560417, 
+    'GCS'       : 14.58784295, 
+    'HEMATOCRIT': 29.44163972, 
+    'PLATELET'  : 200.15499694, 
+    'WBC'       : 12.11825286, 
+    'BILIRUBIN' : 3.79762327, 
+    'pH'        : 7.37816261, 
+    'HCO3'      : 24.38824869, 
+    'CREATININE': 1.5577265, 
+    'LACTATE'   : 2.51239096, 
+    'POTASSIUM' : 4.12411448, 
+    'SODIUM'    : 138.91951009, 
+    'CRP'       : 88.96706267,
+} # feature mean values gained from only training dataset...
 
 def isListEmpty(inList):
     if isinstance(inList, list): # Is a list
@@ -24,32 +52,17 @@ def make_setting_file(args) -> None:
         settings_file.write(key + " # " + str(args.__dict__[key]) + "\n")
 
     settings_file.close()
-
-# def name_trainer(args) -> None:
-#     # select trainer
-#     if args.predict_type == "seq_pretrain":
-#         args.trainer = "seq_pretrain"
-#         raise ValueError("Use other code for pretraining process...")
-        
-#     elif args.input_types == 'vslt':
-#         if args.predict_type == "multi_task_within":
-#             args.trainer = "multi_task_within_vslt"
     
-#     elif args.input_types == "vslt_txt":
-#         if args.predict_type == "multi_task_within":
-#             args.trainer = "multi_task_within_bi_vslt_txt"
 
-#     elif args.input_types == "vslt_img":
-#         if args.predict_type == "multi_task_within":
-#             args.trainer = "multi_task_within_bi_vslt_img"
-
-#     elif args.input_types == "vslt_img_txt":
-#         if args.predict_type == "multi_task_within":
-#             args.trainer = "multi_task_within_tri"
-
-#     else:
-#         raise NotImplementedError("unimodal: vslt, img, txt / bimodal: vslt_txt")
-#     pass
+def carry_forward(np_arr):
+    # for (seq_len x feature_num)
+    df = pd.DataFrame(np_arr, columns=FEATURE_LIST)
+    df = df.fillna(method='ffill')
+    # df = df.fillna(method='bfill')
+    df = df.fillna(value=FEATURE_MEAN)
+    data = df.to_numpy()
+    
+    return data
 
 def set_seeds(args) -> None:
 	torch.manual_seed(args.seed)
@@ -190,10 +203,14 @@ def onetime_outbreak_valdataset_maker(args, patdictPath, winsizePath):
             if ("cxr_input" not in data_info and "img1" in args.fullmodal_definition):
                 continue
             if "txt1" in args.fullmodal_definition:
+                if (int(data_info['pat_id']), int(data_info['chid'])) not in txtDict:
+                    continue
                 if (len(txtDict[(int(data_info['pat_id']), int(data_info['chid']))]) == 0): 
                     continue
         else: # missing modality
             if "txt1" in file_name:
+                if (int(data_info['pat_id']), int(data_info['chid'])) not in txtDict:
+                    continue
                 if (len(txtDict[(int(data_info['pat_id']), int(data_info['chid']))]) == 0): 
                     file_name = file_name.replace("_txt1_", "_txt0_")
             if ("cxr_input" not in data_info and "img1" in file_name):
@@ -229,8 +246,6 @@ def onetime_outbreak_valdataset_maker(args, patdictPath, winsizePath):
         # pat_neg_indices_keys_with_img = 4 for (Case2: full_modal with img1 in fullmodal_definition) or (Case3: missing modal)     Case2: (pn)         Case3: (wimgwtxt-pn: 1, wimgw/otxt-pn: 4)
         # pat_neg_indices_keys_without_img = 5 for (Case3: missing modal)                                                                               Case3: (w/oimgwtxt-pn: 7, w/oimgw/otxt-pn: 10)
         possible_indices_keys_alltypes = [[] for _ in range(6)]
-            
-        possibleWinSizes = data_info['possibleWinSizes']
         if(data_info['death_yn'] == 0):
             target = 0
             target_type = 0
@@ -293,6 +308,12 @@ def onetime_outbreak_valdataset_maker(args, patdictPath, winsizePath):
                 possible_indices_keys_alltypes[5]= list(possible_indices_keys_alltypes[3])    
         
         possibleWinSizes = data_info['possibleWinSizes']
+        new_possibleWinSizes = {}
+        for win_index in possibleWinSizes:
+            new_list = [i for i in possibleWinSizes[win_index] if i >= args.min_inputlen]
+            if len(new_list) > 0:
+                new_possibleWinSizes[win_index] = new_list
+        possibleWinSizes = dict(new_possibleWinSizes)
         possible_indices_keys_alltypes = list([list(filter(lambda x: x in possibleWinSizes, key_list)) for key_list in possible_indices_keys_alltypes])
         
         if isListEmpty(possible_indices_keys_alltypes):
@@ -366,10 +387,14 @@ def multiple_outbreaks_valdataset_maker(args, patdictPath, winsizePath):
             if ("cxr_input" not in data_info and "img1" in args.fullmodal_definition):
                 continue
             if "txt1" in args.fullmodal_definition:
+                if (int(data_info['pat_id']), int(data_info['chid'])) not in txtDict:
+                    continue
                 if (len(txtDict[(int(data_info['pat_id']), int(data_info['chid']))]) == 0): 
                     continue
         else: # missing modality
             if "txt1" in file_name:
+                if (int(data_info['pat_id']), int(data_info['chid'])) not in txtDict:
+                    continue
                 if (len(txtDict[(int(data_info['pat_id']), int(data_info['chid']))]) == 0): 
                     file_name = file_name.replace("_txt1_", "_txt0_")
             if ("cxr_input" not in data_info and "img1" in file_name):
@@ -405,7 +430,7 @@ def multiple_outbreaks_valdataset_maker(args, patdictPath, winsizePath):
         # pat_neg_indices_keys_without_img = 5 for (Case3: missing modal)                                                                               Case3: (w/oimgwtxt-pn: 7, w/oimgw/otxt-pn: 10)
         possible_indices_keys_alltypes = [[] for _ in range(6)]
         
-        possibleWinSizes = data_info['possibleWinSizes']
+        # possibleWinSizes = data_info['possibleWinSizes']
         
         ##### get possibles indices and max lengths here #####
         # If there are no positive cases in indices below args.min_inputlen, we change the case to negative.
@@ -489,6 +514,12 @@ def multiple_outbreaks_valdataset_maker(args, patdictPath, winsizePath):
                     possible_indices_keys_alltypes[5]= list(possible_indices_keys_alltypes[3])  
         ######################################################
         possibleWinSizes = data_info['possibleWinSizes']
+        new_possibleWinSizes = {}
+        for win_index in possibleWinSizes:
+            new_list = [i for i in possibleWinSizes[win_index] if i >= args.min_inputlen]
+            if len(new_list) > 0:
+                new_possibleWinSizes[win_index] = new_list
+        possibleWinSizes = dict(new_possibleWinSizes)
         # possible_indices_keys = [key for key in possible_indices_keys if key in possibleWinSizes]
         possible_indices_keys_alltypes = list([list(filter(lambda x: x in possibleWinSizes, key_list)) for key_list in possible_indices_keys_alltypes])
         

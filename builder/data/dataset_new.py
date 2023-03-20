@@ -236,10 +236,14 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 if ("cxr_input" not in data_info and "img1" in args.fullmodal_definition):
                     continue
                 if "txt1" in args.fullmodal_definition:
+                    if (int(data_info['pat_id']), int(data_info['chid'])) not in self.txtDict:
+                        continue   
                     if (len(self.txtDict[(int(data_info['pat_id']), int(data_info['chid']))]) == 0): 
                         continue
             else: # missing modality
                 if "txt1" in file_name:
+                    if (int(data_info['pat_id']), int(data_info['chid'])) not in self.txtDict:
+                        continue
                     if (len(self.txtDict[(int(data_info['pat_id']), int(data_info['chid']))]) == 0): 
                         file_name = file_name.replace("_txt1_", "_txt0_")
                 if ("cxr_input" not in data_info and "img1" in file_name):
@@ -336,15 +340,18 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                     possible_indices_keys_alltypes[5]= list(possible_indices_keys_alltypes[3])    
             
             possibleWinSizes = data_info['possibleWinSizes']
+            new_possibleWinSizes = {}
+            for win_index in possibleWinSizes:
+                new_list = [i for i in possibleWinSizes[win_index] if i >= args.min_inputlen]
+                if len(new_list) > 0:
+                    new_possibleWinSizes[win_index] = new_list
+            possibleWinSizes = dict(new_possibleWinSizes)
             # possible_indices_keys = [key for key in possible_indices_keys if key in possibleWinSizes]
             possible_indices_keys_alltypes = list([list(filter(lambda x: x in possibleWinSizes, key_list)) for key_list in possible_indices_keys_alltypes])
             
             if isListEmpty(possible_indices_keys_alltypes):
                 continue
             patient_list.append(target_type)
-            
-                # elif ("txt1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion):
-                #     pass
             
             ######################################################
             if ('train-full' in args.modality_inclusion and "img1" not in args.fullmodal_definition): # (Case1: full_modal with img1 not in fullmodal_definition)
@@ -433,8 +440,9 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 
             ######################################################            
             if "train" in data_type:
-                self.train_min.append(data_info['feature_mins'])
-                self.train_max.append(data_info['feature_maxs'])
+                pass
+                # self.train_min.append(data_info['feature_mins'])
+                # self.train_max.append(data_info['feature_maxs'])
             else:
                 lengths.append(sequenceLength)
 
@@ -448,11 +456,10 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         # self.feature_means = list(data_info['mean'])
         self.feature_means = FEATURE_MEANS
 
-        print("max time len: ", time_len)
         print("No Dataset Error: ", len(self._type_list) == len(self._data_list))
-        if "train" in data_type:
-            self.train_min = np.min(np.array(self.train_min), axis=0)
-            self.train_max = np.max(np.array(self.train_max), axis=0)
+        # if "train" in data_type:
+        #     self.train_min = np.min(np.array(self.train_min), axis=0)
+        #     self.train_max = np.max(np.array(self.train_max), axis=0)
         if ('train-full' in args.modality_inclusion):
             print("Number of patient positive samples list for training: {}".format(str(patient_list.count(1))))
             print("Number of patient negative samples list for training: {}".format(str(patient_list.count(2))))
@@ -498,6 +505,8 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
     def __getitem__(self, index):
         pkl_path, possible_indices_keys, labels_by_dict, win_sizes, target = self._data_list[index]
         type_list = self._type_list[index]
+        early_nones = 0
+        late_nones = 0
         file_name = pkl_path.split("/")[-1]
         with open(pkl_path, 'rb') as _f:
             data_pkl = pkl.load(_f)
@@ -512,49 +521,63 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         # Normalization of Data
         pklFeatureMins = args.feature_mins
         pklFeatureMinMaxs = args.feature_maxs - args.feature_mins
-
         windowIndex = self.window_size - 1
         selectedKey = random.choice(possible_indices_keys)
+        oldselectedKey = selectedKey
         randLength = random.choice(win_sizes[selectedKey])
+        data_pkl['data'] = np.subtract(data_pkl['data'], pklFeatureMins)
+        data_pkl['data'] = np.divide(data_pkl['data'], pklFeatureMinMaxs)
         
-        if self.vslt_type == "carryforward":
-        
-            data_pkl['data'] = np.subtract(data_pkl['data'], pklFeatureMins)
-            data_pkl['data'] = np.divide(data_pkl['data'], pklFeatureMinMaxs)
-
-            if args.auxiliary_loss_input is None:
-                dataSequence, maskSequence, deltaSequence, inputLength = sequenceGenerator(args, selectedKey, randLength, windowIndex, data_pkl)
-                f_indices = False
+        final_seqs = torch.Tensor(self.time_data_array)
+        time_data_list = list(data_pkl['data_in_time'][selectedKey-randLength+1:selectedKey+1])
+        if time_data_list[0] is None or time_data_list[-1] is None:
+            if time_data_list[0] is None:
+                early_nones = [i for i in range(len(time_data_list)) if time_data_list[i] is not None][0]
+            elif time_data_list[-1] is None:
+                late_nones = randLength - [i for i in range(len(time_data_list)) if time_data_list[i] is not None][-1] - 1
             else:
-                dataSequence, maskSequence, deltaSequence, inputLength, f_indices = sequenceGenerator_pretrain(args, selectedKey, randLength, windowIndex+12, data_pkl)
-        
-            if args.carry_back:
-                initStartIdx = data_pkl['initStartIdx']
-                for idx, i in enumerate(initStartIdx):
-                    k = i - (selectedKey-randLength) -1
-                    
-                    if (i <= selectedKey) and (i > selectedKey-randLength):
-                        dataSequence[:k, idx] = dataSequence[k, idx]
+                nones = [i for i in range(len(time_data_list)) if time_data_list[i] is not None]
+                early_nones = nones[0]
+                late_nones = randLength - nones[-1] - 1
+                
+            randLength -= early_nones
+            selectedKey -= late_nones
+            time_data_list = list(time_data_list[early_nones:-late_nones])
+
+        if args.auxiliary_loss_input is None:
+            dataSequence, maskSequence, deltaSequence, inputLength = sequenceGenerator(args, selectedKey, randLength, windowIndex, data_pkl)
+            f_indices = False
+        else:
+            dataSequence, maskSequence, deltaSequence, inputLength, f_indices = sequenceGenerator_pretrain(args, selectedKey, randLength, windowIndex+12, data_pkl)
+          
+        if self.vslt_type == "carryforward":    
+            dataSequence = carry_forward(dataSequence)                        
             sample_len = dataSequence.shape[0]
             final_seqs = torch.zeros(3, self.window_size, self.vslt_len)
             final_seqs[0].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(dataSequence, args.vslt_mask, axis = 1)))
             final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
             final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
-            
-        else:
-            time_data = torch.Tensor(data_pkl['data_in_time'])
-            final_seqs = self.time_data_array
+        else:        
+            time_data_np = torch.Tensor(np.concatenate([i for i in time_data_list if i is not None]))
+            final_seqs[:time_data_np.shape[0], :time_data_np.shape[1]] = time_data_np
+            inputLength = time_data_np.shape[0]
+            f_indices = False
+        
+        # print("final_seqs: ", final_seqs.shape)
+        # print("1 selectedKey: ", selectedKey)
+        # print("2 randLength: ", randLength)
+        # print("3 dataSequence: ", dataSequence)
+        # print("4 time_data_list: ", time_data_list)
+    
+        if target != 0:
+            if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
+                target = 0
+            else:
+                target = 1
+        target = torch.tensor(target)
 
-        if target == 0:
-            multi_target = 0
-        else:
-            multi_target = 1
-        multi_target = torch.tensor(multi_target)
-        
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
-        
         img_time = -1
-        
         if "cxr_input" in data_pkl:
             if data_pkl["cxr_input"] == None:
                 del data_pkl["cxr_input"]
@@ -619,9 +642,8 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 textLength = 0
                 missing.append(True)
 
-                
         missing = torch.Tensor(missing)
-        return final_seqs, static_inputs, multi_target, inputLength, img, tokens, textLength, img_time, missing, f_indices
+        return final_seqs, static_inputs, target, inputLength, img, tokens, textLength, img_time, missing, f_indices
 
 class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
 
@@ -654,7 +676,7 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
         self.image_size = [args.image_size, args.image_size]
         self.input_types = args.input_types
         self.image_data_path = args.image_data_path
-        self.token_max_length = args.bert_token_max_length
+        self.time_data_array = np.zeros([10000,3])
         
         class2dict_missing = {3:1, 6:2, 9:3, 2:4, 8:6, 11:7, 1:4, 4:5, 7:6, 10:7}
         class2dict_full = {2:0}
@@ -773,10 +795,14 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                 if ("cxr_input" not in data_info and "img1" in args.fullmodal_definition):
                     continue
                 if "txt1" in args.fullmodal_definition:
+                    if (int(data_info['pat_id']), int(data_info['chid'])) not in self.txtDict:
+                        continue
                     if (len(self.txtDict[(int(data_info['pat_id']), int(data_info['chid']))]) == 0): 
                         continue
             else: # missing modality
                 if "txt1" in file_name:
+                    if (int(data_info['pat_id']), int(data_info['chid'])) not in self.txtDict:
+                        continue
                     if (len(self.txtDict[(int(data_info['pat_id']), int(data_info['chid']))]) == 0): 
                         file_name = file_name.replace("_txt1_", "_txt0_")
                 if ("cxr_input" not in data_info and "img1" in file_name):
@@ -826,7 +852,7 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                 # pat_neg_indices_keys_without_img = 5 for (Case3: missing modal)                                                                               Case3: (w/oimgwtxt-pn: 7, w/oimgw/otxt-pn: 10)
                 possible_indices_keys_alltypes = [[] for _ in range(6)]
                 
-                possibleWinSizes = data_info['possibleWinSizes']
+                # possibleWinSizes = data_info['possibleWinSizes']
                 if(data_info['death_yn'] == 0):
                     target = 0
                     target_type = 0
@@ -890,6 +916,12 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                         possible_indices_keys_alltypes[5]= list(possible_indices_keys_alltypes[3])    
                 
                 possibleWinSizes = data_info['possibleWinSizes']
+                new_possibleWinSizes = {}
+                for win_index in possibleWinSizes:
+                    new_list = [i for i in possibleWinSizes[win_index] if i >= args.min_inputlen]
+                    if len(new_list) > 0:
+                        new_possibleWinSizes[win_index] = new_list
+                possibleWinSizes = dict(new_possibleWinSizes)
                 possible_indices_keys_alltypes = list([list(filter(lambda x: x in possibleWinSizes, key_list)) for key_list in possible_indices_keys_alltypes])
                 
                 if isListEmpty(possible_indices_keys_alltypes):
@@ -1062,7 +1094,8 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
     def __getitem__(self, index):
         pkl_path, possible_indices_keys, labels_by_dict, win_size, target = self._data_list[index]
         type_list = self._type_list[index]
-        
+        early_nones = 0
+        late_nones = 0
         file_name = pkl_path.split("/")[-1]
         with open(pkl_path, 'rb') as _f:
             data_pkl = pkl.load(_f)
@@ -1082,36 +1115,53 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
 
         windowIndex = self.window_size - 1
         selectedKey = possible_indices_keys[0]
+        
+        oldselectedKey = selectedKey
+        final_seqs = torch.Tensor(self.time_data_array)
+        time_data_list = list(data_pkl['data_in_time'][selectedKey-randLength+1:selectedKey+1])
+        if time_data_list[0] is None or time_data_list[-1] is None:
+            if time_data_list[0] is None:
+                early_nones = [i for i in range(len(time_data_list)) if time_data_list[i] is not None][0]
+            elif time_data_list[-1] is None:
+                late_nones = randLength - [i for i in range(len(time_data_list)) if time_data_list[i] is not None][-1] - 1
+            else:
+                nones = [i for i in range(len(time_data_list)) if time_data_list[i] is not None]
+                early_nones = nones[0]
+                late_nones = randLength - nones[-1] - 1
+                
+            randLength -= early_nones
+            selectedKey -= late_nones
+            time_data_list = list(time_data_list[early_nones:-late_nones])
+        
         dataSequence, maskSequence, deltaSequence, inputLength = sequenceGenerator(args, selectedKey, win_size, windowIndex, data_pkl)
         f_indices = False
-        
-        if args.carry_back:
-            initStartIdx = data_pkl['initStartIdx']
-            for idx, i in enumerate(initStartIdx):
-                k = i - (selectedKey-win_size) -1
-                
-                if (i <= selectedKey) and (i > selectedKey-win_size):
-                    dataSequence[:k, idx] = dataSequence[k, idx]
                     
-        sample_len = dataSequence.shape[0]
-        final_seqs = torch.zeros(3, self.window_size, self.vslt_len)
-        final_seqs[0].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(dataSequence, args.vslt_mask, axis = 1)))
-        final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
-        final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
+        if self.vslt_type == "carryforward":    
+            dataSequence = carry_forward(dataSequence)                        
+            sample_len = dataSequence.shape[0]
+            final_seqs = torch.zeros(3, self.window_size, self.vslt_len)
+            final_seqs[0].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(dataSequence, args.vslt_mask, axis = 1)))
+            final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
+            final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
+        else:        
+            time_data_np = torch.Tensor(np.concatenate([i for i in time_data_list if i is not None]))
+            final_seqs[:time_data_np.shape[0], :time_data_np.shape[1]] = time_data_np
+            inputLength = time_data_np.shape[0]
+            f_indices = False
 
-        if target == 0:
-            multi_target = 0
-        else:
-            multi_target = 1
-        multi_target = torch.tensor(multi_target)
+        if target != 0:
+            if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
+                target = 0
+            else:
+                target = 1
+        target = torch.tensor(target)
 
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
-        
+        img_time = -1
         if "cxr_input" in data_pkl:
             if data_pkl["cxr_input"] == None:
                 del data_pkl["cxr_input"]
-                
-        img_time = -1
+
         if (("img" in args.input_types and "img1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and type_list in [0,2,3,5] and "img" in args.input_types)) and ('cxr_input' in data_pkl):
             cxr_li = [i for i in data_pkl['cxr_input'] if i[0] <= selectedKey] 
             if not cxr_li and ('test-full' in args.modality_inclusion): 
@@ -1172,7 +1222,7 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
                 
         missing = torch.Tensor(missing)
-        return final_seqs, static_inputs, multi_target, inputLength, img, tokens, textLength, img_time, missing, f_indices
+        return final_seqs, static_inputs, target, inputLength, img, tokens, textLength, img_time, missing, f_indices
 
 class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
 
@@ -1201,7 +1251,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         self.image_size = [args.image_size, args.image_size]
         self.input_types = args.input_types
         self.image_data_path = args.image_data_path
-        self.token_max_length = args.bert_token_max_length
+        self.time_data_array = np.zeros([10000,3])
         
         # self.txtDict = txtDictLoad("train")
         self.txtDict = txtDictLoad("train")
@@ -1255,10 +1305,14 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 if ("cxr_input" not in data_info and "img1" in args.fullmodal_definition):
                     continue
                 if "txt1" in args.fullmodal_definition:
+                    if (int(data_info['pat_id']), int(data_info['chid'])) not in self.txtDict:
+                        continue
                     if (len(self.txtDict[(int(data_info['pat_id']), int(data_info['chid']))]) == 0): 
                         continue
             else: # missing modality
                 if "txt1" in file_name:
+                    if (int(data_info['pat_id']), int(data_info['chid'])) not in self.txtDict:
+                        continue
                     if (len(self.txtDict[(int(data_info['pat_id']), int(data_info['chid']))]) == 0): 
                         file_name = file_name.replace("_txt1_", "_txt0_")
                 if ("cxr_input" not in data_info and "img1" in file_name):
@@ -1366,6 +1420,12 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
             #     exit(1)
             ######################################################
             possibleWinSizes = data_info['possibleWinSizes']
+            new_possibleWinSizes = {}
+            for win_index in possibleWinSizes:
+                new_list = [i for i in possibleWinSizes[win_index] if i >= args.min_inputlen]
+                if len(new_list) > 0:
+                    new_possibleWinSizes[win_index] = new_list
+            possibleWinSizes = dict(new_possibleWinSizes)
             # possible_indices_keys = [key for key in possible_indices_keys if key in possibleWinSizes]
             possible_indices_keys_alltypes = list([list(filter(lambda x: x in possibleWinSizes, key_list)) for key_list in possible_indices_keys_alltypes])
             
@@ -1537,7 +1597,8 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
     def __getitem__(self, index):
         pkl_path, possible_indices_keys, labels_by_dict, win_sizes, target = self._data_list[index]
         type_list = self._type_list[index]
-        
+        early_nones = 0
+        late_nones = 0
         file_name = pkl_path.split("/")[-1]
         with open(pkl_path, 'rb') as _f:
             data_pkl = pkl.load(_f)
@@ -1552,51 +1613,61 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         # Normalization of Data
         pklFeatureMins = args.feature_mins
         pklFeatureMinMaxs = args.feature_maxs - args.feature_mins
+        windowIndex = self.window_size - 1
+        selectedKey = random.choice(possible_indices_keys)
+        oldselectedKey = selectedKey
+        randLength = random.choice(win_sizes[selectedKey])
         data_pkl['data'] = np.subtract(data_pkl['data'], pklFeatureMins)
         data_pkl['data'] = np.divide(data_pkl['data'], pklFeatureMinMaxs)
 
-        windowIndex = self.window_size - 1
-        
-        # if 'train-full' in args.modality_inclusion:
-        #     earliest_img_time = min([j[0] for j in data_pkl['cxr_input']])
-        #     possible_indices_keys= list([i for i in possible_indices_keys if earliest_img_time<=i])
-        
-        selectedKey = random.choice(possible_indices_keys)
-        randLength = random.choice(win_sizes[selectedKey])
-        
+        final_seqs = torch.Tensor(self.time_data_array)
+        time_data_list = list(data_pkl['data_in_time'][selectedKey-randLength+1:selectedKey+1])
+        if time_data_list[0] is None or time_data_list[-1] is None:
+            if time_data_list[0] is None:
+                early_nones = [i for i in range(len(time_data_list)) if time_data_list[i] is not None][0]
+            elif time_data_list[-1] is None:
+                late_nones = randLength - [i for i in range(len(time_data_list)) if time_data_list[i] is not None][-1] - 1
+            else:
+                nones = [i for i in range(len(time_data_list)) if time_data_list[i] is not None]
+                early_nones = nones[0]
+                late_nones = randLength - nones[-1] - 1
+                
+            randLength -= early_nones
+            selectedKey -= late_nones
+            time_data_list = list(time_data_list[early_nones:-late_nones])
+            
         if args.auxiliary_loss_input is None:
             dataSequence, maskSequence, deltaSequence, inputLength = sequenceGenerator(args, selectedKey, randLength, windowIndex, data_pkl)
             f_indices = False
         else:
             dataSequence, maskSequence, deltaSequence, inputLength, f_indices = sequenceGenerator_pretrain(args, selectedKey, randLength, windowIndex+12, data_pkl)
-        
-        if args.carry_back:
-            initStartIdx = data_pkl['initStartIdx']
-            for idx, i in enumerate(initStartIdx):
-                k = i - (selectedKey-randLength) -1
-                
-                if (i <= selectedKey) and (i > selectedKey-randLength):
-                    dataSequence[:k, idx] = dataSequence[k, idx]
-                    
-        sample_len = dataSequence.shape[0]
-        final_seqs = torch.zeros(3, self.window_size, self.vslt_len)
-        final_seqs[0].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(dataSequence, args.vslt_mask, axis = 1)))
-        final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
-        final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
+            
+        if self.vslt_type == "carryforward":    
+            dataSequence = carry_forward(dataSequence)                        
+            sample_len = dataSequence.shape[0]
+            final_seqs = torch.zeros(3, self.window_size, self.vslt_len)
+            final_seqs[0].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(dataSequence, args.vslt_mask, axis = 1)))
+            final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
+            final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
+        else:        
+            time_data_np = torch.Tensor(np.concatenate([i for i in time_data_list if i is not None]))
+            final_seqs[:time_data_np.shape[0], :time_data_np.shape[1]] = time_data_np
+            inputLength = time_data_np.shape[0]
+            f_indices = False
+            
+        if target != 0:
+            if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
+                target = 0
+            else:
+                target = 1
+        target = torch.tensor(target)
 
-        if target == 0:
-            multi_target = 0
-        else:
-            multi_target = 1
-        multi_target = torch.tensor(multi_target)
-        
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
-        
+        img_time = -1
         if "cxr_input" in data_pkl:
             if data_pkl["cxr_input"] == None:
                 del data_pkl["cxr_input"]
                 
-        img_time = -1
         if (("img" in args.input_types and "img1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and type_list in [0,2,3,5] and "img" in args.input_types)) and ('cxr_input' in data_pkl):
             cxr_li = [i for i in data_pkl['cxr_input'] if i[0] <= selectedKey] 
             if not cxr_li and ('train-full' in args.modality_inclusion): 
@@ -1657,7 +1728,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
                 
         missing = torch.Tensor(missing)  
-        return final_seqs, static_inputs, multi_target, inputLength, img, tokens, textLength, img_time, missing, f_indices
+        return final_seqs, static_inputs, target, inputLength, img, tokens, textLength, img_time, missing, f_indices
 
 class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
 
@@ -1691,7 +1762,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
         self.image_size = [args.image_size, args.image_size]
         self.input_types = args.input_types
         self.image_data_path = args.image_data_path
-        self.token_max_length = args.bert_token_max_length
+        self.time_data_array = np.zeros([10000,3])
         
         class2dict_missing = {3:1, 6:2, 9:3, 2:4, 8:6, 11:7, 1:4, 4:5, 7:6, 10:7}
         class2dict_full = {2:0}
@@ -1798,10 +1869,14 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 if ("cxr_input" not in data_info and "img1" in args.fullmodal_definition):
                     continue
                 if "txt1" in args.fullmodal_definition:
+                    if (int(data_info['pat_id']), int(data_info['chid'])) not in self.txtDict:
+                        continue
                     if (len(self.txtDict[(int(data_info['pat_id']), int(data_info['chid']))]) == 0): 
                         continue
             else: # missing modality
                 if "txt1" in file_name:
+                    if (int(data_info['pat_id']), int(data_info['chid'])) not in self.txtDict:
+                        continue
                     if (len(self.txtDict[(int(data_info['pat_id']), int(data_info['chid']))]) == 0): 
                         file_name = file_name.replace("_txt1_", "_txt0_")
                 if ("cxr_input" not in data_info and "img1" in file_name):
@@ -1855,7 +1930,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 # pat_neg_indices_keys_without_img = 5 for (Case3: missing modal)                                                                               Case3: (w/oimgwtxt-pn: 7, w/oimgw/otxt-pn: 10)
                 possible_indices_keys_alltypes = [[] for _ in range(6)]
                 
-                possibleWinSizes = data_info['possibleWinSizes']
+                # possibleWinSizes = data_info['possibleWinSizes']
                 
                 if target == 0:
                     target_type = 0
@@ -1920,6 +1995,12 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                             possible_indices_keys_alltypes[5]= list(possible_indices_keys_alltypes[3])  
                 
                 possibleWinSizes = data_info['possibleWinSizes']
+                new_possibleWinSizes = {}
+                for win_index in possibleWinSizes:
+                    new_list = [i for i in possibleWinSizes[win_index] if i >= args.min_inputlen]
+                    if len(new_list) > 0:
+                        new_possibleWinSizes[win_index] = new_list
+                possibleWinSizes = dict(new_possibleWinSizes)
                 possible_indices_keys_alltypes = list([list(filter(lambda x: x in possibleWinSizes, key_list)) for key_list in possible_indices_keys_alltypes])
                 
                 if isListEmpty(possible_indices_keys_alltypes):
@@ -2110,9 +2191,9 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         pkl_path, possible_indices_keys, labels_by_dict, win_size, target = self._data_list[index]
-        
         type_list = self._type_list[index]
-        
+        early_nones = 0
+        late_nones = 0
         file_name = pkl_path.split("/")[-1]
         with open(pkl_path, 'rb') as _f:
             data_pkl = pkl.load(_f)
@@ -2132,36 +2213,61 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
 
         windowIndex = self.window_size - 1
         selectedKey = possible_indices_keys[0]
+        
+        oldselectedKey = selectedKey
+        final_seqs = torch.Tensor(self.time_data_array)
+        time_data_list = list(data_pkl['data_in_time'][selectedKey-randLength+1:selectedKey+1])
+        if time_data_list[0] is None or time_data_list[-1] is None:
+            if time_data_list[0] is None:
+                early_nones = [i for i in range(len(time_data_list)) if time_data_list[i] is not None][0]
+            elif time_data_list[-1] is None:
+                late_nones = randLength - [i for i in range(len(time_data_list)) if time_data_list[i] is not None][-1] - 1
+            else:
+                nones = [i for i in range(len(time_data_list)) if time_data_list[i] is not None]
+                early_nones = nones[0]
+                late_nones = randLength - nones[-1] - 1
+                
+            randLength -= early_nones
+            selectedKey -= late_nones
+            time_data_list = list(time_data_list[early_nones:-late_nones])
+        
         dataSequence, maskSequence, deltaSequence, inputLength = sequenceGenerator(args, selectedKey, win_size, windowIndex, data_pkl)
         f_indices = False
         
-        if args.carry_back:
-            initStartIdx = data_pkl['initStartIdx']
-            for idx, i in enumerate(initStartIdx):
-                k = i - (selectedKey-win_size) -1
+        # if args.carry_back:
+        #     initStartIdx = data_pkl['initStartIdx']
+        #     for idx, i in enumerate(initStartIdx):
+        #         k = i - (selectedKey-win_size) -1
                 
-                if (i <= selectedKey) and (i > selectedKey-win_size):
-                    dataSequence[:k, idx] = dataSequence[k, idx]
+        #         if (i <= selectedKey) and (i > selectedKey-win_size):
+        #             dataSequence[:k, idx] = dataSequence[k, idx]
                     
-        sample_len = dataSequence.shape[0]
-        final_seqs = torch.zeros(3, self.window_size, self.vslt_len)
-        final_seqs[0].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(dataSequence, args.vslt_mask, axis = 1)))
-        final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
-        final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
-
-        if target == 0:
-            multi_target = 0
-        else:
-            multi_target = 1
-        multi_target = torch.tensor(multi_target)
+        if self.vslt_type == "carryforward":    
+            dataSequence = carry_forward(dataSequence)                        
+            sample_len = dataSequence.shape[0]
+            final_seqs = torch.zeros(3, self.window_size, self.vslt_len)
+            final_seqs[0].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(dataSequence, args.vslt_mask, axis = 1)))
+            final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
+            final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
+        else:        
+            time_data_np = torch.Tensor(np.concatenate([i for i in time_data_list if i is not None]))
+            final_seqs[:time_data_np.shape[0], :time_data_np.shape[1]] = time_data_np
+            inputLength = time_data_np.shape[0]
+            f_indices = False
+            
+        if target != 0:
+            if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
+                target = 0
+            else:
+                target = 1
+        target = torch.tensor(target)
 
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
-        
+        img_time = -1
         if "cxr_input" in data_pkl:
             if data_pkl["cxr_input"] == None:
                 del data_pkl["cxr_input"]
                 
-        img_time = -1
         if (("img" in args.input_types and "img1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and type_list in [0,2,3,5] and "img" in args.input_types)) and ('cxr_input' in data_pkl):
             cxr_li = [i for i in data_pkl['cxr_input'] if i[0] <= selectedKey] 
             if not cxr_li and ('test-full' in args.modality_inclusion): 
@@ -2222,7 +2328,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
                 
         missing = torch.Tensor(missing)
-        return final_seqs, static_inputs, multi_target, inputLength, img, tokens, textLength, img_time, missing, f_indices
+        return final_seqs, static_inputs, target, inputLength, img, tokens, textLength, img_time, missing, f_indices
 
 
 

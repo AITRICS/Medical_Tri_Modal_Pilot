@@ -74,8 +74,11 @@ def get_data_loader(args, patient_dict, keys_list, k_indx):
         samples_weight = samples_weight.double()
         sampler        = torch.utils.data.WeightedRandomSampler(samples_weight, len(samples_weight))
 
-    args.feature_mins     = torch.Tensor(train_data.train_min)
-    args.feature_maxs     = torch.Tensor(train_data.train_max)
+    # args.feature_mins     = torch.Tensor(train_data.train_min)
+    # args.feature_maxs     = torch.Tensor(train_data.train_max)
+    # args.feature_max_mins = args.feature_maxs - args.feature_mins
+    args.feature_mins = torch.Tensor([0.0, 0.0, 25.0, 0.0, 0.0, 0.0, 9.0, 0.0, 5.0, 0.0, 0.0, 0.94, 2.0, 0.0, 0.0, 0.8, 67.0, 0.2])
+    args.feature_maxs = torch.Tensor([295.0, 120.0, 43.05555555556, 299.0, 298.0, 100.0, 15.0, 68.6, 1000.0, 100.0, 75.0, 9.38, 50.0, 20.0, 20.0, 14.7, 185.0, 531.3])
     args.feature_max_mins = args.feature_maxs - args.feature_mins
     args.feature_means    = torch.Tensor(train_data.feature_means)    
     args.feature_means = np.delete(args.feature_means, args.vslt_mask, axis = 0) 

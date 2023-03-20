@@ -76,21 +76,16 @@ for k_indx, seed_num in enumerate(args.seed_list):
     
     train_loader, val_loader, test_loader = get_data_loader(args, patient_dict, keys_list, k_indx)
 
-    for train_batch in train_loader:
-        train_x, static_x, train_y, input_lengths, train_img, train_txt, txt_lengths, img_time, missing, f_indices = train_batch
-        print("train_vslt: ", train_x.shape)
-        print("train_txt: ", train_txt.shape)
-        print("train_img: ", train_img.shape)
-        print(" ")
-        exit(1)
+    # for train_batch in tqdm(train_loader):
+    #     train_x, static_x, train_y, input_lengths, train_img, train_txt, txt_lengths, img_time, missing, f_indices = train_batch
 
-    # # print("done without any error - Train loader")
-    # # for train_batch in val_loader:
-    # #     train_x, static_x, train_y, input_lengths, train_img, train_txt, txt_lengths, missing, f_indices = train_batch
+    # print("done without any error - Train loader")
+    # for train_batch in tqdm(val_loader):
+    #     train_x, static_x, train_y, input_lengths, train_img, train_txt, txt_lengths, missing, f_indices = train_batch
     
-    # # print("done without any error - Validation loader")
-    # # for train_batch in test_loader:
-    # #     train_x, static_x, train_y, input_lengths, train_img, train_txt, txt_lengths, missing, f_indices = train_batch
+    # print("done without any error - Validation loader")
+    # for train_batch in tqdm(test_loader):
+    #     train_x, static_x, train_y, input_lengths, train_img, train_txt, txt_lengths, missing, f_indices = train_batch
 
     # print("done without any error - Test loader")
     # exit(1)
