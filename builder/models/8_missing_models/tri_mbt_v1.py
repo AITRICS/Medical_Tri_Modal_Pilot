@@ -85,18 +85,18 @@ class TRI_MBT_V1(nn.Module):
             else:
                 self.img_encoder = vit_b_16_m(weights = None)
         elif self.img_model_type == "swin":
-            # if self.img_pretrain =="Yes":
-            #     # self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
-            #     self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
-            #     model_dict = self.img_encoder.state_dict()
-            #     old_weights=torch.load("/nfs/thena/shared/multi_modal/image_reports_Intub_swin_1e-6_modify_best_fold0_seed0.pth")['model']
-            #     new_weights=torch.load("/nfs/thena/shared/multi_modal/image_reports_Intub_swin_1e-6_modify_best_fold0_seed0.pth")['model']
-            #     new_weights = {key.replace('img_encoder.', ''): new_weights.pop(key) for key in old_weights.keys()}
-            #     new_weights = {k: v for k, v in new_weights.items() if k in model_dict}
-            #     model_dict.update(new_weights)
-            #     self.img_encoder.load_state_dict(new_weights)
-            # else:
-            self.img_encoder = swin_t_m(weights = None)
+            if self.img_pretrain =="Yes":
+                # self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
+                self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
+                model_dict = self.img_encoder.state_dict()
+                old_weights=torch.load("/nfs/thena/shared/multi_modal/image_reports_Intub_swin_1e-6_modify_best_fold0_seed0.pth")['model']
+                new_weights=torch.load("/nfs/thena/shared/multi_modal/image_reports_Intub_swin_1e-6_modify_best_fold0_seed0.pth")['model']
+                new_weights = {key.replace('img_encoder.', ''): new_weights.pop(key) for key in old_weights.keys()}
+                new_weights = {k: v for k, v in new_weights.items() if k in model_dict}
+                model_dict.update(new_weights)
+                self.img_encoder.load_state_dict(new_weights)
+            else:
+                self.img_encoder = swin_t_m(weights = None)
                 
         else:
             self.patch_embedding = PatchEmbeddingBlock(
