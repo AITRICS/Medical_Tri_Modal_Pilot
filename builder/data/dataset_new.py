@@ -643,7 +643,7 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
 
         missing = torch.Tensor(missing)
-        return final_seqs, static_inputs, target, inputLength, img, tokens, textLength, img_time, missing, f_indices
+        return final_seqs, static_inputs, target, inputLength, img, img_time, tokens, textLength, img_time, missing, f_indices
 
 class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
 
@@ -1093,7 +1093,7 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
         return len(self._data_list)
 
     def __getitem__(self, index):
-        pkl_path, possible_indices_keys, labels_by_dict, win_size, target = self._data_list[index]
+        pkl_path, possible_indices_keys, labels_by_dict, randLength, target = self._data_list[index]
         type_list = self._type_list[index]
         early_nones = 0
         late_nones = 0
@@ -1116,7 +1116,6 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
 
         windowIndex = self.window_size - 1
         selectedKey = possible_indices_keys[0]
-        
         oldselectedKey = selectedKey
         final_seqs = torch.Tensor(self.time_data_array)
         time_data_list = list(data_pkl['data_in_time'][selectedKey-randLength+1:selectedKey+1])
@@ -1134,7 +1133,7 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
             selectedKey -= late_nones
             time_data_list = list(time_data_list[early_nones:-late_nones])
         
-        dataSequence, maskSequence, deltaSequence, inputLength = sequenceGenerator(args, selectedKey, win_size, windowIndex, data_pkl)
+        dataSequence, maskSequence, deltaSequence, inputLength = sequenceGenerator(args, selectedKey, randLength, windowIndex, data_pkl)
         f_indices = False
                     
         if self.vslt_type == "carryforward":    
@@ -1177,7 +1176,7 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                 image = F_t.equalize(image)
                 img = self.transform(image)
                 missing.append(False)
-                img_time = cxr_time - (selectedKey - win_size + 1)
+                img_time = cxr_time - (selectedKey - randLength + 1)
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             missing.append(True)
@@ -1730,7 +1729,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
                 
         missing = torch.Tensor(missing)  
-        return final_seqs, static_inputs, target, inputLength, img, tokens, textLength, img_time, missing, f_indices
+        return final_seqs, static_inputs, target, inputLength, img, img_time, tokens, textLength, img_time, missing, f_indices
 
 class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
 
@@ -2193,7 +2192,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
         return len(self._data_list)
 
     def __getitem__(self, index):
-        pkl_path, possible_indices_keys, labels_by_dict, win_size, target = self._data_list[index]
+        pkl_path, possible_indices_keys, labels_by_dict, randLength, target = self._data_list[index]
         type_list = self._type_list[index]
         early_nones = 0
         late_nones = 0
@@ -2234,7 +2233,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             selectedKey -= late_nones
             time_data_list = list(time_data_list[early_nones:-late_nones])
         
-        dataSequence, maskSequence, deltaSequence, inputLength = sequenceGenerator(args, selectedKey, win_size, windowIndex, data_pkl)
+        dataSequence, maskSequence, deltaSequence, inputLength = sequenceGenerator(args, selectedKey, randLength, windowIndex, data_pkl)
         f_indices = False
         
         # if args.carry_back:
@@ -2285,7 +2284,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 image = F_t.equalize(image)
                 img = self.transform(image)
                 missing.append(False)
-                img_time = cxr_time - (selectedKey - win_size + 1)
+                img_time = cxr_time - (selectedKey - randLength + 1)
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             missing.append(True)
@@ -2331,7 +2330,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
                 
         missing = torch.Tensor(missing)
-        return final_seqs, static_inputs, target, inputLength, img, tokens, textLength, img_time, missing, f_indices
+        return final_seqs, static_inputs, target, inputLength, img, img_time, tokens, textLength, img_time, missing, f_indices
 
 
 
