@@ -16,7 +16,6 @@ class TRI_MBT_V1(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
-        self.idx_order = torch.range(0, args.batch_size-1).type(torch.LongTensor)
         ##### Configuration
         self.img_size = args.image_size
         self.patch_size = 16

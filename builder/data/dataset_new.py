@@ -529,6 +529,9 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         data_pkl['data'] = np.divide(data_pkl['data'], pklFeatureMinMaxs)
         
         final_seqs = torch.Tensor(self.time_data_array)
+        # print("1 data_pkl['data_in_time']: ", data_pkl['data_in_time'])
+        # print("selectedKey: ", selectedKey)
+        # print("randLength: ", randLength)
         time_data_list = list(data_pkl['data_in_time'][selectedKey-randLength+1:selectedKey+1])
         if time_data_list[0] is None or time_data_list[-1] is None:
             if time_data_list[0] is None:
@@ -542,7 +545,8 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 
             randLength -= early_nones
             selectedKey -= late_nones
-
+            # print("early_nones: ", early_nones)
+            # print("late_nones: ", late_nones)
             if late_nones == 0:
                 time_data_list = list(time_data_list[early_nones:])
             else:
@@ -562,6 +566,7 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
             final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
         else:     
+            # print("2 time_data_list: ", time_data_list)
             time_data_np = np.concatenate([i for i in time_data_list if i is not None])
             time_data_np[:,0] -= selectedKey
             time_data_tensor = torch.Tensor(time_data_np)

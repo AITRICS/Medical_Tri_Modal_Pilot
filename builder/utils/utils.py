@@ -35,6 +35,7 @@ FEATURE_MEAN = {
     'CRP'       : 88.96706267,
 } # feature mean values gained from only training dataset...
 
+
 def isListEmpty(inList):
     if isinstance(inList, list): # Is a list
         return all( map(isListEmpty, inList) )

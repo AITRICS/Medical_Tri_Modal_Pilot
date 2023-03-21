@@ -14,7 +14,7 @@ parser.add_argument('--multitoken', type=int, default=0)
 
 # General Parameters
 parser.add_argument('--seed', type=int, default=0)
-parser.add_argument('--seed-list', type=list, default=[0, 1004]) #[0, 1004, 2022, 9209, 119]
+parser.add_argument('--seed-list', type=list, default=[412, 1004, 2023]) #[0, 1004, 2022, 9209, 119]
 parser.add_argument('--device', type=int, default=1, nargs='+')
 parser.add_argument('--cpu', type=int, default=0)
 parser.add_argument('--num-workers', type=int, default=0)

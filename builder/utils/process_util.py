@@ -14,7 +14,7 @@ from multiprocessing import Pool
 from tqdm import tqdm
 
 
-def run_multi_process(f, l: list, n_processes=40):
+def run_multi_process(f, l: list, n_processes=30):
     n_processes = min(n_processes, len(l))
     print(n_processes)
 

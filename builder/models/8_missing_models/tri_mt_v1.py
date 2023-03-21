@@ -18,13 +18,12 @@ class TRI_MT_V1(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
-        # self.idx_order = torch.range(0, args.batch_size-1).type(torch.LongTensor)
         ##### Configuration
         self.num_layers = args.transformer_num_layers
         self.num_heads = args.transformer_num_head
         self.model_dim = args.transformer_dim
         self.dropout = args.dropout
-        self.multitoken = args.multitoken
+
         self.num_nodes = len(args.vitalsign_labtest)
         self.t_len = args.window_size
 
@@ -45,20 +44,38 @@ class TRI_MT_V1(nn.Module):
         self.relu = self.activations[activation]
         
         ##### Encoders
-        self.vslt_enc = nn.Sequential(
-                            nn.Linear(self.num_nodes+2, self.model_dim),
-                            nn.LayerNorm(self.model_dim),
-                            nn.ReLU(inplace=True),
-                            nn.Linear(self.model_dim, self.model_dim),
-                            nn.LayerNorm(self.model_dim),
-                            nn.ReLU(inplace=True),
-        )
-    
-        datasetType = args.train_data_path.split("/")[-2]
-        if datasetType == "mimic_icu": # BERT
+        if args.vslt_type == "carryforward":
+            self.vslt_enc = nn.Sequential(
+                                        nn.Linear(self.num_nodes+2, self.model_dim),
+                                        nn.LayerNorm(self.model_dim),
+                                        nn.ReLU(inplace=True),
+                    )
+        elif args.vslt_type == "TIE":
+            self.tie_vslt = nn.Sequential(
+                                        nn.Linear(1, self.model_dim),
+                                        nn.LayerNorm(self.model_dim),
+                                        nn.ReLU(inplace=True),
+                    )
+            self.tie_time = nn.Sequential(
+                                        nn.Linear(1, self.model_dim),
+                                        nn.LayerNorm(self.model_dim),
+                                        nn.ReLU(inplace=True),
+                    )
+            self.tie_feat = nn.Sequential(
+                                        nn.Linear(1, self.model_dim),
+                                        nn.LayerNorm(self.model_dim),
+                                        nn.ReLU(inplace=True),
+                    )
+            self.tie_demo = nn.Sequential(
+                                        nn.Linear(2, self.model_dim),
+                                        nn.LayerNorm(self.model_dim),
+                                        nn.ReLU(inplace=True),
+                    )
+            
+        if args.berttype == "bert": # BERT
             self.txt_embedding = nn.Embedding(30000, self.model_dim)
-        elif datasetType == "sev_icu":
-            raise NotImplementedError
+        elif args.berttype == "biobert": # BIOBERT
+            self.txt_embedding = nn.Linear(768, self.model_dim)
         
         self.img_model_type = args.img_model_type
         self.img_pretrain = args.img_pretrain
@@ -96,10 +113,9 @@ class TRI_MT_V1(nn.Module):
             d_ff = self.model_dim * 4,
             n_modality = self.n_modality,
             dropout = self.dropout,
-            pe_maxlen = 2000,
+            pe_maxlen = 10000,
             use_pe = True,
             txt_idx = 2,
-            multitoken = self.multitoken,
         )
 
         ##### Classifier
