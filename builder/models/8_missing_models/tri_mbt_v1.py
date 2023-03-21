@@ -26,7 +26,7 @@ class TRI_MBT_V1(nn.Module):
         self.num_heads = args.transformer_num_head
         self.model_dim = args.transformer_dim
         self.dropout = args.dropout
-
+        self.idx_order = torch.range(0, args.batch_size-1).type(torch.LongTensor)
         self.num_nodes = len(args.vitalsign_labtest)
         self.t_len = args.window_size
 
@@ -54,23 +54,19 @@ class TRI_MBT_V1(nn.Module):
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
                     )
-        elif args.vslt_type == "TIE":
-            self.tie_vslt = nn.Sequential(
+        elif args.vslt_type == "QIE" or args.vslt_type == "TIE":
+            self.ie_vslt = nn.Sequential(
                                         nn.Linear(1, self.model_dim),
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
                     )
-            self.tie_time = nn.Sequential(
+            self.ie_time = nn.Sequential(
                                         nn.Linear(1, self.model_dim),
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
                     )
-            self.tie_feat = nn.Sequential(
-                                        nn.Linear(1, self.model_dim),
-                                        nn.LayerNorm(self.model_dim),
-                                        nn.ReLU(inplace=True),
-                    )
-            self.tie_demo = nn.Sequential(
+            self.ie_feat = nn.Embedding(18, self.model_dim)
+            self.ie_demo = nn.Sequential(
                                         nn.Linear(2, self.model_dim),
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
@@ -89,10 +85,19 @@ class TRI_MBT_V1(nn.Module):
             else:
                 self.img_encoder = vit_b_16_m(weights = None)
         elif self.img_model_type == "swin":
-            if self.img_pretrain =="Yes":
-                self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
-            else:
-                self.img_encoder = swin_t_m(weights = None)
+            # if self.img_pretrain =="Yes":
+            #     # self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
+            #     self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
+            #     model_dict = self.img_encoder.state_dict()
+            #     old_weights=torch.load("/nfs/thena/shared/multi_modal/image_reports_Intub_swin_1e-6_modify_best_fold0_seed0.pth")['model']
+            #     new_weights=torch.load("/nfs/thena/shared/multi_modal/image_reports_Intub_swin_1e-6_modify_best_fold0_seed0.pth")['model']
+            #     new_weights = {key.replace('img_encoder.', ''): new_weights.pop(key) for key in old_weights.keys()}
+            #     new_weights = {k: v for k, v in new_weights.items() if k in model_dict}
+            #     model_dict.update(new_weights)
+            #     self.img_encoder.load_state_dict(new_weights)
+            # else:
+            self.img_encoder = swin_t_m(weights = None)
+                
         else:
             self.patch_embedding = PatchEmbeddingBlock(
             in_channels=1,
@@ -125,12 +130,21 @@ class TRI_MBT_V1(nn.Module):
         )
 
         ##### Classifier
-        self.layer_norms_after_concat = nn.LayerNorm(self.model_dim)
-        self.fc_list = nn.Sequential(
-        nn.Linear(in_features=self.model_dim, out_features= self.model_dim, bias=True),
-        nn.BatchNorm1d(self.model_dim),
-        self.activations[activation],
-        nn.Linear(in_features=self.model_dim, out_features= 1,  bias=True))
+        if self.args.vslt_type == "TIE":
+            self.layer_norms_after_concat = nn.LayerNorm(self.model_dim)
+            self.fc_list = nn.Sequential(
+            nn.Linear(in_features=self.model_dim*2, out_features= self.model_dim, bias=True),
+            nn.BatchNorm1d(self.model_dim),
+            self.activations[activation],
+            nn.Linear(in_features=self.model_dim, out_features= 1,  bias=True))
+        else:
+            self.layer_norms_after_concat = nn.LayerNorm(self.model_dim)
+            self.fc_list = nn.Sequential(
+            nn.Linear(in_features=self.model_dim, out_features= self.model_dim, bias=True),
+            nn.BatchNorm1d(self.model_dim),
+            self.activations[activation],
+            nn.Linear(in_features=self.model_dim, out_features= 1,  bias=True))
+
 
         self.relu = self.activations[activation]
 
@@ -140,18 +154,29 @@ class TRI_MBT_V1(nn.Module):
         # txts:  torch.Size([bs, 128, 768])         --> ([bs, 128, 256])
         # img:  torch.Size([bs, 1, 224, 224])       --> ([bs, 49, 256])
         
-        age = age.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
-        gen = gen.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)    
         if self.args.vslt_type == "carryforward":
+            age = age.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
+            gen = gen.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)    
             x = torch.cat([x, age, gen], axis=2)
             vslt_embedding = self.vslt_enc(x)
-        else:
-            value_embedding = self.tie_vslt(x[:,:,1].unsqueeze(2))
-            time_embedding = self.tie_time(x[:,:,0].unsqueeze(2))
-            feat_embedding = self.tie_feat(x[:,:,2].unsqueeze(2))
+        elif self.args.vslt_type == "QIE":
+            age = age.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
+            gen = gen.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)    
+            value_embedding = self.ie_vslt(x[:,:,1].unsqueeze(2))
+            time_embedding = self.ie_time(x[:,:,0].unsqueeze(2))
+            feat_embedding = self.ie_feat(x[:,:,2].type(torch.IntTensor).to(self.device))
             demographic = torch.cat([age, gen], axis=2)
-            demo_embedding = self.tie_demo(demographic)
+            demo_embedding = self.ie_demo(demographic)
             vslt_embedding = value_embedding + time_embedding + feat_embedding + demo_embedding
+        elif self.args.vslt_type == "TIE":
+            demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1)
+            
+            value_embedding = self.ie_vslt(x[:,:,1].unsqueeze(2))
+            time_embedding = self.ie_time(x[:,:,0].unsqueeze(2))
+            feat = x[:,:,2].type(torch.IntTensor).to(self.device)
+            feat_embedding = self.ie_feat(feat)
+            demo_embedding = self.ie_demo(demographic)
+            vslt_embedding = value_embedding + time_embedding + feat_embedding
 
         txt_embedding = self.txt_embedding(txts)
         
@@ -174,7 +199,15 @@ class TRI_MBT_V1(nn.Module):
         
         outputs_list = torch.stack([outputs[0][:, 0, :], outputs[1][:, 0, :], outputs[2][:, 0, :]]) # vslt, img, txt
         classInput = self.layer_norms_after_concat(outputs_list).reshape(-1, self.model_dim)
-        output_vectors = self.fc_list(classInput)
-        output = torch.mean(output_vectors.reshape(3, -1), dim=0)
+
+        if self.args.vslt_type == "TIE":
+            classInput = torch.cat([classInput, demo_embedding.repeat(3,1)], dim=1)
+        outputs_stack = self.fc_list(classInput).reshape(3, -1)
+        
+        tri_mean = torch.mean(outputs_stack, dim=0) 
+        vslttxt_mean = torch.mean(torch.stack([outputs_stack[0, :], outputs_stack[2, :]]), dim=0)
+        vsltimg_mean = torch.mean(torch.stack([outputs_stack[0, :], outputs_stack[1, :]]), dim=0)
+        all_cls_stack = torch.stack([tri_mean, vsltimg_mean, vslttxt_mean, outputs_stack[0, :]])
+        output = all_cls_stack[missing, self.idx_order]
 
         return output, None
