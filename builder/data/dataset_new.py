@@ -1222,7 +1222,7 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
                 
         missing = torch.Tensor(missing)
-        return final_seqs, static_inputs, target, inputLength, img, tokens, textLength, img_time, missing, f_indices
+        return final_seqs, static_inputs, target, inputLength, img, img_time, tokens, textLength, img_time, missing, f_indices
 
 class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
 
