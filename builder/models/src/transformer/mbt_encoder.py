@@ -87,7 +87,7 @@ class TrimodalTransformerEncoder_Multitokens_MBT(nn.Module):
                         
         self.v_bottleneck_mask = self.v_bottleneck_mask.ge(0.5)
         
-        self.i_bottleneck_mask = torch.zeros(61 + self.final_cls_tokens_num[0], 61 + self.final_cls_tokens_num[0]).cuda()              
+        self.i_bottleneck_mask = torch.zeros(61 + self.final_cls_tokens_num[1], 61 + self.final_cls_tokens_num[1]).cuda()              
         if self.multitoken == 1:
             self.v_bottleneck_mask[:16, :16] = 1
             self.v_bottleneck_mask[:4, :4] = 0
@@ -108,7 +108,7 @@ class TrimodalTransformerEncoder_Multitokens_MBT(nn.Module):
             
         self.i_bottleneck_mask = self.i_bottleneck_mask.ge(0.5)
         
-        self.t_bottleneck_mask = torch.zeros(140 + self.final_cls_tokens_num[0], 140 + self.final_cls_tokens_num[0]).cuda()              
+        self.t_bottleneck_mask = torch.zeros(140 + self.final_cls_tokens_num[2], 140 + self.final_cls_tokens_num[2]).cuda()              
         if self.multitoken == 1:
             self.v_bottleneck_mask[:16, :16] = 1
             self.v_bottleneck_mask[:4, :4] = 0
@@ -248,10 +248,12 @@ class TrimodalTransformerEncoder_MBT(nn.Module):
             dropout: float = 0.1,
             pe_maxlen: int = 5000,
             txt_idx: int = 2,
+            mbt_bottlenecks_type: str = 'skip',
             use_pe: list = [True, True, True],
             mask: list = [True, False, True]):
         super(TrimodalTransformerEncoder_MBT, self).__init__()
 
+        self.mbt_bottlenecks_type = mbt_bottlenecks_type
         self.use_pe = use_pe
         self.n_modality = n_modality
         self.fusion_idx = fusion_startidx
@@ -324,6 +326,8 @@ class TrimodalTransformerEncoder_MBT(nn.Module):
                     
             else:
                 bottleneck_outputs = []
+                if "residual" in self.mbt_bottlenecks_type:
+                    res_bottlenecks = bottlenecks.detach().clone()
                 for modal_idx, enc_layer in enumerate(enc_layers):
                     b_enc_output = torch.cat([bottlenecks, enc_inputs[modal_idx]], axis=1)
                     if len(bottleneck_self_attn_masks) < self.n_modality:
@@ -351,6 +355,8 @@ class TrimodalTransformerEncoder_MBT(nn.Module):
                 # print("self.idx_order: ", self.idx_order.shape)
                 
                 bottlenecks = all_bottleneck_stack[missing, self.idx_order, :, :]
+                if "residual" in self.mbt_bottlenecks_type:
+                    bottlenecks += res_bottlenecks
                 
                 # bottlenecks = torch.where(missing[1].unsqueeze(1).unsqueeze(1) == 0, bottleneck_outputs[0], bottlenecks_mean)
                 # bottlenecks = torch.where(varying_lengths[1].unsqueeze(1).unsqueeze(1) == 0, bottleneck_outputs[0], bottlenecks_mean)
