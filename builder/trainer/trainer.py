@@ -91,6 +91,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
     gender = static_x[0]
     age = age.type(torch.FloatTensor).to(device)
     gender = gender.type(torch.FloatTensor).to(device)
+    x_txt = x_txt.to(device)
     
     if flow_type == "train":
         optimizer.zero_grad()

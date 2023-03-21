@@ -49,20 +49,38 @@ class TRI_MBT_V1(nn.Module):
         self.relu = self.activations[activation]
         
         ##### Encoders
-        self.vslt_enc = nn.Sequential(
-                                    nn.Linear(self.num_nodes+2, self.model_dim),
-                                    nn.LayerNorm(self.model_dim),
-                                    nn.ReLU(inplace=True),
-                                    nn.Linear(self.model_dim, self.model_dim),
-                                    nn.LayerNorm(self.model_dim),
-                                    nn.ReLU(inplace=True),
-                )
-    
-        datasetType = args.train_data_path.split("/")[-2]
-        if datasetType == "mimic_icu": # BERT
+        if args.vslt_type == "carryforward":
+            self.vslt_enc = nn.Sequential(
+                                        nn.Linear(self.num_nodes+2, self.model_dim),
+                                        nn.LayerNorm(self.model_dim),
+                                        nn.ReLU(inplace=True),
+                    )
+        elif args.vslt_type == "TIE":
+            self.tie_vslt = nn.Sequential(
+                                        nn.Linear(1, self.model_dim),
+                                        nn.LayerNorm(self.model_dim),
+                                        nn.ReLU(inplace=True),
+                    )
+            self.tie_time = nn.Sequential(
+                                        nn.Linear(1, self.model_dim),
+                                        nn.LayerNorm(self.model_dim),
+                                        nn.ReLU(inplace=True),
+                    )
+            self.tie_feat = nn.Sequential(
+                                        nn.Linear(1, self.model_dim),
+                                        nn.LayerNorm(self.model_dim),
+                                        nn.ReLU(inplace=True),
+                    )
+            self.tie_demo = nn.Sequential(
+                                        nn.Linear(2, self.model_dim),
+                                        nn.LayerNorm(self.model_dim),
+                                        nn.ReLU(inplace=True),
+                    )
+        
+        if args.berttype == "bert": # BERT
             self.txt_embedding = nn.Embedding(30000, self.model_dim)
-        elif datasetType == "sev_icu":
-            raise NotImplementedError
+        elif args.berttype == "biobert": # BIOBERT
+            self.txt_embedding = nn.Linear(768, self.model_dim)
         
         self.img_model_type = args.img_model_type
         self.img_pretrain = args.img_pretrain
@@ -102,36 +120,40 @@ class TRI_MBT_V1(nn.Module):
             d_model = self.model_dim,
             d_ff = self.model_dim * 4,
             dropout = self.dropout,
-            pe_maxlen = 600,
+            pe_maxlen = 10000,
             use_pe = [True, True, True],
             mask = [True, False, True],
         )
 
         ##### Classifier
         self.layer_norms_after_concat = nn.LayerNorm(self.model_dim)
-        self.fc_list = nn.ModuleList()
-        for _ in range(12):
-            self.fc_list.append(nn.Sequential(
-            nn.Linear(in_features=self.model_dim, out_features= 64, bias=True),
-            nn.BatchNorm1d(64),
-            self.activations[activation],
-            nn.Linear(in_features=64, out_features= 1,  bias=True)))
+        self.fc_list = nn.Sequential(
+        nn.Linear(in_features=self.model_dim, out_features= self.model_dim, bias=True),
+        nn.BatchNorm1d(self.model_dim),
+        self.activations[activation],
+        nn.Linear(in_features=self.model_dim, out_features= 1,  bias=True))
 
         self.relu = self.activations[activation]
 
     def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices):
-        print("x: ", x.shape)
-        print("txts: ", txts.shape)
-        print("img: ", img.shape)
-        exit(1)
-        
+        # x-TIE:  torch.Size([bs, vslt_len, 3])
+        # x-Carryforward:  torch.Size([bs, 24, 16])
+        # txts:  torch.Size([bs, 128, 768])         --> ([bs, 128, 256])
+        # img:  torch.Size([bs, 1, 224, 224])       --> ([bs, 49, 256])
         
         age = age.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
-        gen = gen.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
-        x = torch.cat([x, age, gen], axis=2)
-        vslt_embedding = self.vslt_enc(x)
-        
-        txts = txts.type(torch.IntTensor).to(self.device)
+        gen = gen.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)    
+        if self.args.vslt_type == "carryforward":
+            x = torch.cat([x, age, gen], axis=2)
+            vslt_embedding = self.vslt_enc(x)
+        else:
+            value_embedding = self.tie_vslt(x[:,:,1].unsqueeze(2))
+            time_embedding = self.tie_time(x[:,:,0].unsqueeze(2))
+            feat_embedding = self.tie_feat(x[:,:,2].unsqueeze(2))
+            demographic = torch.cat([age, gen], axis=2)
+            demo_embedding = self.tie_demo(demographic)
+            vslt_embedding = value_embedding + time_embedding + feat_embedding + demo_embedding
+
         txt_embedding = self.txt_embedding(txts)
         
         if self.img_model_type == "vit":
@@ -143,7 +165,7 @@ class TRI_MBT_V1(nn.Module):
             img_embedding = self.linear(img_embedding)     
         else:
             img_embedding = self.patch_embedding(img)
-        
+            
         outputs, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding, txt_embedding], 
                                       fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1), txt_embedding.size(1)],
                                       varying_lengths = [input_lengths, img_embedding.size(1), txt_lengths+2],
@@ -151,30 +173,9 @@ class TRI_MBT_V1(nn.Module):
                                       missing=missing
                                       )
         
-        outputs_list = torch.stack([outputs[0][:, 0, :], outputs[1][:, 0, :], outputs[2][:, 0, :]])
+        outputs_list = torch.stack([outputs[0][:, 0, :], outputs[1][:, 0, :], outputs[2][:, 0, :]]) # vslt, img, txt
         classInput = self.layer_norms_after_concat(outputs_list).reshape(-1, self.model_dim)
-        
-        # outputs_stack = torch.stack([outputs[i][:, 0, :] for i in range(self.n_modality)])
-        # tri_mean = torch.mean(outputs_stack, dim=0)
-        # vslttxt_mean = torch.mean(torch.stack([outputs[0][:, 0, :], outputs[2][:, 0, :]]), dim=0)
-        # vsltimg_mean = torch.mean(torch.stack([outputs[0][:, 0, :], outputs[1][:, 0, :]]), dim=0)
-        # all_cls_stack = torch.stack([tri_mean, vsltimg_mean, vslttxt_mean, outputs[0][:, 0, :]])
-        # print(all_cls_stack.shape)
-        # final_output = all_cls_stack[missing, self.idx_order, :]
-        # print(final_output.shape)
-        # classInput = self.layer_norms_after_concat(final_output)
+        output_vectors = self.fc_list(classInput)
+        output = torch.mean(output_vectors.reshape(3, -1), dim=0)
 
-        multitask_vectors = []
-        for i, fc in enumerate(self.fc_list):
-            multitask_vectors.append(fc(classInput))
-        output = torch.stack(multitask_vectors).reshape(12, 3, -1) #12 3 64 
-        
-        outputs_stack = output.permute(1,0,2) # 3 12 64 
-        tri_mean = torch.mean(outputs_stack, dim=0) 
-        vslttxt_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[2, :, :]]), dim=0)
-        vsltimg_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[1, :, :]]), dim=0)
-        all_cls_stack = torch.stack([tri_mean, vsltimg_mean, vslttxt_mean, outputs_stack[0, :, :]])
-        output = all_cls_stack[missing, :, self.idx_order].permute(1,0).unsqueeze(2)
-        
-        #12, 64, 1
         return output, None

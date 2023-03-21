@@ -562,16 +562,12 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
             final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
         else:     
-            time_data_np = torch.Tensor(np.concatenate([i for i in time_data_list if i is not None]))
-            final_seqs[:time_data_np.shape[0], :time_data_np.shape[1]] = time_data_np
-            inputLength = time_data_np.shape[0]
+            time_data_np = np.concatenate([i for i in time_data_list if i is not None])
+            time_data_np[:,0] -= selectedKey
+            time_data_tensor = torch.Tensor(time_data_np)
+            final_seqs[:time_data_tensor.shape[0], :time_data_tensor.shape[1]] = time_data_tensor
+            inputLength = time_data_tensor.shape[0]
             f_indices = False
-        
-        # print("final_seqs: ", final_seqs.shape)
-        # print("1 selectedKey: ", selectedKey)
-        # print("2 randLength: ", randLength)
-        # print("3 dataSequence: ", dataSequence)
-        # print("4 time_data_list: ", time_data_list)
     
         if target != 0:
             if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
@@ -1152,11 +1148,13 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
             final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
             final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
         else:        
-            time_data_np = torch.Tensor(np.concatenate([i for i in time_data_list if i is not None]))
-            final_seqs[:time_data_np.shape[0], :time_data_np.shape[1]] = time_data_np
-            inputLength = time_data_np.shape[0]
+            time_data_np = np.concatenate([i for i in time_data_list if i is not None])
+            time_data_np[:,0] -= selectedKey
+            time_data_tensor = torch.Tensor(time_data_np)
+            final_seqs[:time_data_tensor.shape[0], :time_data_tensor.shape[1]] = time_data_tensor
+            inputLength = time_data_tensor.shape[0]
             f_indices = False
-
+    
         if target != 0:
             if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
                 target = 0
@@ -1662,11 +1660,13 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
             final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
             final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
         else:        
-            time_data_np = torch.Tensor(np.concatenate([i for i in time_data_list if i is not None]))
-            final_seqs[:time_data_np.shape[0], :time_data_np.shape[1]] = time_data_np
-            inputLength = time_data_np.shape[0]
+            time_data_np = np.concatenate([i for i in time_data_list if i is not None])
+            time_data_np[:,0] -= selectedKey
+            time_data_tensor = torch.Tensor(time_data_np)
+            final_seqs[:time_data_tensor.shape[0], :time_data_tensor.shape[1]] = time_data_tensor
+            inputLength = time_data_tensor.shape[0]
             f_indices = False
-            
+    
         if target != 0:
             if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
                 target = 0
@@ -2266,11 +2266,13 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
             final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
         else:        
-            time_data_np = torch.Tensor(np.concatenate([i for i in time_data_list if i is not None]))
-            final_seqs[:time_data_np.shape[0], :time_data_np.shape[1]] = time_data_np
-            inputLength = time_data_np.shape[0]
+            time_data_np = np.concatenate([i for i in time_data_list if i is not None])
+            time_data_np[:,0] -= selectedKey
+            time_data_tensor = torch.Tensor(time_data_np)
+            final_seqs[:time_data_tensor.shape[0], :time_data_tensor.shape[1]] = time_data_tensor
+            inputLength = time_data_tensor.shape[0]
             f_indices = False
-            
+    
         if target != 0:
             if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
                 target = 0

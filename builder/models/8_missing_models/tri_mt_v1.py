@@ -108,7 +108,6 @@ class TRI_MT_V1(nn.Module):
         for _ in range(12):
             self.fc_list.append(nn.Sequential(
             nn.Linear(in_features=self.model_dim, out_features= self.classifier_nodes, bias=True),
-            # nn.BatchNorm1d(self.classifier_nodes),
             nn.LayerNorm(self.classifier_nodes),
             self.relu,
             nn.Linear(in_features=self.classifier_nodes, out_features= 1,  bias=True)))

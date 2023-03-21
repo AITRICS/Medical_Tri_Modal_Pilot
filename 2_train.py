@@ -78,6 +78,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
 
     # for train_batch in tqdm(train_loader):
     #     train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, img_time, missing, f_indices = train_batch
+    #     exit(1)
         
     # print("done without any error - Train loader")
     # for train_batch in tqdm(val_loader):
@@ -244,7 +245,8 @@ for k_indx, seed_num in enumerate(args.seed_list):
 
             ### VALIDATION
             # if iteration % (iter_num_per_epoch) == 0:
-            if iteration % (iter_num_per_epoch) == 0 and epoch > (args.epochs//2):
+            # if iteration % (iter_num_per_epoch) == 0 and epoch > (args.epochs//2):
+            if iteration % (iter_num_per_epoch) == 0:
                 # initialize valid step
                 model.eval()
                 logger.evaluator.reset()
