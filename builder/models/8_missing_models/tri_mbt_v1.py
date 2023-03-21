@@ -120,6 +120,12 @@ class TRI_MBT_V1(nn.Module):
         self.relu = self.activations[activation]
 
     def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices):
+        print("x: ", x.shape)
+        print("txts: ", txts.shape)
+        print("img: ", img.shape)
+        exit(1)
+        
+        
         age = age.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
         gen = gen.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
         x = torch.cat([x, age, gen], axis=2)

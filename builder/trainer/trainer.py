@@ -25,8 +25,24 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
     #     [0., 0., 1.],
     #     [0., 1., 0.],
     #     [0., 1., 1.]])
-    train_x = train_x.permute(1, 0, 2, 3)
-    data = train_x[0]
+    # print("train_x: ", train_x.shape)  # TIE: ([batch_size, 10000, 3]) Carry-forward:  torch.Size([batch_size, 3, 24, 16])
+
+    if args.vslt_type == "carryforward":
+        train_x = train_x.permute(1, 0, 2, 3)
+        data = train_x[0]
+        # most likely for GRUD
+        h0 = torch.zeros(data.size(0), args.hidden_size).to(device)
+        mask = train_x[1]
+        delta = train_x[2]
+
+    else: # TIE
+        max_input_lengths = torch.max(input_lengths).detach().clone()
+        data = train_x[:, :max_input_lengths, :]
+        h0 = None
+        mask = None
+        delta = None
+    mean = args.feature_means.to(device)
+        
     final_target = train_y.type(torch.FloatTensor).to(device)
     
     if args.fullmodal_definition == "txt1":
@@ -76,11 +92,6 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
     age = age.type(torch.FloatTensor).to(device)
     gender = gender.type(torch.FloatTensor).to(device)
     
-    # most likely for GRUD
-    h0 = torch.zeros(data.size(0), args.hidden_size).to(device)
-    mask = train_x[1]
-    delta = train_x[2]
-    mean = args.feature_means.to(device)
     if flow_type == "train":
         optimizer.zero_grad()
         with torch.cuda.amp.autocast():

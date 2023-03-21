@@ -32,7 +32,7 @@ parser.add_argument('--ar-upperbound', type=float, default=1.3)
 
 parser.add_argument('--input-types', type=str, default="vslt", choices=["vslt", "vslt_img", "vslt_txt", "vslt_img_txt"])
 parser.add_argument('--output-type', type=str, default="mortality", choices=['mortality', 'vasso', 'intubation', 'cpr', 'transfer'])
-parser.add_argument('--predict-type', type=str, default="multi_task_within", choices=["multi_task_within", "multi_task_range", "seq_pretrain"])
+parser.add_argument('--predict-type', type=str, default="within", choices=["within", "multi_task_within", "multi_task_range", "seq_pretrain"])
 parser.add_argument('--modality-inclusion', type=str, default="train-full_test-full", choices=['train-full_test-full', 'train-missing_test-missing', 'train-full_test-missing'])
 parser.add_argument('--fullmodal-definition', type=str, default="txt1", choices=["txt1_img1", "img1", "txt1"])
 

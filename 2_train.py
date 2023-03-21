@@ -186,7 +186,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
 
         for train_batch in train_loader:
             # get X, y, input_lengths, ...
-            train_x, static_x, train_y, input_lengths, train_img, train_txt, txt_lengths, img_time, missing, f_indices = train_batch
+            train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, img_time, missing, f_indices = train_batch
             if "vslt" in args.input_types:
                 input_lengths = input_lengths.to(device)
                 static_x      = static_x.to(device)
@@ -254,7 +254,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
                 with torch.no_grad():
                     for idx, val_batch in enumerate(tqdm(val_loader)):
                         # get X, y, input_lengths, ...
-                        val_x, val_static_x, val_y, input_lengths, val_img, val_txt, txt_lengths, img_time, missing, f_indices = val_batch
+                        val_x, val_static_x, val_y, input_lengths, val_img, img_time, val_txt, txt_lengths, img_time, missing, f_indices = val_batch
             
                         if "vslt" in args.input_types:
                             input_lengths = input_lengths.to(device)
@@ -345,7 +345,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
         for test_batch in tqdm(test_loader, total=len(test_loader), 
                                bar_format="{desc:<5}{percentage:3.0f}%|{bar:10}{r_bar}"):
             # get X, y, input_lengths, ...
-            test_x, test_static_x, test_y, input_lengths, test_img, test_txt, txt_lengths, img_time, missing, f_indices = test_batch
+            test_x, test_static_x, test_y, input_lengths, test_img, img_time, test_txt, txt_lengths, img_time, missing, f_indices = test_batch
             if "vslt" in args.input_types:
                 input_lengths = input_lengths.to(device)
                 test_static_x = test_static_x.to(device)

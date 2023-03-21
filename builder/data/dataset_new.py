@@ -542,7 +542,11 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 
             randLength -= early_nones
             selectedKey -= late_nones
-            time_data_list = list(time_data_list[early_nones:-late_nones])
+
+            if late_nones == 0:
+                time_data_list = list(time_data_list[early_nones:])
+            else:
+                time_data_list = list(time_data_list[early_nones:-late_nones])
 
         if args.auxiliary_loss_input is None:
             dataSequence, maskSequence, deltaSequence, inputLength = sequenceGenerator(args, selectedKey, randLength, windowIndex, data_pkl)
@@ -557,7 +561,7 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             final_seqs[0].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(dataSequence, args.vslt_mask, axis = 1)))
             final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
             final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
-        else:        
+        else:     
             time_data_np = torch.Tensor(np.concatenate([i for i in time_data_list if i is not None]))
             final_seqs[:time_data_np.shape[0], :time_data_np.shape[1]] = time_data_np
             inputLength = time_data_np.shape[0]
@@ -1131,8 +1135,12 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                 
             randLength -= early_nones
             selectedKey -= late_nones
-            time_data_list = list(time_data_list[early_nones:-late_nones])
-        
+            
+            if late_nones == 0:
+                time_data_list = list(time_data_list[early_nones:])
+            else:
+                time_data_list = list(time_data_list[early_nones:-late_nones])
+
         dataSequence, maskSequence, deltaSequence, inputLength = sequenceGenerator(args, selectedKey, randLength, windowIndex, data_pkl)
         f_indices = False
                     
@@ -1635,7 +1643,10 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 
             randLength -= early_nones
             selectedKey -= late_nones
-            time_data_list = list(time_data_list[early_nones:-late_nones])
+            if late_nones == 0:
+                time_data_list = list(time_data_list[early_nones:])
+            else:
+                time_data_list = list(time_data_list[early_nones:-late_nones])
             
         if args.auxiliary_loss_input is None:
             dataSequence, maskSequence, deltaSequence, inputLength = sequenceGenerator(args, selectedKey, randLength, windowIndex, data_pkl)
@@ -2231,7 +2242,10 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 
             randLength -= early_nones
             selectedKey -= late_nones
-            time_data_list = list(time_data_list[early_nones:-late_nones])
+            if late_nones == 0:
+                time_data_list = list(time_data_list[early_nones:])
+            else:
+                time_data_list = list(time_data_list[early_nones:-late_nones])
         
         dataSequence, maskSequence, deltaSequence, inputLength = sequenceGenerator(args, selectedKey, randLength, windowIndex, data_pkl)
         f_indices = False
