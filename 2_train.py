@@ -75,28 +75,12 @@ for k_indx, seed_num in enumerate(args.seed_list):
     print(args.modality_inclusion)
     
     train_loader, val_loader, test_loader = get_data_loader(args, patient_dict, keys_list, k_indx)
-
-    # for train_batch in tqdm(train_loader):
-    #     train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, img_time, missing, f_indices = train_batch
-    #     exit(1)
-        
-    # print("done without any error - Train loader")
-    # for train_batch in tqdm(val_loader):
-    #     train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, img_time, missing, f_indices = train_batch
     
-    # print("done without any error - Validation loader")
-    # for train_batch in tqdm(test_loader):
-    #     train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, img_time, missing, f_indices = train_batch
-
-    # print("done without any error - Test loader")
-    # exit(1)
-
     # get model
     model = get_model(args) 
     model = model(args).to(device)
     
     # set loss function
-    # criterion = nn.BCELoss(reduction='mean')
     criterion = nn.BCEWithLogitsLoss(size_average=True, reduction='mean')
 
     # check whether to use model checkpoint
@@ -124,31 +108,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
         start_epoch = 1
 
     # set optimizer
-    if args.optim == 'adam':
-        optimizer = optim.Adam(model.parameters(), lr=args.lr_init, weight_decay=args.weight_decay)
-    
-    elif args.optim == 'sgd':
-        optimizer = optim.SGD(model.parameters(), lr=args.lr_init, momentum=args.momentum, 
-                              weight_decay=args.weight_decay)
-    
-    elif args.optim == 'adamw':
-        optimizer = optim.AdamW(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
-    
-    elif args.optim == 'adam_lars':
-        optimizer = optim.Adam(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
-        optimizer = LARC(optimizer=optimizer, eps=1e-8, trust_coefficient=0.001)
-    
-    elif args.optim == 'sgd_lars':
-        optimizer = optim.SGD(model.parameters(), lr=args.lr_init, momentum=args.momentum, 
-                              weight_decay=args.weight_decay)
-        optimizer = LARC(optimizer=optimizer, eps=1e-8, trust_coefficient=0.001)
-    
-    elif args.optim == 'adamw_lars':
-        optimizer = optim.AdamW(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
-        optimizer = LARC(optimizer=optimizer, eps=1e-8, trust_coefficient=0.001)
-    
-    else:
-        raise ValueError('invalid optimizer: adam, sgd, adamw, adam_lars, sgd_lars, adamw_lars')
+    optimizer = optimizer(args)
 
     # get number of iteration
     iter_num_per_epoch  = len(train_loader)
@@ -157,19 +117,13 @@ for k_indx, seed_num in enumerate(args.seed_list):
     print("# of Iterations (total): ",      iter_num_total)
 
     # set learning scheduler
-    if args.lr_scheduler == "CosineAnnealing":
-        scheduler = CosineAnnealingWarmupRestarts(optimizer, 
-                                                  first_cycle_steps=args.t_0*iter_num_per_epoch, 
-                                                  cycle_mult=args.t_mult, 
-                                                  max_lr=args.lr_init * math.sqrt(args.batch_size), 
-                                                  min_lr=1e-6,
-                                                  warmup_steps=args.t_up*iter_num_per_epoch, gamma=args.gamma)
-    elif args.lr_scheduler == "Single":
-        scheduler = CosineAnnealingWarmUpSingle(optimizer, max_lr=args.lr_init * math.sqrt(args.batch_size), 
-                                                epochs=args.epochs, steps_per_epoch=iter_num_per_epoch, 
-                                                div_factor=math.sqrt(args.batch_size))
-    else:
-        raise ValueError('invalid lr-scheduler: Single, CosineAnnealing')
+    scheduler = CosineAnnealingWarmupRestarts(optimizer, 
+                                                first_cycle_steps=args.t_0*iter_num_per_epoch, 
+                                                cycle_mult=args.t_mult, 
+                                                max_lr=args.lr_init * math.sqrt(args.batch_size), 
+                                                min_lr=1e-6,
+                                                warmup_steps=args.t_up*iter_num_per_epoch, gamma=args.gamma)
+
 
     # intialize train step
     model.train()
@@ -189,12 +143,12 @@ for k_indx, seed_num in enumerate(args.seed_list):
             # get X, y, input_lengths, ...
             train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, img_time, missing, f_indices = train_batch
             if "vslt" in args.input_types:
-                input_lengths = input_lengths.to(device)
-                static_x      = static_x.to(device)
+                input_lengths = input_lengths.to(device, non_blocking=True)
+                static_x      = static_x.to(device, non_blocking=True)
         
             if "txt" in args.input_types:
-                train_txt     = train_txt.to(device)
-                txt_lengths   = txt_lengths.to(device)
+                train_txt     = train_txt.to(device, non_blocking=True)
+                txt_lengths   = txt_lengths.to(device, non_blocking=True)
 
             if args.auxiliary_loss_input is None:
                 f_indices     = None    
@@ -202,11 +156,11 @@ for k_indx, seed_num in enumerate(args.seed_list):
                 f_indices   = f_indices.to(device)
                 
             if "img" in args.input_types:
-                train_img     = train_img.to(device)
+                train_img     = train_img.to(device, non_blocking=True)
         
             # set vars to selected device
-            train_x         = train_x.to(device)
-            train_y         = train_y.to(device)
+            train_x         = train_x.type(torch.HalfTensor).to(device, non_blocking=True)
+            train_y         = train_y.to(device, non_blocking=True)
             
             # update iter counts
             iteration               += 1
@@ -244,7 +198,6 @@ for k_indx, seed_num in enumerate(args.seed_list):
                 logger.log_scalars(total_epoch_iteration)
 
             ### VALIDATION
-            # if iteration % (iter_num_per_epoch) == 0:
             # if iteration % (iter_num_per_epoch) == 0 and epoch > (args.epochs//2):
             if iteration % (iter_num_per_epoch) == 0:
                 # initialize valid step

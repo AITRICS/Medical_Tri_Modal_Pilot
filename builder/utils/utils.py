@@ -35,6 +35,35 @@ FEATURE_MEAN = {
     'CRP'       : 88.96706267,
 } # feature mean values gained from only training dataset...
 
+def optimizer(args):
+
+    if args.optim == 'adam':
+        optimizer = optim.Adam(model.parameters(), lr=args.lr_init, weight_decay=args.weight_decay)
+    
+    elif args.optim == 'sgd':
+        optimizer = optim.SGD(model.parameters(), lr=args.lr_init, momentum=args.momentum, 
+                              weight_decay=args.weight_decay)
+    
+    elif args.optim == 'adamw':
+        optimizer = optim.AdamW(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
+    
+    elif args.optim == 'adam_lars':
+        optimizer = optim.Adam(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
+        optimizer = LARC(optimizer=optimizer, eps=1e-8, trust_coefficient=0.001)
+    
+    elif args.optim == 'sgd_lars':
+        optimizer = optim.SGD(model.parameters(), lr=args.lr_init, momentum=args.momentum, 
+                              weight_decay=args.weight_decay)
+        optimizer = LARC(optimizer=optimizer, eps=1e-8, trust_coefficient=0.001)
+    
+    elif args.optim == 'adamw_lars':
+        optimizer = optim.AdamW(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
+        optimizer = LARC(optimizer=optimizer, eps=1e-8, trust_coefficient=0.001)
+    
+    else:
+        raise ValueError('invalid optimizer: adam, sgd, adamw, adam_lars, sgd_lars, adamw_lars')
+    
+    return optimizer
 
 def isListEmpty(inList):
     if isinstance(inList, list): # Is a list
@@ -60,7 +89,8 @@ def carry_forward(np_arr):
     df = pd.DataFrame(np_arr, columns=FEATURE_LIST)
     df = df.fillna(method='ffill')
     # df = df.fillna(method='bfill')
-    df = df.fillna(value=FEATURE_MEAN)
+    # df = df.fillna(value=FEATURE_MEAN)
+    df = df.fillna(0.0)
     data = df.to_numpy()
     
     return data
@@ -340,7 +370,8 @@ def onetime_outbreak_valdataset_maker(args, patdictPath, winsizePath):
             for key in keys_list:
                 win_key_name = "_".join(pkl_pth.split("/")[-1].split("_")[:2]) + f"_{str(keylist_idx)}" + "_" + f"_{str(key)}"
                 if win_key_name not in winDict:     
-                    win_size = random.choice(possibleWinSizes[key])
+                    # win_size = random.choice(possibleWinSizes[key])
+                    win_size = max(possibleWinSizes[key])
                     winDict[win_key_name] = win_size
                 
     with open(patdictPath, 'wb') as f:
@@ -547,7 +578,8 @@ def multiple_outbreaks_valdataset_maker(args, patdictPath, winsizePath):
             for key in keys_list:
                 win_key_name = "_".join(pkl_pth.split("/")[-1].split("_")[:2]) + f"_{str(keylist_idx)}" + "_" + f"_{str(key)}"
                 if win_key_name not in winDict:     
-                    win_size = random.choice(possibleWinSizes[key])
+                    # win_size = random.choice(possibleWinSizes[key])
+                    win_size = max(possibleWinSizes[key])
                     winDict[win_key_name] = win_size
                 
     with open(patdictPath, 'wb') as f:

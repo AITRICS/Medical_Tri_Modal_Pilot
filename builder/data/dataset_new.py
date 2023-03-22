@@ -38,6 +38,7 @@ FEATURE_TYPES = [
         'CREATININE', 'LACTATE', 'POTASSIUM', 'SODIUM', 'CRP'
     ]
 FEATURE_MEANS = [85.93695802, 20.10544135, 36.97378611, 120.00165406, 62.85878326, 96.7560417, 14.58784295, 29.44163972, 200.15499694, 12.11825286, 3.79762327, 7.37816261, 24.38824869, 1.5577265, 2.51239096, 4.12411448, 138.91951009, 88.96706267]
+# FEATURE_ZEROS = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 #margin_dir = search_walk({"path": "/nfs/thena/MedicalAI/ImageData/public/MIMIC_CXR/data/files_margins", "extension": ".jpg"})
 #with open("margin_dir.pkl","wb") as f:
 #    pickle.dump(margin_dir,f)
@@ -529,9 +530,6 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         data_pkl['data'] = np.divide(data_pkl['data'], pklFeatureMinMaxs)
         
         final_seqs = torch.Tensor(self.time_data_array)
-        # print("1 data_pkl['data_in_time']: ", data_pkl['data_in_time'])
-        # print("selectedKey: ", selectedKey)
-        # print("randLength: ", randLength)
         time_data_list = list(data_pkl['data_in_time'][selectedKey-randLength+1:selectedKey+1])
         if time_data_list[0] is None or time_data_list[-1] is None:
             if time_data_list[0] is None:
@@ -557,16 +555,15 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             f_indices = False
         else:
             dataSequence, maskSequence, deltaSequence, inputLength, f_indices = sequenceGenerator_pretrain(args, selectedKey, randLength, windowIndex+12, data_pkl)
-          
-        if self.vslt_type == "carryforward":    
-            dataSequence = carry_forward(dataSequence)                        
+        
+        if self.vslt_type == "carryforward":        
             sample_len = dataSequence.shape[0]
             final_seqs = torch.zeros(3, self.window_size, self.vslt_len)
             final_seqs[0].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(dataSequence, args.vslt_mask, axis = 1)))
             final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
             final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
         else:     
-            # print("2 time_data_list: ", time_data_list)
+            feature_init = dataSequence[0,:]
             time_data_np = np.concatenate([i for i in time_data_list if i is not None])
             time_data_np[:,0] -= selectedKey
             time_data_tensor = torch.Tensor(time_data_np)
@@ -580,7 +577,6 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             else:
                 target = 1
         target = torch.tensor(target)
-
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
         img_time = -1
         if "cxr_input" in data_pkl:
@@ -1032,7 +1028,8 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
             if win_key_name in winDict:     
                 win_size = winDict[win_key_name]
             else:
-                win_size = random.choice(possibleWinSizes[p_key])
+                # win_size = random.choice(possibleWinSizes[p_key])
+                win_size = max(possibleWinSizes[p_key])
                 winDict[win_key_name] = win_size
 
             if p_key is not None:
@@ -2124,7 +2121,8 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             if win_key_name in winDict:     
                 win_size = winDict[win_key_name]
             else:
-                win_size = random.choice(possibleWinSizes[p_key])
+                # win_size = random.choice(possibleWinSizes[p_key])
+                win_size = max(possibleWinSizes[p_key])
                 winDict[win_key_name] = win_size
 
             if p_key is not None:
