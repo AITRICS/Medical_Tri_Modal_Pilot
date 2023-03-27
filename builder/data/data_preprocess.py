@@ -45,9 +45,6 @@ def get_data_loader(args, patient_dict, keys_list, k_indx):
     print("train_data_list: ", len(train_data_list))
     print("val_data_list: ", len(val_data_list))
     print("test_dir: ", len(test_dir))
-    # train_data_list = train_data_list[:12800]
-    # val_data_list = val_data_list[:1024]
-    # test_dir = test_dir[:128]
 
     # For severance VC dataset, only onset time exist for intubation...!
     # For MIMIC-ER dataset, future 24 hrs of labtest is measured...
@@ -86,98 +83,27 @@ def get_data_loader(args, patient_dict, keys_list, k_indx):
     # For validation dataset, we prioritize full window_size subsequences over smaller ones
     # The indexes for sampling are random for every iteration
     # For testing dataset, we prioritize full window_size subsequences over smaller ones
-    if args.input_types == 'vslt':
-        train_loader = DataLoader(train_data, batch_size=args.batch_size, drop_last=True,
-                                num_workers=args.num_workers, pin_memory=True, sampler=sampler)
-            
-        val_loader   = DataLoader(val_data, batch_size=args.batch_size, drop_last=True,
-                                    num_workers=args.num_workers, pin_memory=True)                
-        test_loader  = DataLoader(test_data, batch_size=args.batch_size, drop_last=True,
-                                    num_workers=args.num_workers, pin_memory=True)
-
-    elif args.input_types == 'vslt_txt':
-        train_loader = DataLoader(train_data, batch_size=args.batch_size, drop_last=True,
+    train_loader = DataLoader(train_data, batch_size=args.batch_size, drop_last=True,
                                 num_workers=args.num_workers, pin_memory=True, sampler=sampler)
 
-        val_loader   = DataLoader(val_data, batch_size=args.batch_size, drop_last=True,
-                                    num_workers=args.num_workers, pin_memory=True)                
-        test_loader  = DataLoader(test_data, batch_size=args.batch_size, drop_last=True,
-                                    num_workers=args.num_workers, pin_memory=True)
-        
-    elif args.input_types == 'vslt_img':
-        train_loader = DataLoader(train_data, batch_size=args.batch_size, drop_last=True,
-                                num_workers=args.num_workers, pin_memory=True, sampler=sampler)
-
-        val_loader   = DataLoader(val_data, batch_size=args.batch_size, drop_last=True,
-                                    num_workers=args.num_workers, pin_memory=True)                
-        test_loader  = DataLoader(test_data, batch_size=args.batch_size, drop_last=True,
-                                    num_workers=args.num_workers, pin_memory=True)
-
-    elif args.input_types == 'vslt_img_txt':
-        train_loader = DataLoader(train_data, batch_size=args.batch_size, drop_last=True,
-                                    num_workers=args.num_workers, pin_memory=True, sampler=sampler)
-
-        val_loader   = DataLoader(val_data, batch_size=args.batch_size, drop_last=True,
-                                    num_workers=args.num_workers, pin_memory=True)                
-        test_loader  = DataLoader(test_data, batch_size=args.batch_size, drop_last=True,
-                                    num_workers=args.num_workers, pin_memory=True)
+    val_loader   = DataLoader(val_data, batch_size=args.batch_size, drop_last=True,
+                                num_workers=args.num_workers, pin_memory=True)                
+    test_loader  = DataLoader(test_data, batch_size=args.batch_size, drop_last=True,
+                                num_workers=args.num_workers, pin_memory=True)
             
     return train_loader, val_loader, test_loader
 
 
 def get_test_data_loader(args):
     # get test data
-    if "vslt" in args.input_types:
-        test_dir = search_walk({'path': args.test_data_path, 'extension': ".pkl"})
-        # random.shuffle(test_dir)  # Q: does test set need random shuffling?
-    elif args.input_types == "txt":
-        test_data_list = []
-        if args.modality_inclusion == "fullmodal":
-            test_dir = "builder/data/text/textDataset/" + args.train_data_path.split("/")[-2] + "_test_" + args.txt_tokenization + "_full_textDataset.txt"
-        else:
-            test_dir = "builder/data/text/textDataset/" + args.train_data_path.split("/")[-2] + "_test_" + args.txt_tokenization + "_textDataset.txt"
-        with open(test_dir, 'r') as f:
-            while True:
-                line = f.readline()
-                if not line:
-                    break
-                test_data_list.append(line.strip())
-    elif args.input_types == 'img':
-        test_dir       = search_walk({'path': args.test_data_path, 'extension': ".pkl"})
-        test_data_list = list()
-        for pkl in test_dir:
-            filename = pkl.split('/')[-1]
-            pat_id   = filename.split('_')[0]
-            # select samples only with cxr images
-            if 'img1' not in filename:
-                continue
-            test_data_list.append(pkl)
-        print('[img] test patients: ', len(test_data_list))
-    
+    test_dir = search_walk({'path': args.test_data_path, 'extension': ".pkl"})
     args.vslt_mask = [True if i not in args.vitalsign_labtest else False for i in VITALSIGN_LABTEST] # True to remove
-
-    if 'multi_task' in args.predict_type:
-        if args.output_type == 'mortality':
-            test_data         = Onetime_Outbreak_Test_Dataset(args, data=test_dir, data_type="test dataset")
-    
-        elif args.output_type == 'cpr' or args.output_type == 'intubation' or\
-             args.output_type == 'vasso' or args.output_type == 'transfer':
-            test_data         = Multiple_Outbreaks_Test_Dataset(args, data=test_dir, data_type="test dataset")
+    if args.output_type == 'mortality':
+        test_data         = Onetime_Outbreak_Test_Dataset(args, data=test_dir, data_type="test dataset")
+    elif args.output_type == 'cpr' or args.output_type == 'intubation' or\
+            args.output_type == 'vasso' or args.output_type == 'transfer':
+        test_data         = Multiple_Outbreaks_Test_Dataset(args, data=test_dir, data_type="test dataset")
         
-    if args.input_types == 'vslt':
-        test_loader  = DataLoader(test_data, batch_size=args.batch_size, drop_last=True,
-                                    num_workers=args.num_workers, pin_memory=True)
-
-    elif args.input_types == 'vslt_txt':
-        test_loader  = DataLoader(test_data, batch_size=args.batch_size, drop_last=True,
-                                    num_workers=args.num_workers, pin_memory=True)
-        
-    elif args.input_types == 'vslt_img':
-        test_loader  = DataLoader(test_data, batch_size=args.batch_size, drop_last=True,
-                                    num_workers=args.num_workers, pin_memory=True)
-
-    elif args.input_types == 'vslt_img_txt':
-        test_loader  = DataLoader(test_data, batch_size=args.batch_size, drop_last=True,
-                                    num_workers=args.num_workers, pin_memory=True)
-    
+    test_loader  = DataLoader(test_data, batch_size=args.batch_size, drop_last=True,
+                                num_workers=args.num_workers, pin_memory=True)
     return test_loader

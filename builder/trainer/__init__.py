@@ -28,6 +28,7 @@ def get_trainer(args,
                 x_img=None, 
                 txt_lengths=None, 
                 seq_lengths=None, 
+                imgtxt_time=None,
                 scaler=None, 
                 missing=None,
                 flow_type=None):
@@ -35,6 +36,7 @@ def get_trainer(args,
     model, iter_loss = missing_trainer(args, iteration, x, static, input_lengths, y, 
                                         model, logger, device, scheduler, optimizer, criterion, 
                                         scaler, flow_type, output_lengths, 
-                                        seq_lengths=seq_lengths, x_img=x_img, x_txt=x_txt, txt_lengths=txt_lengths, missing=missing)
+                                        seq_lengths=seq_lengths, x_img=x_img, x_txt=x_txt, 
+                                        txt_lengths=txt_lengths, imgtxt_time=imgtxt_time, missing=missing)
 
     return model, iter_loss

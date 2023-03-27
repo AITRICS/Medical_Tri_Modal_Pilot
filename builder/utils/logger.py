@@ -86,34 +86,52 @@ class Logger:
         self.writer.add_scalar('val/loss', self.val_loss / val_step, global_step=step)
 
     def add_validation_logs(self, step):
-                
-        result, tprfnrtnrfpr = self.evaluator.performance_metric_binary()
-        tpr, fnr, tnr, fpr = tprfnrtnrfpr
-        auc = result[0]
-        os.system("echo  \'##### Current Validation results #####\'")
-        os.system("echo  \'auc: {}, apr: {}, f1_score: {}\'".format(str(result[0]), str(result[1]), str(result[2])))
-        os.system("echo  \'tpr: {}, fnr: {}, tnr: {}, fpr: {}\'".format(str(tpr), str(fnr), str(tnr), str(fpr)))
+        result = self.evaluator.performance_metric()
 
-        self.writer.add_scalar('val/auc', result[0], global_step=step)
-        self.writer.add_scalar('val/apr', result[1], global_step=step)
-        self.writer.add_scalar('val/f1', result[2], global_step=step)
-        self.writer.add_scalar('val/tpr', tpr, global_step=step)
-        self.writer.add_scalar('val/fnr', fnr, global_step=step)
-        self.writer.add_scalar('val/tnr', tnr, global_step=step)
-        self.writer.add_scalar('val/fpr', fpr, global_step=step)
+        if (self.args.model_types == "detection"):
+            auc, apr, f1 = result
+            anchor = auc + apr
+            os.system("echo  \'##### Current Validation results #####\'")
+            os.system("echo  \'auc: {}, apr: {}, f1_score: {}\'".format(str(auc), str(apr), str(f1)))
+            
+            self.writer.add_scalar('val/auc', np.mean(auc), global_step=step)
+            self.writer.add_scalar('val/apr', np.mean(apr), global_step=step)
+            self.writer.add_scalar('val/f1', np.mean(f1), global_step=step)
+            
+            if self.best_auc < anchor:
+                self.best_iter = step
+                self.best_auc = anchor
+                self.best_result_so_far = list(result)
+            
+        elif (self.args.model_types == "classification"):
+            nresult, wresult = result
+            aucs, aprs, f1s = nresult
+            wauc, wapr, wf1 = wresult
+            anchor = wf1
+            os.system("echo  \'##### Current Validation results #####\'")
+            os.system("echo  \'Weighted auc: {}, apr: {}, f1: {}\'".format(str(wauc), str(wapr), str(wf1)))
+            os.system("echo  \'Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(str(aucs), str(aprs), str(f1s)))
 
-        if self.best_auc < auc:
-            self.best_iter = step
-            self.best_auc = auc
-            self.best_result_so_far = result
-            self.best_results = [tpr, fnr, tnr, fpr]
-            self.scores_list = list([result, tpr, fnr, tnr, fpr])
+            self.writer.add_scalar('val/avg_auc', np.mean(aucs), global_step=step)
+            self.writer.add_scalar('val/avg_apr', np.mean(aprs), global_step=step)
+            self.writer.add_scalar('val/avg_f1', np.mean(f1s), global_step=step)
+            self.writer.add_scalar('val/w_auc', wauc, global_step=step)
+            self.writer.add_scalar('val/w_apr', wapr, global_step=step)
+            self.writer.add_scalar('val/w_f1', wf1, global_step=step)
 
-        os.system("echo  \'##### Best Validation results in history #####\'")
-        os.system("echo  \'auc: {}, apr: {}, f1_score: {}\'".format(str(self.best_result_so_far[0]), str(self.best_result_so_far[1]), str(self.best_result_so_far[2])))
-        os.system("echo  \'tpr: {}, fnr: {}, tnr: {}, fpr: {}\'".format(str(self.best_results[0]), str(self.best_results[1]), str(self.best_results[2]), str(self.best_results[3])))
+            if self.best_auc < anchor:
+                self.best_iter = step
+                self.best_auc = anchor
+                self.best_result_so_far = list(result)
 
-        self.writer.flush()
+            nresult, wresult = self.best_result_so_far 
+            aucs, aprs, f1s = nresult
+            wauc, wapr, wf1 = wresult
+            os.system("echo  \'##### Best Validation results in history #####\'")
+            os.system("echo  \'Weighted auc: {}, apr: {}, f1: {}\'".format(str(wauc), str(wapr), str(wf1)))
+            os.system("echo  \'Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(str(aucs), str(aprs), str(f1s)))
+
+            self.writer.flush()
 
     def save(self, model, optimizer, step, epoch, k_indx, last=None):
         ckpt = {'model': model.state_dict(), 'optimizer': optimizer.state_dict(), 'best_step': step, 'last_step' : last, 'score' : self.best_auc, 'epoch' : epoch}
@@ -129,35 +147,41 @@ class Logger:
         torch.save(ckpt, os.path.join(self.dir_save, name))
 
     def test_result_only(self):
-        result, tprfnrtnrfpr = self.evaluator.performance_metric_binary()
-        tpr, fnr, tnr, fpr = tprfnrtnrfpr
+        result = self.evaluator.performance_metric()
         
-        os.system("echo  \'##### Test results #####\'")
-        os.system("echo  \'auc: {}, apr: {}, f1_score: {}\'".format(str(result[0]), str(result[1]), str(result[2])))
-        os.system("echo  \'tpr: {}, fnr: {}, tnr: {}, fpr: {}\'".format(str(tpr), str(fnr), str(tnr), str(fpr)))
-        self.test_results = list([self.args.seed, result, tpr, tnr])
+        if (self.args.model_types == "detection"):
+            auc, apr, f1 = result
+            anchor = auc + apr
+            os.system("echo  \'##### Test results #####\'")
+            os.system("echo  \'auc: {}, apr: {}, f1_score: {}\'".format(str(auc), str(apr), str(f1)))
+            
+        elif (self.args.model_types == "classification"):
+            nresult, wresult = result
+            aucs, aprs, f1s = nresult
+            wauc, wapr, wf1 = wresult
+            anchor = wf1
+            os.system("echo  \'##### Test results #####\'")
+            os.system("echo  \'Weighted auc: {}, apr: {}, f1: {}\'".format(str(wauc), str(wapr), str(wf1)))
+            os.system("echo  \'Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(str(aucs), str(aprs), str(f1s)))        
+
+        self.test_results = list([self.args.seed, result])
 
     def val_result_only(self):
-        os.system("echo  \'##### Validation results #####\'")
-        result, tpr, fnr, tnr, fpr = self.scores_list
-        auc, apr, f1 = result
-        os.system(f"echo  \'Val || auc: {str(auc)}, apr: {str(apr)}, f1_score: {str(f1)} tpr: {str(tpr)}, tnr: {str(tnr)}\'")
+        if (self.args.model_types == "detection"):
+            auc, apr, f1 = self.best_result_so_far 
+            anchor = auc + apr
+            os.system("echo  \'##### Validation results #####\'")
+            os.system("echo  \'auc: {}, apr: {}, f1_score: {}\'".format(str(auc), str(apr), str(f1)))
             
-        auc = np.round(auc, 4)
-        apr = np.round(apr, 4)
-        f1 = np.round(f1, 4)
-        tpr = np.round(tpr, 4)
-        fnr = np.round(fnr, 4)
-        tnr = np.round(tnr, 4)
-        fpr = np.round(fpr, 4)
-        
-        auc = self.best_result_so_far[0]
-        apr = self.best_result_so_far[1]
-        f1 = self.best_result_so_far[2]
-        tpr = self.best_results[0]
-        tnr = self.best_results[2]
-        os.system(f"echo  \'Mean || auc: {str(auc)}, apr: {str(apr)}, f1_score: {str(f1)} tpr: {str(tpr)}, tnr: {str(tnr)}\'")
-        result = [auc, apr, f1]
-        self.val_results = list([self.args.seed, result, tpr, tnr])
+        elif (self.args.model_types == "classification"):
+            nresult, wresult = self.best_result_so_far 
+            aucs, aprs, f1s = nresult
+            wauc, wapr, wf1 = wresult
+            anchor = wf1
+            os.system("echo  \'##### Validation results #####\'")
+            os.system("echo  \'Weighted auc: {}, apr: {}, f1: {}\'".format(str(wauc), str(wapr), str(wf1)))
+            os.system("echo  \'Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(str(aucs), str(aprs), str(f1s)))       
+
+        self.val_results = list([self.args.seed, self.best_result_so_far])
             
           

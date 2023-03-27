@@ -23,12 +23,12 @@ class TRI_MT_V1(nn.Module):
         self.num_heads = args.transformer_num_head
         self.model_dim = args.transformer_dim
         self.dropout = args.dropout
+        self.output_dim = args.output_dim
 
         self.num_nodes = len(args.vitalsign_labtest)
         self.t_len = args.window_size
 
         self.device = args.device
-        self.classifier_nodes = 64
         self.vslt_input_size = len(args.vitalsign_labtest)
         self.n_modality = len(args.input_types.split("_"))
         activation = 'relu'
@@ -51,26 +51,22 @@ class TRI_MT_V1(nn.Module):
                                         nn.ReLU(inplace=True),
                     )
         elif args.vslt_type == "TIE":
-            self.tie_vslt = nn.Sequential(
+            self.ie_vslt = nn.Sequential(
                                         nn.Linear(1, self.model_dim),
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
                     )
-            self.tie_time = nn.Sequential(
+            self.ie_time = nn.Sequential(
                                         nn.Linear(1, self.model_dim),
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
                     )
-            self.tie_feat = nn.Sequential(
-                                        nn.Linear(1, self.model_dim),
-                                        nn.LayerNorm(self.model_dim),
-                                        nn.ReLU(inplace=True),
-                    )
-            self.tie_demo = nn.Sequential(
-                                        nn.Linear(2, self.model_dim),
-                                        nn.LayerNorm(self.model_dim),
-                                        nn.ReLU(inplace=True),
-                    )
+            self.ie_feat = nn.Embedding(18, self.model_dim)
+        self.ie_demo = nn.Sequential(
+                                    nn.Linear(2, self.model_dim),
+                                    nn.LayerNorm(self.model_dim),
+                                    nn.ReLU(inplace=True),
+                )
             
         if args.berttype == "bert": # BERT
             self.txt_embedding = nn.Embedding(30000, self.model_dim)
@@ -86,9 +82,18 @@ class TRI_MT_V1(nn.Module):
                 self.img_encoder = vit_b_16_m(weights = None)
         elif self.img_model_type == "swin":
             if self.img_pretrain =="Yes":
+                # self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
                 self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
+                model_dict = self.img_encoder.state_dict()
+                old_weights=torch.load("/nfs/thena/shared/multi_modal/mlhc/chx_ckpts/image_reports_swin_1e-6_resize_affine_crop-resize_crop_0323_best_fold0_seed0.pth")['model']
+                new_weights=torch.load("/nfs/thena/shared/multi_modal/mlhc/chx_ckpts/image_reports_swin_1e-6_resize_affine_crop-resize_crop_0323_best_fold0_seed0.pth")['model']
+                new_weights = {key.replace('img_encoder.', ''): new_weights.pop(key) for key in old_weights.keys()}
+                new_weights = {k: v for k, v in new_weights.items() if k in model_dict}
+                model_dict.update(new_weights)
+                self.img_encoder.load_state_dict(new_weights)
             else:
                 self.img_encoder = swin_t_m(weights = None)
+                
         else:
             self.patch_embedding = PatchEmbeddingBlock(
             in_channels=1,
@@ -110,33 +115,40 @@ class TRI_MT_V1(nn.Module):
             n_layers = self.num_layers,
             n_head = self.num_heads,
             d_model = self.model_dim,
+            fusion_startidx = args.mbt_fusion_startIdx,
             d_ff = self.model_dim * 4,
             n_modality = self.n_modality,
             dropout = self.dropout,
-            pe_maxlen = 10000,
-            use_pe = True,
+            pe_maxlen = 2500,
+            use_pe = [True, False, True],
+            mask = [True, False, True],
             txt_idx = 2,
         )
 
         ##### Classifier
         self.layer_norm_final = nn.LayerNorm(self.model_dim)
-        self.fc_list = nn.ModuleList()
-        for _ in range(12):
-            self.fc_list.append(nn.Sequential(
-            nn.Linear(in_features=self.model_dim, out_features= self.classifier_nodes, bias=True),
-            nn.LayerNorm(self.classifier_nodes),
-            self.relu,
-            nn.Linear(in_features=self.classifier_nodes, out_features= 1,  bias=True)))
+        self.fc_list = nn.Sequential(
+        nn.Linear(in_features=self.model_dim*2, out_features= self.model_dim, bias=True),
+        nn.BatchNorm1d(self.model_dim),
+        self.activations[activation],
+        nn.Linear(in_features=self.model_dim, out_features= self.output_dim,  bias=True))
         
         self.fixed_lengths = [0, 25]
         
-    def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices):
-        age = age.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
-        gen = gen.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
-        x = torch.cat([x, age, gen], axis=2)
-        vslt_embedding = self.vslt_enc(x)
+    def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices, img_time, txt_time):
+        demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1)
+        demo_embedding = self.ie_demo(demographic)
+                                
+        if self.args.vslt_type == "carryforward":
+            vslt_embedding = self.vslt_enc(x)
+        elif self.args.vslt_type == "TIE": # [seqlen x 3] 0: time, 1: value, 2: feature    
+            value_embedding = self.ie_vslt(x[:,:,1].unsqueeze(2))
+            time_embedding = self.ie_time(x[:,:,0].unsqueeze(2))
+            feat = x[:,:,2].type(torch.IntTensor).to(self.device)
+            feat_embedding = self.ie_feat(feat)
+            
+            vslt_embedding = value_embedding + time_embedding + feat_embedding
 
-        txts = txts.type(torch.IntTensor).to(self.device)
         txt_embedding = self.txt_embedding(txts)
         
         if self.img_model_type == "vit":
@@ -149,25 +161,19 @@ class TRI_MT_V1(nn.Module):
         else:
             img_embedding = self.patch_embedding(img)
             
+        if self.args.imgtxt_time == 1:
+            img_embedding += self.ie_time(img_time.unsqueeze(1)).unsqueeze(1)
+            txt_embedding += self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1)
+            
         context_vector, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding, txt_embedding], 
             fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1), txt_embedding.size(1)],
             varying_lengths = [input_lengths, torch.tensor(img_embedding.size(1)).repeat(img_embedding.size(0)), txt_lengths+2],
             fusion_idx = None,
             missing=missing
         )
-        if self.multitoken == 0:
-            final_cls_output = context_vector[:,0,:]
-        else:
-            final_vslt_output = context_vector[:,3,:]
-            final_vsltimg_output = context_vector[:,1,:]
-            final_vslttxt_output = context_vector[:,2,:]
-            final_vsltimgtxt_output = context_vector[:,0,:]
-            final_cls_output = torch.stack([final_vsltimgtxt_output, final_vsltimg_output, final_vslttxt_output, final_vslt_output])
-            # final_cls_output = final_cls_output[missing, self.idx_order, :]
+        final_cls_output = context_vector[:,0,:]
             
-        context_vector = self.layer_norm_final(final_cls_output)
-        multitask_vectors = []
-        for i, fc in enumerate(self.fc_list):
-                multitask_vectors.append(fc(context_vector))
-        output = torch.stack(multitask_vectors) # torch.Size([12, 64, 1])
+        classInput = self.layer_norm_final(final_cls_output)
+        classInput = torch.cat([classInput, demo_embedding], dim=1)
+        output = self.fc_list(classInput)
         return output, None

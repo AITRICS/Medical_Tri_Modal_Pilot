@@ -66,7 +66,6 @@ class TrimodalTransformerEncoder_MBT(nn.Module):
     def forward(self, enc_outputs, fixed_lengths = None, varying_lengths = None, return_attns = False, fusion_idx = None, missing = None):
         cls_token_per_modality = [cls_token.repeat(enc_outputs[0].size(0), 1, 1) for cls_token in self.cls_token_per_modality]
         bottlenecks = self.bottlenecks.repeat(enc_outputs[0].size(0), 1, 1)
-        
         enc_inputs = [torch.cat([cls_token_per_modality[idx], enc_input], axis=1) for idx, enc_input in enumerate(enc_outputs)]
         
         self_attn_masks = []
@@ -106,8 +105,6 @@ class TrimodalTransformerEncoder_MBT(nn.Module):
                     
             else:
                 bottleneck_outputs = []
-                if "residual" in self.mbt_bottlenecks_type:
-                    res_bottlenecks = bottlenecks.detach().clone()
                 for modal_idx, enc_layer in enumerate(enc_layers):
                     b_enc_output = torch.cat([bottlenecks, enc_inputs[modal_idx]], axis=1)
                     if len(bottleneck_self_attn_masks) < self.n_modality:
@@ -135,8 +132,6 @@ class TrimodalTransformerEncoder_MBT(nn.Module):
                 # print("self.idx_order: ", self.idx_order.shape)
                 
                 bottlenecks = all_bottleneck_stack[missing, self.idx_order, :, :]
-                if "residual" in self.mbt_bottlenecks_type:
-                    bottlenecks += res_bottlenecks
                 
                 # bottlenecks = torch.where(missing[1].unsqueeze(1).unsqueeze(1) == 0, bottleneck_outputs[0], bottlenecks_mean)
                 # bottlenecks = torch.where(varying_lengths[1].unsqueeze(1).unsqueeze(1) == 0, bottleneck_outputs[0], bottlenecks_mean)

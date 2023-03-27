@@ -7,6 +7,8 @@ from tqdm import tqdm
 from builder.data.data_utils import *
 import pickle5 as pickle
 import math 
+import torch.optim as optim
+from builder.utils.lars import LARC
 
 FEATURE_LIST = [
     'PULSE', 'RESP', 'TEMP', 'SBP', 'DBP', 'SpO2', 'GCS',
@@ -35,35 +37,35 @@ FEATURE_MEAN = {
     'CRP'       : 88.96706267,
 } # feature mean values gained from only training dataset...
 
-def optimizer(args):
+# def optimizer(args, model):
 
-    if args.optim == 'adam':
-        optimizer = optim.Adam(model.parameters(), lr=args.lr_init, weight_decay=args.weight_decay)
+#     if args.optim == 'adam':
+#         optimizer = optim.Adam(model.parameters(), lr=args.lr_init, weight_decay=args.weight_decay)
     
-    elif args.optim == 'sgd':
-        optimizer = optim.SGD(model.parameters(), lr=args.lr_init, momentum=args.momentum, 
-                              weight_decay=args.weight_decay)
+#     elif args.optim == 'sgd':
+#         optimizer = optim.SGD(model.parameters(), lr=args.lr_init, momentum=args.momentum, 
+#                               weight_decay=args.weight_decay)
     
-    elif args.optim == 'adamw':
-        optimizer = optim.AdamW(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
+#     elif args.optim == 'adamw':
+#         optimizer = optim.AdamW(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
     
-    elif args.optim == 'adam_lars':
-        optimizer = optim.Adam(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
-        optimizer = LARC(optimizer=optimizer, eps=1e-8, trust_coefficient=0.001)
+#     elif args.optim == 'adam_lars':
+#         optimizer = optim.Adam(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
+#         optimizer = LARC(optimizer=optimizer, eps=1e-8, trust_coefficient=0.001)
     
-    elif args.optim == 'sgd_lars':
-        optimizer = optim.SGD(model.parameters(), lr=args.lr_init, momentum=args.momentum, 
-                              weight_decay=args.weight_decay)
-        optimizer = LARC(optimizer=optimizer, eps=1e-8, trust_coefficient=0.001)
+#     elif args.optim == 'sgd_lars':
+#         optimizer = optim.SGD(model.parameters(), lr=args.lr_init, momentum=args.momentum, 
+#                               weight_decay=args.weight_decay)
+#         optimizer = LARC(optimizer=optimizer, eps=1e-8, trust_coefficient=0.001)
     
-    elif args.optim == 'adamw_lars':
-        optimizer = optim.AdamW(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
-        optimizer = LARC(optimizer=optimizer, eps=1e-8, trust_coefficient=0.001)
+#     elif args.optim == 'adamw_lars':
+#         optimizer = optim.AdamW(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
+#         optimizer = LARC(optimizer=optimizer, eps=1e-8, trust_coefficient=0.001)
     
-    else:
-        raise ValueError('invalid optimizer: adam, sgd, adamw, adam_lars, sgd_lars, adamw_lars')
+#     else:
+#         raise ValueError('invalid optimizer: adam, sgd, adamw, adam_lars, sgd_lars, adamw_lars')
     
-    return optimizer
+#     return optimizer
 
 def isListEmpty(inList):
     if isinstance(inList, list): # Is a list

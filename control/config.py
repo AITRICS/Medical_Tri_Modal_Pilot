@@ -12,6 +12,8 @@ parser = argparse.ArgumentParser()
 # Missing modality techniques
 parser.add_argument('--multitoken', type=int, default=0)
 
+parser.add_argument('--model-types', type=str, default="classification", choices=["detection", "classification"])
+
 # General Parameters
 parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--seed-list', type=list, default=[412, 1004, 2023]) #[0, 1004, 2022, 9209, 119]
@@ -26,7 +28,8 @@ parser.add_argument('--checkpoint', '-cp', type=bool, default=False)
 parser.add_argument('--prediction-range', type=int, default=12)
 parser.add_argument('--min-inputlen', type=int, default=3)
 parser.add_argument('--window-size', type=int, default=24)
-parser.add_argument('--vslt-type', type=str, default="carryforward", choices=["carryforward", "TIE", "QIE"])
+parser.add_argument('--vslt-type', type=str, default="carryforward", choices=["carryforward", "TIE"])
+parser.add_argument('--TIE-len', type=int, default=2000)
 parser.add_argument('--ar-lowerbound', type=float, default=0.7)
 parser.add_argument('--ar-upperbound', type=float, default=1.3)
 
@@ -34,17 +37,18 @@ parser.add_argument('--input-types', type=str, default="vslt", choices=["vslt", 
 parser.add_argument('--output-type', type=str, default="mortality", choices=['mortality', 'vasso', 'intubation', 'cpr', 'transfer'])
 parser.add_argument('--predict-type', type=str, default="within", choices=["within", "multi_task_within", "multi_task_range", "seq_pretrain"])
 parser.add_argument('--modality-inclusion', type=str, default="train-full_test-full", choices=['train-full_test-full', 'train-missing_test-missing', 'train-full_test-missing'])
-parser.add_argument('--fullmodal-definition', type=str, default="txt1", choices=["txt1_img1", "img1", "txt1"])
+parser.add_argument('--fullmodal-definition', type=str, default="txt1_img1", choices=["txt1_img1", "img1", "txt1"])
 
 # Data path setting
-parser.add_argument('--train-data-path', type=str, default="/home/destin/training_data_0320/mimic_icu_size24/train")
-parser.add_argument('--test-data-path', type=str, default="/home/destin/training_data_0320/mimic_icu_size24/test")
+parser.add_argument('--train-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/train")
+parser.add_argument('--test-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/test")
 parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/destin/multimodal/MLHC_result")
 parser.add_argument('--image-data-path', type=str, default="/home/destin/")
 # Data Parameters
 parser.add_argument('--cross-fold-val', type=int, default=0, choices=[1, 0], help="1: k-fold, 0: seed-average")
 parser.add_argument('--val-data-ratio', type=float, default=0.1)
 parser.add_argument('--carry-back', type=bool, default=True)
+parser.add_argument('--imgtxt-time', type=int, default=0, choices=[0,1])
 
 # Training Parameters
 parser.add_argument('--epochs', type=int, default=150)
@@ -101,22 +105,17 @@ parser.add_argument("--img-pretrain", type=str, default="Yes", choices = ["No","
 #Image preprocess argument
 parser.add_argument('--image-size', type=int, default=224, choices=[224,512])
 #center is default, resize: image-train-type = ["random"], image-test-type = ["resize"]
-parser.add_argument('--image-train-type', type=str, default="random", choices=["random", "resize", "resize_crop", "resize_affine_crop", "randaug"])
-parser.add_argument('--image-test-type', type=str, default="center", choices=["center", "resize", "resize_crop", "resize_larger"])#center: shorter로 resize 후, center crop, resize: aspect ratio 고려 없이 정사각형 resize
+parser.add_argument('--image-train-type', type=str, default="resize_affine_crop", choices=["random", "resize", "resize_crop", "resize_affine_crop", "randaug"])
+parser.add_argument('--image-test-type', type=str, default="resize_crop", choices=["center", "resize", "resize_crop", "resize_larger"])#center: shorter로 resize 후, center crop, resize: aspect ratio 고려 없이 정사각형 resize
 parser.add_argument('--image-norm-type', type=str, default="HE", choices=["HE", "CLAHE"])
 
 # temporal method
 parser.add_argument('--temporal', type=str, default="LSTM", choices=["LSTM", "BLSTM", "TRANSFORMER"])
 parser.add_argument('--graph', type=str, default="gtransformer", choices=["gtransformer", "cnn1d"])
 
-# cross Model Parameters
-parser.add_argument('--cross-transformer-dim', type=int, default=256)
-parser.add_argument('--cross-transformer-num-layers', type=int, default=4)
-parser.add_argument('--cross-transformer-num-head', type=int, default=4)
-
 # MBT Model Parameters
 parser.add_argument('--mbt-bottlenecks-n', type=int, default=4)
-parser.add_argument('--mbt-fusion-startIdx', type=int, default=4)
+parser.add_argument('--mbt-fusion-startIdx', type=int, default=0)
 
 # Final Fusion Model Parameters
 parser.add_argument('--final-num-layers', type=int, default=4)
@@ -131,25 +130,15 @@ parser.add_argument('--auxiliary-loss-weight', type=float, default=1.0)
 parser.add_argument('--neg-samples-from', type=str, default="Future", choices=["Future", "PastFuture"])
 
 # 'HR', 'RR', 'BT', 'SBP', 'DBP', 'Sat', 'GCS'6, 'Hematocrit', 'PLT', 'WBC', 'Bilirubin', 'pH', 'HCO3', 'Creatinine', 'Lactate', 'Potassium', 'Sodium', 'CRP'17
-# parser.add_argument('--vitalsign-labtest', type=list, default=['HR', 'RR', 'BT', 'SBP', 'DBP', 'Sat', 'Hematocrit', 'PLT', 'WBC', 'Bilirubin', 'pH', 'HCO3', 'Creatinine', 'Lactate', 'Potassium', 'Sodium'])  
 parser.add_argument('--mandatory-vitalsign-labtest', type=list, default=['HR', 'RR', 'BT', 'SBP', 'DBP', 'Sat'])  
 parser.add_argument('--vitalsign-labtest', type=list, default=['HR', 'RR', 'BT', 'SBP', 'DBP', 'Sat', 'Hematocrit', 'PLT', 'WBC', 'Bilirubin', 'pH', 'HCO3', 'Creatinine', 'Lactate', 'Potassium', 'Sodium'])  
 parser.add_argument('--model', type=str, default="gru_d") 
 
 # Visualize / Logging Parameters
 parser.add_argument('--log-iter', type=int, default=10)
-# Test / Store Parameters
-# testset-type: 
-#   - 'uni': for comparison between three different unimodal models (testset tpye A)
-#   - 'all': for the comparison between trimodal, bimodals, vs-unimodal, and image-unimodals (testset tpye B)
-# parser.add_argument('--testset-type', default="uni", choices=['uni', 'all'])
-# for testset-type 'uni' validation dataset and testset-type 'all' validation/test dataset
 parser.add_argument('--nonPatNegSampleN', type=int, default=4)
 parser.add_argument('--PatNegSampleN', type=int, default=1)
 parser.add_argument('--PatPosSampleN', type=int, default=5)
-# parser.add_argument('--nonPatNegSampleN', type=int, default=5)
-# parser.add_argument('--PatNegSampleN', type=int, default=5)
-# parser.add_argument('--PatPosSampleN', type=int, default=10)
 parser.add_argument('--best', default=True, action='store_true')
 parser.add_argument('--last', default=False, action='store_true')
 

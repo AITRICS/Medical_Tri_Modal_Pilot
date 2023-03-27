@@ -133,15 +133,12 @@ class TrimodalTransformerEncoder_MT(nn.Module):
             d_model: int,
             d_ff: int,
             fusion_startidx: int = 0,
-            multitoken: int = 0,
             dropout: float = 0.1,
             pe_maxlen: int = 5000,
             txt_idx: int = 2,
             use_pe: list = [True, True, True],
             mask: list = [True, False, True]):
         super(TrimodalTransformerEncoder_MT, self).__init__()
-        print("multitoken: ", multitoken)
-        self.multitoken = multitoken
         self.use_pe = use_pe
         self.n_modality = n_modality
         self.fusion_idx = fusion_startidx
@@ -153,46 +150,20 @@ class TrimodalTransformerEncoder_MT(nn.Module):
         
         # CLASSIFICATION TOKENS
         self.cls_token_per_modality = nn.ParameterList([nn.Parameter(torch.randn(1, 1, d_model)) for _ in range(n_modality)])
-        if self.multitoken == 1:
-            self.final_cls_tokens = nn.Parameter(torch.zeros(1,3,d_model)).cuda()
-            self.final_token_mask = torch.ones([3, 1]).cuda()
-            self.specific_masks = torch.zeros(207,207).cuda()               # 3 + 25 + 50 + 129 = 207
-            self.specific_masks[3,28:] = 1
-            self.specific_masks[28:,3] = 1
-            self.specific_masks[28,3:28] = 1
-            self.specific_masks[3:28,28] = 1
-            self.specific_masks[78,3:78] = 1
-            self.specific_masks[3:78,78] = 1
-            self.specific_masks[28,78:] = 1
-            self.specific_masks[78:,28] = 1
-            
-            self.specific_masks[1,78:] = 1
-            self.specific_masks[78:,1] = 1
-            self.specific_masks[2,28:78] = 1
-            self.specific_masks[28:78,2] = 1
-            
-            self.specific_masks[1,2] = 1
-            self.specific_masks[2,1] = 1
-            self.specific_masks[0,1:3] = 1
-            self.specific_masks[1:3,0] = 1
-            self.specific_masks[3,:3] = 1
-            self.specific_masks[:3,3] = 1
-            self.specific_masks = self.specific_masks.ge(0.5)
-
-        else: 
-            self.final_cls_tokens = nn.Parameter(torch.zeros(1,1,d_model)).cuda() 
-            self.final_token_mask = torch.ones([1, 1]).cuda()
-            self.specific_masks = torch.zeros(205,205).cuda()               # 1 + 25 + 50 + 129 = 205
-            self.specific_masks[1,26:] = 1
-            self.specific_masks[26:,1] = 1
-            self.specific_masks[26,1:26] = 1
-            self.specific_masks[1:26,26] = 1
-            self.specific_masks[76,1:76] = 1
-            self.specific_masks[1:76,76] = 1
-            self.specific_masks[26,76:] = 1
-            self.specific_masks[76:,26] = 1
-            self.specific_masks = self.specific_masks.ge(0.5)
-        
+    
+        self.final_cls_tokens = nn.Parameter(torch.zeros(1,1,d_model)).cuda() 
+        self.final_token_mask = torch.ones([1, 1]).cuda()
+        # self.specific_masks = torch.zeros(205,205).cuda()               # 1 + 25 + 50 + 129 = 205
+        # self.specific_masks[1,26:] = 1
+        # self.specific_masks[26:,1] = 1
+        # self.specific_masks[26,1:26] = 1
+        # self.specific_masks[1:26,26] = 1
+        # self.specific_masks[76,1:76] = 1
+        # self.specific_masks[1:76,76] = 1
+        # self.specific_masks[26,76:] = 1
+        # self.specific_masks[76:,26] = 1
+        # self.specific_masks = self.specific_masks.ge(0.5)
+    
         self.layer_norms_in =  nn.ModuleList([nn.LayerNorm(d_model) for _ in range(n_modality)])
         self.layer_norms_after_concat = nn.LayerNorm(self.d_model)
         self.positional_encoding = PositionalEncoding(d_model, max_len=pe_maxlen)
@@ -219,7 +190,6 @@ class TrimodalTransformerEncoder_MT(nn.Module):
       
     def forward(self, enc_outputs, fixed_lengths = None, varying_lengths = None, return_attns = False, fusion_idx = None, missing = None):
         enc_slf_attn_list = []
-        # print("varying_lengths: ", varying_lengths)
         final_cls_tokens = self.final_cls_tokens.repeat(enc_outputs[0].size(0), 1, 1) 
         cls_token_per_modality = [cls_token.repeat(enc_outputs[0].size(0), 1, 1) for cls_token in self.cls_token_per_modality]
         final_cls_mask = self.final_token_mask.repeat(enc_outputs[0].size(0), 1, 1) 
@@ -245,11 +215,9 @@ class TrimodalTransformerEncoder_MT(nn.Module):
             each_mask_stack.append(slf_attn_mask)
                 
         fusion_mask_stack = get_multi_attn_pad_mask(enc_stack, varying_lengths, fixed_lengths, additional_cls_mask=final_cls_mask)
-        # print("fusion_mask_stack: ", fusion_mask_stack.shape)
         # fusion_mask_stack = get_multi_attn_pad_mask(enc_stack, varying_lengths, fixed_lengths)
-        
-        specific_masks = self.specific_masks.repeat(enc_outputs[0].size(0), 1, 1) 
-        fusion_mask_stack = fusion_mask_stack + specific_masks
+        # specific_masks = self.specific_masks.repeat(enc_outputs[0].size(0), 1, 1) 
+        # fusion_mask_stack = fusion_mask_stack + specific_masks
         # print("2 fusion_mask_stack[1]: ", fusion_mask_stack[5,0,:])
         # print("2 fusion_mask_stack[1]: ", fusion_mask_stack[5,1,:])
         # print("2 fusion_mask_stack[1]: ", fusion_mask_stack[5,2,:])

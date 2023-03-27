@@ -16,7 +16,6 @@ import math
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
 
 from tqdm import tqdm
 
@@ -26,7 +25,6 @@ from builder.models import get_model
 from builder.trainer import get_trainer
 from builder.utils.utils import *
 from builder.utils.result_utils import *
-from builder.utils.lars import LARC
 from builder.utils.logger import Logger
 from builder.utils.cosine_annealing_with_warmup_v2 import CosineAnnealingWarmupRestarts
 from builder.utils.cosine_annealing_with_warmupSingle import CosineAnnealingWarmUpSingle
@@ -45,7 +43,7 @@ if args.cross_fold_val == 1:
 
 # define result class
 save_valid_results = experiment_results_validation(args)
-save_test_results = experiment_results(args)
+save_test_results = experiment_results_test(args)
 
 # get patient_dict: {pat_id: pkl list}
 patient_dict, keys_list = patient_wise_ordering(args)
@@ -76,13 +74,50 @@ for k_indx, seed_num in enumerate(args.seed_list):
     
     train_loader, val_loader, test_loader = get_data_loader(args, patient_dict, keys_list, k_indx)
     
-    # get model
-    model = get_model(args) 
-    model = model(args).to(device)
+    # # a = []
+    # for train_batch in train_loader:
+    #     train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, img_time, missing, f_indices = train_batch
+    #     print("train_y: ", train_y)
+    # #     a.append(train_y.detach().clone())
+    # # a = torch.stack(a).reshape(-1).tolist()
+    # # for i in range(13):
+    # #     print(a.count(i))
+        
+    # # valid_count = []
+    # print("train loader done well")
+    # for train_batch in val_loader:
+    #     train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, img_time, missing, f_indices = train_batch
+    #     print("train_y: ", train_y)
+        
+    # #     valid_count.append(train_y.detach().clone())
+    # # valid_count = torch.stack(valid_count).reshape(-1).tolist()
+    # # for i in range(13):
+    # #     print(valid_count.count(i))
+
+    # # test_count = []
+    # print("val loader done well")
+    # for train_batch in test_loader:
+    #     train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, img_time, missing, f_indices = train_batch
+    # print("test loader done well")
+    # exit(1)
+    
+        # test_count.append(train_y.detach().clone())
+    # test_count = torch.stack(test_count).reshape(-1).tolist()
+    # for i in range(13):
+    #     print(test_count.count(i))
     
     # set loss function
-    criterion = nn.BCEWithLogitsLoss(size_average=True, reduction='mean')
+    if args.model_types == "classification":
+        criterion = nn.CrossEntropyLoss(reduction='mean')
+        args.output_dim = 12
+    elif args.model_types == "detection":   
+        criterion = nn.BCEWithLogitsLoss(size_average=True, reduction='mean')
+        args.output_dim = 1
 
+    # get model
+    model = get_model(args) 
+    model = model(args).to(device, non_blocking=True)
+        
     # check whether to use model checkpoint
     if args.checkpoint:
         # check type of model checkpoint
@@ -108,7 +143,31 @@ for k_indx, seed_num in enumerate(args.seed_list):
         start_epoch = 1
 
     # set optimizer
-    optimizer = optimizer(args)
+    if args.optim == 'adam':
+        optimizer = optim.Adam(model.parameters(), lr=args.lr_init, weight_decay=args.weight_decay)
+    
+    elif args.optim == 'sgd':
+        optimizer = optim.SGD(model.parameters(), lr=args.lr_init, momentum=args.momentum, 
+                              weight_decay=args.weight_decay)
+    
+    elif args.optim == 'adamw':
+        optimizer = optim.AdamW(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
+    
+    elif args.optim == 'adam_lars':
+        optimizer = optim.Adam(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
+        optimizer = LARC(optimizer=optimizer, eps=1e-8, trust_coefficient=0.001)
+    
+    elif args.optim == 'sgd_lars':
+        optimizer = optim.SGD(model.parameters(), lr=args.lr_init, momentum=args.momentum, 
+                              weight_decay=args.weight_decay)
+        optimizer = LARC(optimizer=optimizer, eps=1e-8, trust_coefficient=0.001)
+    
+    elif args.optim == 'adamw_lars':
+        optimizer = optim.AdamW(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
+        optimizer = LARC(optimizer=optimizer, eps=1e-8, trust_coefficient=0.001)
+    
+    else:
+        raise ValueError('invalid optimizer: adam, sgd, adamw, adam_lars, sgd_lars, adamw_lars')
 
     # get number of iteration
     iter_num_per_epoch  = len(train_loader)
@@ -141,7 +200,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
 
         for train_batch in train_loader:
             # get X, y, input_lengths, ...
-            train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, img_time, missing, f_indices = train_batch
+            train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, txt_time, missing, f_indices = train_batch
             if "vslt" in args.input_types:
                 input_lengths = input_lengths.to(device, non_blocking=True)
                 static_x      = static_x.to(device, non_blocking=True)
@@ -184,6 +243,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
                                             x_txt            = train_txt,
                                             x_img            = train_img,
                                             txt_lengths      = txt_lengths,
+                                            imgtxt_time      = (img_time, txt_time),
                                             scaler           = scaler,
                                             missing          = missing,
                                             flow_type        = "train"
@@ -209,27 +269,27 @@ for k_indx, seed_num in enumerate(args.seed_list):
                 with torch.no_grad():
                     for idx, val_batch in enumerate(tqdm(val_loader)):
                         # get X, y, input_lengths, ...
-                        val_x, val_static_x, val_y, input_lengths, val_img, img_time, val_txt, txt_lengths, img_time, missing, f_indices = val_batch
+                        val_x, val_static_x, val_y, input_lengths, val_img, img_time, val_txt, txt_lengths, txt_time, missing, f_indices = val_batch
             
                         if "vslt" in args.input_types:
-                            input_lengths = input_lengths.to(device)
-                            val_static_x  = val_static_x.to(device)
+                            input_lengths = input_lengths.to(device, non_blocking=True)
+                            val_static_x  = val_static_x.to(device, non_blocking=True)
                     
                         if "txt" in args.input_types:
-                            val_txt       = val_txt.to(device)
-                            txt_lengths   = txt_lengths.to(device)
+                            val_txt       = val_txt.to(device, non_blocking=True)
+                            txt_lengths   = txt_lengths.to(device, non_blocking=True)
 
                         if args.auxiliary_loss_input is None:
                             f_indices     = None    
                         else:
-                            f_indices     = f_indices.to(device)
+                            f_indices     = f_indices.to(device, non_blocking=True)
                             
                         if "img" in args.input_types:
-                            val_img       = val_img.to(device)
+                            val_img       = val_img.to(device, non_blocking=True)
                     
                         # set vars to selected device
-                        val_x             = val_x.to(device)
-                        val_y             = val_y.to(device)
+                        val_x             = val_x.type(torch.HalfTensor).to(device, non_blocking=True)
+                        val_y             = val_y.to(device, non_blocking=True)
                         
                         # input_lengths   = input_lengths.to(device)
 
@@ -250,6 +310,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
                                             x_txt            = val_txt,
                                             x_img            = val_img,
                                             txt_lengths      = txt_lengths,
+                                            imgtxt_time      = (img_time, txt_time),
                                             scaler           = scaler,
                                             missing          = missing,
                                             flow_type        = "test"
@@ -300,7 +361,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
         for test_batch in tqdm(test_loader, total=len(test_loader), 
                                bar_format="{desc:<5}{percentage:3.0f}%|{bar:10}{r_bar}"):
             # get X, y, input_lengths, ...
-            test_x, test_static_x, test_y, input_lengths, test_img, img_time, test_txt, txt_lengths, img_time, missing, f_indices = test_batch
+            test_x, test_static_x, test_y, input_lengths, test_img, img_time, test_txt, txt_lengths, txt_time, missing, f_indices = test_batch
             if "vslt" in args.input_types:
                 input_lengths = input_lengths.to(device)
                 test_static_x = test_static_x.to(device)
@@ -318,7 +379,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
                 test_img      = test_img.to(device)
         
             # set vars to selected device
-            test_x            = test_x.to(device)
+            test_x            = test_x.type(torch.HalfTensor).to(device)
             test_y            = test_y.to(device)
 
             # get trainer: model
@@ -338,6 +399,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
                                     x_txt            = test_txt,
                                     x_img            = test_img,
                                     txt_lengths      = txt_lengths,
+                                    imgtxt_time      = (img_time, txt_time),
                                     scaler           = scaler,
                                     missing          = missing,
                                     flow_type        = "test"

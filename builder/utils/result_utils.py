@@ -11,78 +11,134 @@ class experiment_results_validation:
         self.auc_final_list = []
         self.apr_final_list = []
         self.f1_final_list = []
-        self.tpr_final_list = []
-        self.tnr_final_list = []
+        self.aucs_final_list = []
+        self.aprs_final_list = []
+        self.f1s_final_list = []
         
     def results_all_seeds(self, list_of_test_results_per_seed):
         os.system("echo  \'#######################################\'")
         os.system("echo  \'##### Final validation results per seed #####\'")
         os.system("echo  \'#######################################\'")
-        seed, result, tpr, tnr = list_of_test_results_per_seed
-        os.system("echo  \'seed_case:{} -- auc: {}, apr: {}, f1_score: {}, tpr: {}, tnr: {}\'".\
-            format(seed, str(result[0]), str(result[1]), str(result[2]), str(tpr), str(tnr)))
+        seed, result = list_of_test_results_per_seed
+
+        if (self.args.model_types == "detection"):
+            auc, apr, f1 = result
+            os.system("echo  \'##### validation results #####\'")
+            os.system("echo  \'seed_case:{} - auc: {}, apr: {}, f1_score: {}\'".format(str(seed), str(auc), str(apr), str(f1)))
             
-        self.auc_final_list.append(result[0])
-        self.apr_final_list.append(result[1])
-        self.f1_final_list.append(result[2])
-        self.tpr_final_list.append(tpr)
-        self.tnr_final_list.append(tnr)
+        elif (self.args.model_types == "classification"):
+            nresult, wresult = result
+            aucs, aprs, f1s = nresult
+            auc, apr, f1 = wresult
+            os.system("echo  \'##### validation results #####\'")
+            os.system("echo  \'seed_case:{} - weighted auc: {}, apr: {}, f1: {}\'".format(str(seed), str(auc), str(apr), str(f1)))
+            os.system("echo  \'Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(str(aucs), str(aprs), str(f1s)))        
+            self.aucs_final_list.append(aucs)
+            self.aprs_final_list.append(aprs)
+            self.f1s_final_list.append(f1s)
+        
+        self.auc_final_list.append(auc)
+        self.apr_final_list.append(apr)
+        self.f1_final_list.append(f1)
         
     def results_per_cross_fold(self):
         print("##########################################################################################")
         os.system("echo  \'{} fold cross validation results each fold with {} seeds\'".format(str(self.args.seed_list), str(len(self.args.seed_list))))
-        os.system("echo  \'Total validation average -- auc: {}, apr: {}, f1_score: {}, tnr: {}, tpr: {}\'".format(
-            str(np.mean(self.auc_final_list)), 
-            str(np.mean(self.apr_final_list)), 
-            str(np.mean(self.f1_final_list)), 
-            str(np.mean(self.tpr_final_list)), 
-            str(np.mean(self.tnr_final_list))))
+        
+        os.system("echo  \'Total validation average -- auc: {}, apr: {}, f1_score: {}\'".format(
+            str(np.mean(self.auc_final_list, axis=0)), 
+            str(np.mean(self.apr_final_list, axis=0)), 
+            str(np.mean(self.f1_final_list, axis=0)))) 
 
-        os.system("echo  \'Total validation std -- auc: {}, apr: {}, f1_score: {}, tnr: {}, tpr: {}\'".format(
-            str(np.std(self.auc_final_list)), 
-            str(np.std(self.apr_final_list)), 
-            str(np.std(self.f1_final_list)), 
-            str(np.std(self.tpr_final_list)), 
-            str(np.std(self.tnr_final_list))))
+        os.system("echo  \'Total validation std -- auc: {}, apr: {}, f1_score: {}\'".format(
+            str(np.std(self.auc_final_list, axis=0)), 
+            str(np.std(self.apr_final_list, axis=0)), 
+            str(np.std(self.f1_final_list, axis=0))))
+    
+        if (self.args.model_types == "classification"):
+            os.system("echo  \'Total validation average -- Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(
+                str(np.mean(self.aucs_final_list, axis=0)), 
+                str(np.mean(self.aprs_final_list, axis=0)), 
+                str(np.mean(self.f1s_final_list, axis=0)))) 
 
-class experiment_results:
+            os.system("echo  \'Total validation std -- Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(
+                str(np.std(self.aucs_final_list, axis=0)), 
+                str(np.std(self.aprs_final_list, axis=0)), 
+                str(np.std(self.f1s_final_list, axis=0))))
+
+class experiment_results_test:
     def __init__(self, args):
         self.args = args
         
         self.auc_final_list = []
         self.apr_final_list = []
         self.f1_final_list = []
-        self.tpr_final_list = []
-        self.tnr_final_list = []
+        self.aucs_final_list = []
+        self.aprs_final_list = []
+        self.f1s_final_list = []
     
     def results_all_seeds(self, list_of_test_results_per_seed):
         os.system("echo  \'#######################################\'")
         os.system("echo  \'##### Final test results per seed #####\'")
         os.system("echo  \'#######################################\'")
-        seed, result, tpr, tnr = list_of_test_results_per_seed
-        os.system("echo  \'seed_case:{} -- auc: {}, apr: {}, f1_score: {}, tpr: {}, tnr: {}\'".\
-            format(seed, str(result[0]), str(result[1]), str(result[2]), str(tpr), str(tnr)))
+        seed, result = list_of_test_results_per_seed
+
+        if (self.args.model_types == "detection"):
+            auc, apr, f1 = result
+            os.system("echo  \'##### test results #####\'")
+            os.system("echo  \'seed_case:{} - auc: {}, apr: {}, f1_score: {}\'".format(str(seed), str(auc), str(apr), str(f1)))
             
-        self.auc_final_list.append(result[0])
-        self.apr_final_list.append(result[1])
-        self.f1_final_list.append(result[2])
-        self.tpr_final_list.append(tpr)
-        self.tnr_final_list.append(tnr)
+        elif (self.args.model_types == "classification"):
+            nresult, wresult = result
+            aucs, aprs, f1s = nresult
+            auc, apr, f1 = wresult
+            os.system("echo  \'##### test results #####\'")
+            os.system("echo  \'seed_case:{} - weighted auc: {}, apr: {}, f1: {}\'".format(str(seed), str(auc), str(apr), str(f1)))
+            os.system("echo  \'Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(str(aucs), str(aprs), str(f1s)))        
+            self.aucs_final_list.append(aucs)
+            self.aprs_final_list.append(aprs)
+            self.f1s_final_list.append(f1s)
+        
+        self.auc_final_list.append(auc)
+        self.apr_final_list.append(apr)
+        self.f1_final_list.append(f1)
 
     def results_per_cross_fold(self):
-        os.system("echo  \'{} fold cross validation results each fold with {} seeds\'".format(str(self.args.seed_list), str(len(self.args.seed_list))))
-        os.system("echo  \'Total test average -- auc: {}, apr: {}, f1_score: {}, tnr: {}, tpr: {}\'".format(
-            str(np.mean(self.auc_final_list)), 
-            str(np.mean(self.apr_final_list)), 
-            str(np.mean(self.f1_final_list)), 
-            str(np.mean(self.tpr_final_list)), 
-            str(np.mean(self.tnr_final_list))))
+        print("##########################################################################################")
+        os.system("echo  \'{} fold cross test results each fold with {} seeds\'".format(str(self.args.seed_list), str(len(self.args.seed_list))))
+        
+        os.system("echo  \'Total test average -- auc: {}, apr: {}, f1_score: {}\'".format(
+            str(np.mean(self.auc_final_list, axis=0)), 
+            str(np.mean(self.apr_final_list, axis=0)), 
+            str(np.mean(self.f1_final_list, axis=0)))) 
 
-        os.system("echo  \'Total test std -- auc: {}, apr: {}, f1_score: {}, tnr: {}, tpr: {}\'".format(
-            str(np.std(self.auc_final_list)), 
-            str(np.std(self.apr_final_list)), 
-            str(np.std(self.f1_final_list)), 
-            str(np.std(self.tpr_final_list)), 
-            str(np.std(self.tnr_final_list))))
+        os.system("echo  \'Total test std -- auc: {}, apr: {}, f1_score: {}\'".format(
+            str(np.std(self.auc_final_list, axis=0)), 
+            str(np.std(self.apr_final_list, axis=0)), 
+            str(np.std(self.f1_final_list, axis=0))))
+    
+        if (self.args.model_types == "classification"):
+            os.system("echo  \'Total test average -- Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(
+                str(np.mean(self.aucs_final_list, axis=0)), 
+                str(np.mean(self.aprs_final_list, axis=0)), 
+                str(np.mean(self.f1s_final_list, axis=0))))
+
+            os.system("echo  \'Total test std -- Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(
+                str(np.std(self.aucs_final_list, axis=0)), 
+                str(np.std(self.aprs_final_list, axis=0)), 
+                str(np.std(self.f1s_final_list, axis=0))))
+            
+        # os.system("echo  \'{} fold cross validation results each fold with {} seeds\'".format(str(self.args.seed_list), str(len(self.args.seed_list))))
+        # os.system("echo  \'Total validation average -- auc: {}, apr: {}, f1_score: {}\'".format(
+        #     str(np.mean(self.auc_final_list, axis=0)), 
+        #     str(np.mean(self.apr_final_list, axis=0)), 
+        #     str(np.mean(self.f1_final_list, axis=0)))) 
+        #     # str(np.mean(self.tpr_final_list)), 
+        #     # str(np.mean(self.tnr_final_list))))
+
+        # os.system("echo  \'Total validation std -- auc: {}, apr: {}, f1_score: {}\'".format(
+        #     str(np.std(self.auc_final_list, axis=0)), 
+        #     str(np.std(self.apr_final_list, axis=0)), 
+        #     str(np.std(self.f1_final_list, axis=0))))
         
         
