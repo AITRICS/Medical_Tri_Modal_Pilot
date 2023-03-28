@@ -88,7 +88,7 @@ class Logger:
     def add_validation_logs(self, step):
         result = self.evaluator.performance_metric()
 
-        if (self.args.model_types == "detection"):
+        if (self.args.model_types == "detection") or (self.args.model_types == "bce_rmse"):
             auc, apr, f1 = result
             anchor = auc + apr
             os.system("echo  \'##### Current Validation results #####\'")

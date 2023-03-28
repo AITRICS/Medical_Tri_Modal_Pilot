@@ -46,7 +46,7 @@ class TRI_MT_V1(nn.Module):
         ##### Encoders
         if args.vslt_type == "carryforward":
             self.vslt_enc = nn.Sequential(
-                                        nn.Linear(self.num_nodes+2, self.model_dim),
+                                        nn.Linear(self.num_nodes, self.model_dim),
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
                     )

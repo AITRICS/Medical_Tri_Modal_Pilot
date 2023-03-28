@@ -48,7 +48,17 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
     mean = args.feature_means.to(device, non_blocking=True)
         
     if args.model_types == "classification":
-        final_target = train_y.type(torch.LongTensor).to(device, non_blocking=True)
+        if "softmax" == args.loss_types:
+            final_target = train_y.type(torch.LongTensor).to(device, non_blocking=True)
+        elif "bces" == args.loss_types: # 1
+            final_target = train_y.type(torch.FloatTensor).to(device, non_blocking=True)
+        elif "rmse" == args.loss_types:
+            final_target = train_y.type(torch.FloatTensor).to(device, non_blocking=True)
+            final_target = final_target.unsqueeze(1)
+        elif "bceandsoftmax" == args.loss_types: # 1
+            final_target = (train_y[0].type(torch.LongTensor).to(device, non_blocking=True), train_y[1].type(torch.FloatTensor).to(device, non_blocking=True))
+    elif args.model_types == "bce_rmse":
+        final_target = (train_y[0].type(torch.FloatTensor).to(device, non_blocking=True), train_y[1].type(torch.FloatTensor).to(device, non_blocking=True).unsqueeze(1))
     else:
         final_target = train_y.type(torch.FloatTensor).to(device, non_blocking=True)
     
@@ -72,8 +82,8 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
         [0., 1., 0.],
         [0., 1., 1.]])
         missing = missing.detach().clone()
-        if flow_type == "train" and args.multitoken:
-            final_target = final_target.repeat(4,1,1).permute(1,0,2).reshape(-1,12) # [2, 64, 12] -> [64, 2, 12] -> [128, 12]
+        # if flow_type == "train" and args.multitoken:
+        #     final_target = final_target.repeat(4,1,1).permute(1,0,2).reshape(-1,12) # [2, 64, 12] -> [64, 2, 12] -> [128, 12]
     
     
     sample_missing = torch.cat([sample_missing, missing], dim = 0)
@@ -105,9 +115,22 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
         with torch.cuda.amp.autocast():
             output, aux_loss = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time)
             output = output.squeeze()
-            # print("final_target: ", final_target)
-            # print("output: ", output)
-            loss = criterion(output, final_target)
+            
+            if "bceandsoftmax" == args.loss_types:
+                loss1 = criterion[0](output, final_target[0])
+                loss2 = criterion[1](output, final_target[1])
+                loss = loss1 + loss2
+            elif "rmse" == args.loss_types:
+                loss = criterion(output, final_target)
+            elif  args.model_types == "bce_rmse":
+                loss1 = criterion[0](output[:,0], final_target[0])
+                loss2 = criterion[1](output[:,1], final_target[1])[:,0]
+                loss2 = torch.sqrt(torch.mean(loss2[final_target[0] == 1]))
+                loss2 = torch.nan_to_num(loss2, nan=0.0)
+                loss = loss1 + loss2
+            else:
+                loss = criterion(output, final_target)
+                
             if aux_loss is not None:
                 loss = loss + (args.auxiliary_loss_weight * aux_loss)
                 
@@ -124,15 +147,34 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
         with torch.cuda.amp.autocast():
             output, aux_loss = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time)
             output = output.squeeze()
-            loss = criterion(output, final_target)
+            loss2 = None
+            if "bceandsoftmax" == args.loss_types:
+                loss1 = criterion[0](output, final_target[0])
+                loss2 = criterion[1](output, final_target[1])
+                final_target = final_target[0]
+                loss = loss1 + loss2
+            elif  args.model_types == "bce_rmse":
+                loss1 = criterion[0](output[:,0], final_target[0])
+                loss2 = criterion[1](output[:,1], final_target[1])[:,0]
+                loss2 = torch.sqrt(torch.mean(loss2[final_target[0] == 1]))
+                loss2 = torch.nan_to_num(loss2, nan=0.0)
+                output = output[:,0]
+                final_target = final_target[0]
+                
+                loss = loss1 + loss2
+            else:
+                loss = criterion(output, final_target)
             
             if args.model_types == "classification":
-                output = F.softmax(output, dim=1)
+                if "rmse" == args.loss_types:
+                    output = loss
+                else:
+                    output = torch.softmax(output, dim=1)
             else: # detection
                 output = torch.sigmoid(output)
             
         test_loss.append(loss)
-        logger.evaluator.add_batch(final_target, output)
+        logger.evaluator.add_batch(final_target, output, rmse = loss2)
 
     return model, loss.item()
 

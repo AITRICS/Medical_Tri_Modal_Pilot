@@ -14,3 +14,4 @@ transformers
 pandas
 h5py
 transformers==3.0.0
+pytorch-forecasting

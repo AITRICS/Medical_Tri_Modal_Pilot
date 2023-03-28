@@ -9,17 +9,15 @@ seed_list = [0, 1004, 9209, 909, 30, 31, 2022]
 ### CONFIGURATIONS
 parser = argparse.ArgumentParser()
 
-# Missing modality techniques
-parser.add_argument('--multitoken', type=int, default=0)
-
-parser.add_argument('--model-types', type=str, default="classification", choices=["detection", "classification"])
+# # Missing modality techniques
+# parser.add_argument('--multitoken', type=int, default=0)
 
 # General Parameters
 parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--seed-list', type=list, default=[412, 1004, 2023]) #[0, 1004, 2022, 9209, 119]
 parser.add_argument('--device', type=int, default=1, nargs='+')
 parser.add_argument('--cpu', type=int, default=0)
-parser.add_argument('--num-workers', type=int, default=2)
+parser.add_argument('--num-workers', type=int, default=4)
 parser.add_argument('--gpus', type=int, default=1)
 parser.add_argument('--reset', default=False, action='store_true')
 parser.add_argument('--project-name', type=str, default="small1")
@@ -29,7 +27,7 @@ parser.add_argument('--prediction-range', type=int, default=12)
 parser.add_argument('--min-inputlen', type=int, default=3)
 parser.add_argument('--window-size', type=int, default=24)
 parser.add_argument('--vslt-type', type=str, default="carryforward", choices=["carryforward", "TIE"])
-parser.add_argument('--TIE-len', type=int, default=2000)
+parser.add_argument('--TIE-len', type=int, default=1000)
 parser.add_argument('--ar-lowerbound', type=float, default=0.7)
 parser.add_argument('--ar-upperbound', type=float, default=1.3)
 
@@ -43,7 +41,7 @@ parser.add_argument('--fullmodal-definition', type=str, default="txt1_img1", cho
 parser.add_argument('--train-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/train")
 parser.add_argument('--test-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/test")
 parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/destin/multimodal/MLHC_result")
-parser.add_argument('--image-data-path', type=str, default="/home/destin/")
+parser.add_argument('--image-data-path', type=str, default="/home/claire/")
 # Data Parameters
 parser.add_argument('--cross-fold-val', type=int, default=0, choices=[1, 0], help="1: k-fold, 0: seed-average")
 parser.add_argument('--val-data-ratio', type=float, default=0.1)
@@ -123,6 +121,15 @@ parser.add_argument('--final-dropout', type=float, default=0.1)
 parser.add_argument('--final-num-heads', type=int, default=4)
 
 # Model Parameters
+parser.add_argument('--model-types', type=str, default="classification", choices=["detection", "classification", "bce_rmse"])
+# "bce&softmax": for classification
+# "softmax": for classification
+# "bces": for classification
+# "wkappa": for classification
+# "rmse": for classification with time
+# "bce+rmse": for detection and classification with time
+# "bce": for detection
+parser.add_argument('--loss-types', type=str, default="softmax", choices=["bceandsoftmax", "softmax", "bces", "bce", "wkappa", "rmse", "bce_rmse"])
 # Auxiliary loss
 parser.add_argument('--auxiliary-loss-input', type=str, default=None, choices=[None, "directInput", "encOutput"])
 parser.add_argument('--auxiliary-loss-type', type=str, default="cpcWbrl", choices=["cpc", "cosine", "l2", "cpcWbrl", "cosineWbrl", "l2Wbrl"])
