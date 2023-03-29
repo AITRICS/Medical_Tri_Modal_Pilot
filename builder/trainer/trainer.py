@@ -174,51 +174,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                 output = torch.sigmoid(output)
             
         test_loss.append(loss)
-        logger.evaluator.add_batch(final_target, output, rmse = loss2)
+        logger.evaluator.add_batch(final_target, output)
 
     return model, loss.item()
 
-
-# def multiTaskLearningVsltImg(args, iteration, train_x, static_x, input_lengths, train_y, img, model, logger, device, scheduler=None, optimizer=None, criterion=None, seq_lengths=None, scaler=None, flow_type=None):
-#     train_x = train_x.permute(1, 0, 2, 3)
-#     static_x = static_x.permute(1,0)
-
-#     data = train_x[0]
-#     delta = train_x[2]
-#     mask = train_x[1]
-
-#     age = static_x[1]
-#     gender = static_x[0]
-
-#     final_target = train_y.type(torch.FloatTensor).to(device)
-#     mean = args.feature_means.to(device)
-#     h0 = torch.zeros(data.size(0), args.hidden_size).to(device)
-#     age = age.type(torch.FloatTensor).to(device)
-#     gender = gender.type(torch.FloatTensor).to(device)
-#     # print("data: ", data.get_device())
-#     if flow_type == "train":
-#         optimizer.zero_grad()
-#         with torch.cuda.amp.autocast():
-#             output = model(data, h0, mask, delta, mean, age, gender, input_lengths, img)
-#             output = output.squeeze().permute(1,0)
-#             loss = criterion(output, final_target)
-#         scaler.scale(loss).backward()
-#         scaler.step(optimizer)
-#         scaler.update()
-#         nn.utils.clip_grad_norm_(model.parameters(), 5)
-#         #optimizer.step()
-#         scheduler.step(iteration)
-#         logger.log_lr(scheduler.get_lr()[0], iteration)
-#     else:
-#         test_loss = []
-#         with torch.cuda.amp.autocast():
-#             output = model(data, h0, mask, delta, mean, age, gender, input_lengths, img)
-#             output = output.squeeze().permute(1,0)
-#             loss = criterion(output, final_target)
-#             output = torch.sigmoid(output)
-#         test_loss.append(loss)
-#         logger.evaluator.add_batch(np.array(final_target.cpu()), np.array(output.cpu()))
-#         # print("done")
-#         # exit(1)
-
-#     return model, loss.item()

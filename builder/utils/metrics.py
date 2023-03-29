@@ -121,19 +121,19 @@ class Evaluator(object):
                 del wapr
                 del wf1
         
-        elif self.args.model_types == "bce_rmse":  
-            self.rmse = torch.stack(self.rmse).cuda() 
-            f1 =  torch.mean(self.rmse)
-            trues = self.y_true_multi.cuda()
-            preds = self.y_pred_multi.cuda()
-            auc = self.auroc(preds, trues)
-            apr = self.auprc(preds, trues)
+        # elif self.args.model_types == "bce_rmse":  
+        #     self.rmse = torch.stack(self.rmse).cuda() 
+        #     f1 =  torch.mean(self.rmse)
+        #     trues = self.y_true_multi.cuda()
+        #     preds = self.y_pred_multi.cuda()
+        #     auc = self.auroc(preds, trues)
+        #     apr = self.auprc(preds, trues)
 
-            scores_list = list(np.round(np.array([auc.detach().cpu().numpy(), 
-                                                apr.detach().cpu().numpy(), 
-                                                f1.detach().cpu().numpy()]), 4))    
+        #     scores_list = list(np.round(np.array([auc.detach().cpu().numpy(), 
+        #                                         apr.detach().cpu().numpy(), 
+        #                                         f1.detach().cpu().numpy()]), 4))    
             
-        elif self.args.model_types == "detection":     
+        elif self.args.model_types == "detection" or self.args.model_types == "bce_rmse":     
             trues = self.y_true_multi.cuda()
             preds = self.y_pred_multi.cuda()
             auc = self.auroc(preds, trues)
