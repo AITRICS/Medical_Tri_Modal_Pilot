@@ -20,7 +20,7 @@ from control.config import args
 def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y, 
                                             model, logger, device, scheduler=None, optimizer=None, criterion=None, 
                                             scaler=None, flow_type=None, output_lengths=None, 
-                                            seq_lengths=None, x_img=None, x_txt=None, txt_lengths=None, imgtxt_time=None, missing=None):
+                                            seq_lengths=None, x_img=None, x_txt=None, txt_lengths=None, imgtxt_time=None, missing=None, reports_tokens=None, reports_lengths=None):
     
     # (tensor([[0., 0., 0.],
     #     [0., 0., 1.],
@@ -113,7 +113,10 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
     if flow_type == "train":
         optimizer.zero_grad()
         with torch.cuda.amp.autocast():
-            output, aux_loss = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time)
+            if "tdecoder" not in args.auxiliary_loss_type:
+                output, aux_loss = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time)
+            else:
+                output, aux_loss = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths)
             output = output.squeeze()
             
             if "bceandsoftmax" == args.loss_types:
@@ -145,7 +148,10 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
     else:
         test_loss = []
         with torch.cuda.amp.autocast():
-            output, aux_loss = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time)
+            if "tdecoder" not in args.auxiliary_loss_type:
+                output, aux_loss = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time)
+            else:
+                output, aux_loss = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths)
             output = output.squeeze()
             loss2 = None
             if "bceandsoftmax" == args.loss_types:

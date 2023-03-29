@@ -11,6 +11,8 @@ from builder.models.src.transformer.module import LayerNorm
 from monai.networks.blocks.patchembedding import PatchEmbeddingBlock
 from builder.models.src.vision_transformer import vit_b_16_m, ViT_B_16_Weights
 from builder.models.src.swin_transformer import swin_t_m, Swin_T_Weights
+from builder.models.src.reports_transformer_decoder import TransformerDecoder
+from transformers import AutoTokenizer
 
 # early fusion
 
@@ -137,7 +139,21 @@ class TRI_MT_V1(nn.Module):
         self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
         self.txt_feat = torch.Tensor([19]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
         
-    def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices, img_time, txt_time):
+        ##### Reports Generation
+        self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+        self.vocab_size = self.tokenizer.vocab_size
+        self.img_2_txt = TransformerDecoder(self.vocab_size,
+                                                d_model = self.model_dim,
+                                                d_ff = self.model_dim * 4,
+                                                num_layers = self.num_layers,
+                                                num_heads = self.num_heads,
+                                                sos_id = 101,
+                                                eos_id = 102,
+                                                max_length = 1024
+                                                )
+        self.encoder_output_lengths = torch.tensor([1 for i in range(self.args.batch_size)]).to(self.device)### 되나?
+        
+    def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths):
         demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1)
         demo_embedding = self.ie_demo(demographic)
                                 
@@ -180,5 +196,10 @@ class TRI_MT_V1(nn.Module):
         classInput = self.layer_norm_final(final_cls_output)
         classInput = torch.cat([classInput, demo_embedding], dim=1)
         output = self.fc_list(classInput)
-
-        return output, None
+        
+        if (flow_type == "train") and ("tdecoder" in self.args.auxiliary_loss_type):
+            output2 = self.img_2_txt(reports_token, context_vector2, encoder_output_lengths = self.encoder_output_lengths)
+            # exit(1)
+        else:
+            output2 = None
+        return output, output2

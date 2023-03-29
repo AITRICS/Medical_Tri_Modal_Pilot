@@ -219,7 +219,10 @@ for k_indx, seed_num in enumerate(args.seed_list):
 
         for train_batch in train_loader:
             # get X, y, input_lengths, ...
-            train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, txt_time, missing, f_indices, train_y2 = train_batch
+            if "tdecoder" not in args.auxiliary_loss_type:
+                train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, txt_time, missing, f_indices, train_y2 = train_batch
+            else:
+                train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, txt_time, missing, f_indices, train_y2, train_reports_tokens, train_reports_lengths = train_batch
             if "vslt" in args.input_types:
                 input_lengths = input_lengths.to(device, non_blocking=True)
                 static_x      = static_x.to(device, non_blocking=True)
@@ -231,10 +234,13 @@ for k_indx, seed_num in enumerate(args.seed_list):
             if args.auxiliary_loss_input is None:
                 f_indices     = None    
             else:
-                f_indices   = f_indices.to(device)
+                f_indices   = f_indices.to(device, non_blocking=True)
                 
             if "img" in args.input_types:
                 train_img     = train_img.to(device, non_blocking=True)
+                if "tdecoder" in args.auxiliary_loss_type:
+                    train_reports_tokens = train_reports_tokens.to(device, non_blocking=True)
+                    train_reports_lengths = train_reports_lengths.to(device, non_blocking=True)
         
             # set vars to selected device
             train_x         = train_x.type(torch.HalfTensor).to(device, non_blocking=True)
@@ -249,28 +255,54 @@ for k_indx, seed_num in enumerate(args.seed_list):
             iter_in_epoch           += 1
             total_epoch_iteration   += 1
 
-            # get trainer: model, iter_loss                    
-            model, iter_loss = get_trainer(args              = args,
-                                            iteration        = iteration,
-                                            x                = train_x,
-                                            static           = static_x,
-                                            input_lengths    = input_lengths,
-                                            y                = train_y,
-                                            output_lengths   = f_indices,
-                                            model            = model,
-                                            logger           = logger,
-                                            device           = device,
-                                            scheduler        = scheduler,
-                                            optimizer        = optimizer,
-                                            criterion        = criterion,
-                                            x_txt            = train_txt,
-                                            x_img            = train_img,
-                                            txt_lengths      = txt_lengths,
-                                            imgtxt_time      = (img_time, txt_time),
-                                            scaler           = scaler,
-                                            missing          = missing,
-                                            flow_type        = "train"
-                                            )
+            # get trainer: model, iter_loss
+            if "tdecoder" not in args.auxiliary_loss_type:                 
+                model, iter_loss = get_trainer(args              = args,
+                                                iteration        = iteration,
+                                                x                = train_x,
+                                                static           = static_x,
+                                                input_lengths    = input_lengths,
+                                                y                = train_y,
+                                                output_lengths   = f_indices,
+                                                model            = model,
+                                                logger           = logger,
+                                                device           = device,
+                                                scheduler        = scheduler,
+                                                optimizer        = optimizer,
+                                                criterion        = criterion,
+                                                x_txt            = train_txt,
+                                                x_img            = train_img,
+                                                txt_lengths      = txt_lengths,
+                                                imgtxt_time      = (img_time, txt_time),
+                                                scaler           = scaler,
+                                                missing          = missing,
+                                                flow_type        = "train"
+                                                )
+            else:
+                model, iter_loss = get_trainer(args              = args,
+                                                iteration        = iteration,
+                                                x                = train_x,
+                                                static           = static_x,
+                                                input_lengths    = input_lengths,
+                                                y                = train_y,
+                                                output_lengths   = f_indices,
+                                                model            = model,
+                                                logger           = logger,
+                                                device           = device,
+                                                scheduler        = scheduler,
+                                                optimizer        = optimizer,
+                                                criterion        = criterion,
+                                                x_txt            = train_txt,
+                                                x_img            = train_img,
+                                                txt_lengths      = txt_lengths,
+                                                imgtxt_time      = (img_time, txt_time),
+                                                scaler           = scaler,
+                                                missing          = missing,
+                                                flow_type        = "train",
+                                                reports_tokens   = train_reports_tokens,
+                                                reports_lengths   = train_reports_lengths,
+                                                )
+            
 
             # update loss (in logger)
             logger.loss += iter_loss
@@ -292,8 +324,10 @@ for k_indx, seed_num in enumerate(args.seed_list):
                 with torch.no_grad():
                     for idx, val_batch in enumerate(tqdm(val_loader)):
                         # get X, y, input_lengths, ...
-                        val_x, val_static_x, val_y, input_lengths, val_img, img_time, val_txt, txt_lengths, txt_time, missing, f_indices, val_y2 = val_batch
-            
+                        if "tdecoder" not in args.auxiliary_loss_type:  
+                            val_x, val_static_x, val_y, input_lengths, val_img, img_time, val_txt, txt_lengths, txt_time, missing, f_indices, val_y2 = val_batch
+                        else:
+                            val_x, val_static_x, val_y, input_lengths, val_img, img_time, val_txt, txt_lengths, txt_time, missing, f_indices, val_y2, val_reports_tokens, val_reports_lengths = val_batch
                         if "vslt" in args.input_types:
                             input_lengths = input_lengths.to(device, non_blocking=True)
                             val_static_x  = val_static_x.to(device, non_blocking=True)
@@ -309,6 +343,9 @@ for k_indx, seed_num in enumerate(args.seed_list):
                             
                         if "img" in args.input_types:
                             val_img       = val_img.to(device, non_blocking=True)
+                            if "tdecoder" in args.auxiliary_loss_type:
+                                val_reports_tokens = val_reports_tokens.to(device, non_blocking=True)
+                                val_reports_lengths =val_reports_lengths.to(device, non_blocking=True)
                     
                         # set vars to selected device
                         val_x             = val_x.type(torch.HalfTensor).to(device, non_blocking=True)
@@ -320,27 +357,53 @@ for k_indx, seed_num in enumerate(args.seed_list):
                         # input_lengths   = input_lengths.to(device)
 
                         # get trainer: model, val_loss
-                        model, val_loss = get_trainer(args   = args,
-                                            iteration        = iteration,
-                                            x                = val_x,
-                                            static           = val_static_x,
-                                            input_lengths    = input_lengths,
-                                            y                = val_y,
-                                            output_lengths   = f_indices,
-                                            model            = model,
-                                            logger           = logger,
-                                            device           = device,
-                                            scheduler        = scheduler,
-                                            optimizer        = optimizer,
-                                            criterion        = criterion,
-                                            x_txt            = val_txt,
-                                            x_img            = val_img,
-                                            txt_lengths      = txt_lengths,
-                                            imgtxt_time      = (img_time, txt_time),
-                                            scaler           = scaler,
-                                            missing          = missing,
-                                            flow_type        = "test"
-                                            )
+                        if "tdecoder" not in args.auxiliary_loss_type:
+                            model, val_loss = get_trainer(args   = args,
+                                                iteration        = iteration,
+                                                x                = val_x,
+                                                static           = val_static_x,
+                                                input_lengths    = input_lengths,
+                                                y                = val_y,
+                                                output_lengths   = f_indices,
+                                                model            = model,
+                                                logger           = logger,
+                                                device           = device,
+                                                scheduler        = scheduler,
+                                                optimizer        = optimizer,
+                                                criterion        = criterion,
+                                                x_txt            = val_txt,
+                                                x_img            = val_img,
+                                                txt_lengths      = txt_lengths,
+                                                imgtxt_time      = (img_time, txt_time),
+                                                scaler           = scaler,
+                                                missing          = missing,
+                                                flow_type        = "test"
+                                                )
+                        else:
+                            model, val_loss = get_trainer(args   = args,
+                                                iteration        = iteration,
+                                                x                = val_x,
+                                                static           = val_static_x,
+                                                input_lengths    = input_lengths,
+                                                y                = val_y,
+                                                output_lengths   = f_indices,
+                                                model            = model,
+                                                logger           = logger,
+                                                device           = device,
+                                                scheduler        = scheduler,
+                                                optimizer        = optimizer,
+                                                criterion        = criterion,
+                                                x_txt            = val_txt,
+                                                x_img            = val_img,
+                                                txt_lengths      = txt_lengths,
+                                                imgtxt_time      = (img_time, txt_time),
+                                                scaler           = scaler,
+                                                missing          = missing,
+                                                flow_type        = "test",
+                                                reports_tokens   = val_reports_tokens,
+                                                reports_lengths  = val_reports_lengths,
+                                                )
+                            
                         
                         
                         # update loss, iter count
@@ -387,7 +450,10 @@ for k_indx, seed_num in enumerate(args.seed_list):
         for test_batch in tqdm(test_loader, total=len(test_loader), 
                                bar_format="{desc:<5}{percentage:3.0f}%|{bar:10}{r_bar}"):
             # get X, y, input_lengths, ...
-            test_x, test_static_x, test_y, input_lengths, test_img, img_time, test_txt, txt_lengths, txt_time, missing, f_indices, test_y2 = test_batch
+            if "tdecoder" not in args.auxiliary_loss_type:
+                test_x, test_static_x, test_y, input_lengths, test_img, img_time, test_txt, txt_lengths, txt_time, missing, f_indices, test_y2 = test_batch
+            else:
+                test_x, test_static_x, test_y, input_lengths, test_img, img_time, test_txt, txt_lengths, txt_time, missing, f_indices, test_y2, test_reports_tokens, test_reports_lengths = test_batch
             if "vslt" in args.input_types:
                 input_lengths = input_lengths.to(device)
                 test_static_x = test_static_x.to(device)
@@ -403,6 +469,9 @@ for k_indx, seed_num in enumerate(args.seed_list):
                 
             if "img" in args.input_types:
                 test_img      = test_img.to(device)
+                if "tdecoder" in args.auxiliary_loss_type:
+                    test_reports_tokens = test_reports_tokens.to(device)
+                    test_reports_lengths = test_reports_lengths.to(device)
         
             # set vars to selected device
             test_x            = test_x.type(torch.HalfTensor).to(device)
@@ -412,27 +481,52 @@ for k_indx, seed_num in enumerate(args.seed_list):
                 test_y         = test_y.to(device, non_blocking=True)
 
             # get trainer: model
-            model, _ = get_trainer(args   = args,
-                                    iteration        = iteration,
-                                    x                = test_x,
-                                    static           = test_static_x,
-                                    input_lengths    = input_lengths,
-                                    y                = test_y,
-                                    output_lengths   = f_indices,
-                                    model            = model,
-                                    logger           = logger,
-                                    device           = device,
-                                    scheduler        = scheduler,
-                                    optimizer        = optimizer,
-                                    criterion        = criterion,
-                                    x_txt            = test_txt,
-                                    x_img            = test_img,
-                                    txt_lengths      = txt_lengths,
-                                    imgtxt_time      = (img_time, txt_time),
-                                    scaler           = scaler,
-                                    missing          = missing,
-                                    flow_type        = "test"
-                                    )
+            if "tdecoder" not in args.auxiliary_loss_type:
+                model, _ = get_trainer(args   = args,
+                                        iteration        = iteration,
+                                        x                = test_x,
+                                        static           = test_static_x,
+                                        input_lengths    = input_lengths,
+                                        y                = test_y,
+                                        output_lengths   = f_indices,
+                                        model            = model,
+                                        logger           = logger,
+                                        device           = device,
+                                        scheduler        = scheduler,
+                                        optimizer        = optimizer,
+                                        criterion        = criterion,
+                                        x_txt            = test_txt,
+                                        x_img            = test_img,
+                                        txt_lengths      = txt_lengths,
+                                        imgtxt_time      = (img_time, txt_time),
+                                        scaler           = scaler,
+                                        missing          = missing,
+                                        flow_type        = "test"
+                                        )
+            else:
+                model, _ = get_trainer(args   = args,
+                                        iteration        = iteration,
+                                        x                = test_x,
+                                        static           = test_static_x,
+                                        input_lengths    = input_lengths,
+                                        y                = test_y,
+                                        output_lengths   = f_indices,
+                                        model            = model,
+                                        logger           = logger,
+                                        device           = device,
+                                        scheduler        = scheduler,
+                                        optimizer        = optimizer,
+                                        criterion        = criterion,
+                                        x_txt            = test_txt,
+                                        x_img            = test_img,
+                                        txt_lengths      = txt_lengths,
+                                        imgtxt_time      = (img_time, txt_time),
+                                        scaler           = scaler,
+                                        missing          = missing,
+                                        flow_type        = "test",
+                                        reports_tokens   = test_reports_tokens,
+                                        reports_lengths  = test_reports_lengths,
+                                        )
 
     # update logger - end of test step
     logger.test_result_only()

@@ -38,9 +38,9 @@ parser.add_argument('--modality-inclusion', type=str, default="train-full_test-f
 parser.add_argument('--fullmodal-definition', type=str, default="txt1_img1", choices=["txt1_img1", "img1", "txt1"])
 
 # Data path setting
-parser.add_argument('--train-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/train")
-parser.add_argument('--test-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/test")
-parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/destin/multimodal/MLHC_result")
+parser.add_argument('--train-data-path', type=str, default="/home/claire/training_data_0320/mimic_cf_icu_size24/train")
+parser.add_argument('--test-data-path', type=str, default="/home/claire/training_data_0320/mimic_cf_icu_size24/test")
+parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/claire/multimodal/MLHC_result")
 parser.add_argument('--image-data-path', type=str, default="/home/claire/")
 # Data Parameters
 parser.add_argument('--cross-fold-val', type=int, default=0, choices=[1, 0], help="1: k-fold, 0: seed-average")
@@ -80,7 +80,7 @@ parser.add_argument('--txt-classifier-nodes', type=int, default=64)
 
 parser.add_argument('--txt-tokenization', type=str, default="bert", choices=["word", "character", "bpe", "bert"])
 parser.add_argument('--berttype', type=str, default="biobert", choices=["biobert", "bert"])
-parser.add_argument('--biobert-path', type=str, default="./data/mimic4_embeddings.h5", choices=["mimic4_embeddings.h5", "mimic4_clstoken.h5"])
+parser.add_argument('--biobert-path', type=str, default="./data/mimic4_embeddings.h5", choices=["./data/mimic4_embeddings.h5", "./data/mimic4_clstoken.h5"])
 parser.add_argument('--character-token-max-length', type=int, default=512)
 parser.add_argument('--word-token-max-length', type=int, default=128)
 parser.add_argument('--bpe-token-max-length', type=int, default=256)

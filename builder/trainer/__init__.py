@@ -31,12 +31,22 @@ def get_trainer(args,
                 imgtxt_time=None,
                 scaler=None, 
                 missing=None,
-                flow_type=None):
+                flow_type=None,
+                reports_tokens=None,
+                reports_lengths=None):
     #print(flow_type)
-    model, iter_loss = missing_trainer(args, iteration, x, static, input_lengths, y, 
-                                        model, logger, device, scheduler, optimizer, criterion, 
-                                        scaler, flow_type, output_lengths, 
-                                        seq_lengths=seq_lengths, x_img=x_img, x_txt=x_txt, 
-                                        txt_lengths=txt_lengths, imgtxt_time=imgtxt_time, missing=missing)
+    if "tdecoder" not in args.auxiliary_loss_type:
+        model, iter_loss = missing_trainer(args, iteration, x, static, input_lengths, y, 
+                                            model, logger, device, scheduler, optimizer, criterion, 
+                                            scaler, flow_type, output_lengths, 
+                                            seq_lengths=seq_lengths, x_img=x_img, x_txt=x_txt, 
+                                            txt_lengths=txt_lengths, imgtxt_time=imgtxt_time, missing=missing)
+    else:
+        model, iter_loss = missing_trainer(args, iteration, x, static, input_lengths, y, 
+                                            model, logger, device, scheduler, optimizer, criterion, 
+                                            scaler, flow_type, output_lengths, 
+                                            seq_lengths=seq_lengths, x_img=x_img, x_txt=x_txt, 
+                                            txt_lengths=txt_lengths, imgtxt_time=imgtxt_time, missing=missing, reports_tokens = reports_tokens, reports_lengths = reports_lengths)
+        
 
     return model, iter_loss

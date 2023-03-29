@@ -1,0 +1,29 @@
+{
+    // IntelliSense를 사용하여 가능한 특성에 대해 알아보세요.
+    // 기존 특성에 대한 설명을 보려면 가리킵니다.
+    // 자세한 내용을 보려면 https://go.microsoft.com/fwlink/?linkid=830387을(를) 방문하세요.
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: 현재 파일",
+            "type": "python",
+            "request": "launch",
+            "program":"2_train.py",
+            "args":["--project-name","test_aux",
+                    "--input-types", "vslt_img_txt",
+                    "--model", "tri_mt_v1",
+                    "--predict-type", "multi_task_within",
+                    "--modality-inclusion", "train-missing_test-missing",
+                    "--prediction-range", "12",
+                    "--lr-init", "1e-7",
+                    "--output-type", "mortality",
+                    "--batch-size", "16",
+                    "--epochs", "1",
+                    "--transformer-num-layers", "6",
+                    "--vslt-type", "TIE",
+                    "--model-types", "detection",
+                    "--auxiliary-loss-type","tdecoder"],
+            "console": "integratedTerminal"
+        }
+    ]
+}
