@@ -132,7 +132,7 @@ parser.add_argument('--model-types', type=str, default="classification", choices
 parser.add_argument('--loss-types', type=str, default="softmax", choices=["bceandsoftmax", "softmax", "bces", "bce", "wkappa", "rmse", "bce_rmse"])
 # Auxiliary loss
 parser.add_argument('--auxiliary-loss-input', type=str, default=None, choices=[None, "directInput", "encOutput"])
-parser.add_argument('--auxiliary-loss-type', type=str, default="cpcWbrl", choices=["cpc", "cosine", "l2", "cpcWbrl", "cosineWbrl", "l2Wbrl"])
+parser.add_argument('--auxiliary-loss-type', type=str, default="cpc", choices=["cpc", "rmse", "tdecoder", "tdecoder_rmse", "tdecoder_cpc", "tdecoder_rmse_cpc"])
 parser.add_argument('--auxiliary-loss-weight', type=float, default=1.0)
 parser.add_argument('--neg-samples-from', type=str, default="Future", choices=["Future", "PastFuture"])
 

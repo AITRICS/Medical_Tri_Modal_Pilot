@@ -21,7 +21,7 @@ class experiment_results_validation:
         os.system("echo  \'#######################################\'")
         seed, result = list_of_test_results_per_seed
 
-        if (self.args.model_types == "detection"):
+        if (self.args.model_types == "detection") or (self.args.model_types == "bce_rmse"):
             auc, apr, f1 = result
             os.system("echo  \'##### validation results #####\'")
             os.system("echo  \'seed_case:{} - auc: {}, apr: {}, f1_score: {}\'".format(str(seed), str(auc), str(apr), str(f1)))
@@ -83,7 +83,7 @@ class experiment_results_test:
         os.system("echo  \'#######################################\'")
         seed, result = list_of_test_results_per_seed
 
-        if (self.args.model_types == "detection"):
+        if (self.args.model_types == "detection") or (self.args.model_types == "bce_rmse"):
             auc, apr, f1 = result
             os.system("echo  \'##### test results #####\'")
             os.system("echo  \'seed_case:{} - auc: {}, apr: {}, f1_score: {}\'".format(str(seed), str(auc), str(apr), str(f1)))

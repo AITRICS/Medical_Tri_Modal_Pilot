@@ -59,7 +59,7 @@ class TRI_MBT_V1(nn.Module):
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
                     )
-            self.ie_feat = nn.Embedding(18, self.model_dim)
+            self.ie_feat = nn.Embedding(20, self.model_dim)
             
         self.ie_time = nn.Sequential(
                                         nn.Linear(1, self.model_dim),
@@ -138,6 +138,8 @@ class TRI_MBT_V1(nn.Module):
         nn.Linear(in_features=self.model_dim, out_features= self.output_dim,  bias=True))
 
         self.relu = self.activations[activation]
+        self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
+        self.txt_feat = torch.Tensor([19]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
 
     def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices, img_time, txt_time):
         # x-TIE:  torch.Size([bs, vslt_len, 3])
@@ -173,8 +175,10 @@ class TRI_MBT_V1(nn.Module):
             img_embedding = self.patch_embedding(img)
             
         if self.args.imgtxt_time == 1:
-            img_embedding += self.ie_time(img_time.unsqueeze(1)).unsqueeze(1)
-            txt_embedding += self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1)
+            # img_embedding += self.ie_time(img_time.unsqueeze(1)).unsqueeze(1)
+            # txt_embedding += self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1)
+            img_embedding = img_embedding + self.ie_time(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat)
+            txt_embedding = txt_embedding + self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat)
             
         outputs, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding, txt_embedding], 
                                       fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1), txt_embedding.size(1)],
@@ -194,4 +198,5 @@ class TRI_MBT_V1(nn.Module):
         vsltimg_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[1, :, :]]), dim=0)
         all_cls_stack = torch.stack([tri_mean, vsltimg_mean, vslttxt_mean, outputs_stack[0, :, :]])
         output = all_cls_stack[missing, self.idx_order]
+
         return output, None
