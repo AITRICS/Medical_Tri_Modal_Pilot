@@ -28,8 +28,6 @@ from builder.utils.result_utils import *
 from builder.utils.logger import Logger
 from builder.utils.cosine_annealing_with_warmup_v2 import CosineAnnealingWarmupRestarts
 from builder.utils.cosine_annealing_with_warmupSingle import CosineAnnealingWarmUpSingle
-# from pytorch_forecasting.metrics.point import RMSE
-from pytorch_forecasting.metrics import RMSE
 
 # set gpu device
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
