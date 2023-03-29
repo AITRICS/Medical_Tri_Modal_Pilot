@@ -106,7 +106,7 @@ class TrimodalTransformerEncoder_MBT(nn.Module):
             else:
                 bottleneck_outputs = []
                 for modal_idx, enc_layer in enumerate(enc_layers):
-                    b_enc_output = torch.cat([bottlenecks, enc_inputs[modal_idx]], axis=1)
+                    b_enc_output = torch.cat([bottlenecks, enc_inputs[modal_idx]], axis=1) #bottleneck, cls, input
                     if len(bottleneck_self_attn_masks) < self.n_modality:
                         if self.mask[modal_idx]:
                             b_mask = get_attn_pad_mask(b_enc_output, varying_lengths[modal_idx]+self.bottlenecks_n, b_enc_output.size(1))

@@ -191,9 +191,10 @@ class TransformerDecoder(BaseDecoder):
                 encoder_outputs_mask=encoder_outputs_mask,
             )
 
-        predicted_log_probs = self.fc(outputs).log_softmax(dim=-1)
+        # predicted_log_probs = self.fc(outputs).log_softmax(dim=-1)
+        no_predicted_log_probs = self.fc(outputs)
 
-        return predicted_log_probs
+        return no_predicted_log_probs
 
     @torch.no_grad()
     def decode(self, encoder_outputs: Tensor, encoder_output_lengths: Tensor) -> Tensor:

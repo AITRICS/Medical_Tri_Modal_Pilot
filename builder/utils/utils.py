@@ -279,7 +279,7 @@ def onetime_outbreak_valdataset_maker(args, patdictPath, winsizePath):
         # pat_neg_indices_keys_with_img = 4 for (Case2: full_modal with img1 in fullmodal_definition) or (Case3: missing modal)     Case2: (pn)         Case3: (wimgwtxt-pn: 1, wimgw/otxt-pn: 4)
         # pat_neg_indices_keys_without_img = 5 for (Case3: missing modal)                                                                               Case3: (w/oimgwtxt-pn: 7, w/oimgw/otxt-pn: 10)
         possible_indices_keys_alltypes = [[] for _ in range(6)]
-        event_time = -1
+    
         if(data_info['death_yn'] == 0):
             target = 0
             target_type = 0
@@ -288,7 +288,7 @@ def onetime_outbreak_valdataset_maker(args, patdictPath, winsizePath):
             
         else:
             death_time = data_info['death_time']
-            event_time = death_time
+            
             # If death time is beyond the prediction range of the given data or happened too early, change to 0 target
             if (death_time > sequenceLength + args.prediction_range - 1) or (death_time < args.min_inputlen):
                 target = 0
@@ -365,7 +365,7 @@ def onetime_outbreak_valdataset_maker(args, patdictPath, winsizePath):
                     possible_indices_keys_alltypes[pidx] = random.sample(possible_indices_keys_type, args.PatNegSampleN)
                 
         _data_list.append([pkl_path, possible_indices_keys_alltypes, possibleWinSizes, target])
-        patDict[(pat_id, chid)] = possible_indices_keys_alltypes, possible_indices_dict, target, possibleWinSizes, target_type, event_time
+        patDict[(pat_id, chid)] = possible_indices_keys_alltypes, possible_indices_dict, target, possibleWinSizes, target_type
 
     for idx, sample in enumerate(_data_list):
         pkl_pth, p_keys, possibleWinSizes, t = sample

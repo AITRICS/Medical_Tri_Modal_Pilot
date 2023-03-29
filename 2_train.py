@@ -132,6 +132,9 @@ for k_indx, seed_num in enumerate(args.seed_list):
     elif args.model_types == "detection":   
         criterion = nn.BCEWithLogitsLoss(size_average=True, reduction='mean')
         args.output_dim = 1
+        
+    pad_id = 0
+    criterion_aux = nn.CrossEntropyLoss(ignore_index = pad_id).to(device, non_blocking=True)
 
     # get model
     model = get_model(args) 
@@ -301,6 +304,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
                                                 flow_type        = "train",
                                                 reports_tokens   = train_reports_tokens,
                                                 reports_lengths   = train_reports_lengths,
+                                                criterion_aux    = criterion_aux
                                                 )
             
 
@@ -402,6 +406,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
                                                 flow_type        = "test",
                                                 reports_tokens   = val_reports_tokens,
                                                 reports_lengths  = val_reports_lengths,
+                                                criterion_aux    = criterion_aux
                                                 )
                             
                         
@@ -526,6 +531,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
                                         flow_type        = "test",
                                         reports_tokens   = test_reports_tokens,
                                         reports_lengths  = test_reports_lengths,
+                                        criterion_aux    = criterion_aux
                                         )
 
     # update logger - end of test step

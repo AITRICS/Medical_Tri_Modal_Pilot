@@ -20,7 +20,7 @@ from control.config import args
 def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y, 
                                             model, logger, device, scheduler=None, optimizer=None, criterion=None, 
                                             scaler=None, flow_type=None, output_lengths=None, 
-                                            seq_lengths=None, x_img=None, x_txt=None, txt_lengths=None, imgtxt_time=None, missing=None, reports_tokens=None, reports_lengths=None):
+                                            seq_lengths=None, x_img=None, x_txt=None, txt_lengths=None, imgtxt_time=None, missing=None, reports_tokens=None, reports_lengths=None, criterion_aux = None):
     
     # (tensor([[0., 0., 0.],
     #     [0., 0., 1.],
@@ -114,9 +114,9 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
         optimizer.zero_grad()
         with torch.cuda.amp.autocast():
             if "tdecoder" not in args.auxiliary_loss_type:
-                output, aux_loss = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time)
+                output, aux = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time)
             else:
-                output, aux_loss = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths)
+                output, aux = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths)
             output = output.squeeze()
             
             if "bceandsoftmax" == args.loss_types:
@@ -134,8 +134,13 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
             else:
                 loss = criterion(output, final_target)
                 
-            if aux_loss is not None:
-                loss = loss + (args.auxiliary_loss_weight * aux_loss)
+            if aux is not None:
+                exist_reports_idx = (reports_tokens[:,0]!=0).nonzero(as_tuple=True)[0]
+                if len(exist_reports_idx) == 0: # 이미지가 모두 없는 batch
+                    loss = loss
+                else:
+                    aux_loss = criterion_aux(aux[exist_reports_idx].contiguous().view(-1, 30522), reports_tokens[exist_reports_idx][:,1:].contiguous().view(-1))
+                    loss = loss + (args.auxiliary_loss_weight * aux_loss)
                 
         scaler.scale(loss).backward()
         scaler.step(optimizer)

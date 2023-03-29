@@ -11,7 +11,7 @@
             "program":"2_train.py",
             "args":["--project-name","test_aux",
                     "--input-types", "vslt_img_txt",
-                    "--model", "tri_mt_v1",
+                    "--model", "tri_mbt_v1",
                     "--predict-type", "multi_task_within",
                     "--modality-inclusion", "train-missing_test-missing",
                     "--prediction-range", "12",

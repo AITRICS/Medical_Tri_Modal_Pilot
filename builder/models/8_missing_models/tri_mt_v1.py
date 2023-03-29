@@ -197,8 +197,10 @@ class TRI_MT_V1(nn.Module):
         classInput = torch.cat([classInput, demo_embedding], dim=1)
         output = self.fc_list(classInput)
         
+        
         if (flow_type == "train") and ("tdecoder" in self.args.auxiliary_loss_type):
-            output2 = self.img_2_txt(reports_token, context_vector2, encoder_output_lengths = self.encoder_output_lengths)
+            # unsqueeze를 한 이유: transformer decoder,의 enc_output, seq_lengths를 1로 주기 위해서 
+            output2 = self.img_2_txt(reports_tokens, context_vector[:,-179,:].unsqueeze(1), encoder_output_lengths = self.encoder_output_lengths) 
             # exit(1)
         else:
             output2 = None

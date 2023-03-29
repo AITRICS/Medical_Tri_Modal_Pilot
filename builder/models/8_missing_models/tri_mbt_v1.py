@@ -215,7 +215,7 @@ class TRI_MBT_V1(nn.Module):
         all_cls_stack = torch.stack([tri_mean, vsltimg_mean, vslttxt_mean, outputs_stack[0, :, :]])
         output = all_cls_stack[missing, self.idx_order]
         if (flow_type == "train") and ("tdecoder" in self.args.auxiliary_loss_type):
-            output2 = self.img_2_txt(reports_token, context_vector2, encoder_output_lengths = self.encoder_output_lengths)
+            output2 = self.img_2_txt(reports_tokens, outputs[1][:,0,:].unsqueeze(1), encoder_output_lengths = self.encoder_output_lengths)
             # exit(1)
         else:
             output2 = None

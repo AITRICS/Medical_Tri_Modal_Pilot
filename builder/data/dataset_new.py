@@ -967,9 +967,13 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
             if not all([True if i in data_info['feature_order'] else False for i in args.mandatory_vitalsign_labtest]):
                 continue
                 
+            event_time = -1
+            if(data_info['death_yn'] != 0):
+                death_time = data_info['death_time']
+                event_time = death_time
             # Check if the randIndex for the given patient has already been initialized
             if (pat_id, chid) in patDict:
-                possible_indices_keys_alltypes, possible_indices_dict, target, possibleWinSizes, target_type, event_time = patDict[(pat_id, chid)]
+                possible_indices_keys_alltypes, possible_indices_dict, target, possibleWinSizes, target_type = patDict[(pat_id, chid)]
                 
                 if isListEmpty(possible_indices_keys_alltypes):
                     continue
@@ -999,7 +1003,7 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                 # pat_neg_indices_keys_with_img = 4 for (Case2: full_modal with img1 in fullmodal_definition) or (Case3: missing modal)     Case2: (pn)         Case3: (wimgwtxt-pn: 1, wimgw/otxt-pn: 4)
                 # pat_neg_indices_keys_without_img = 5 for (Case3: missing modal)                                                                               Case3: (w/oimgwtxt-pn: 7, w/oimgw/otxt-pn: 10)
                 possible_indices_keys_alltypes = [[] for _ in range(6)]
-                event_time = -1
+                
                 # possibleWinSizes = data_info['possibleWinSizes']
                 if(data_info['death_yn'] == 0):
                     target = 0
@@ -1009,7 +1013,7 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
             
                 else:
                     death_time = data_info['death_time']
-                    event_time = death_time
+                    
                     # If death time is beyond the prediction range of the given data or happened too early, change to 0 target
                     if (death_time > sequenceLength + args.prediction_range - 1) or (death_time < args.min_inputlen):
                         target = 0
