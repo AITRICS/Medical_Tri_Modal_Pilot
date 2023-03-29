@@ -578,7 +578,10 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         type_list = self._type_list[index]
         early_nones = 0
         late_nones = 0
-        target2 = 0
+        target_aux = 0
+        reports_tokens = 0
+        reports_lengths = 0
+
         file_name = pkl_path.split("/")[-1]
         with open(pkl_path, 'rb') as _f:
             data_pkl = pkl.load(_f)
@@ -621,6 +624,7 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 
             randLength -= early_nones
             selectedKey -= late_nones
+            
             if late_nones == 0:
                 time_data_list = list(time_data_list[early_nones:])
             else:
@@ -648,7 +652,6 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             inputLength = time_data_tensor.shape[0]
             f_indices = False
     
-        # print(" ") > args.prediction_range:
         if args.model_types == "classification":
             target = labels_by_dict[oldselectedKey][0][-1] + late_nones
             if target == 0:
@@ -666,36 +669,26 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             elif "bceandsoftmax" == self.loss_types:
                 multi_target = list(self.neg_multi_target)
                 multi_target[target] = 1
-                target2 =multi_target 
+                target_aux =multi_target 
                 
             # rmse
             elif "rmse" == self.loss_types:
                 target = event_time - selectedKey
             
             # softmax
-            else:
-                pass 
         
-        # detection and rmse # bce+rmse        
-        elif self.model_types == "bce_rmse":        
-            if target != 0:
-                if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
-                    target = 0
-                    target2 = 0.0
-                else:
-                    target = 1
-                    target2 = event_time - selectedKey
-        
-        # detection # bce
+        # detection # bce or bce with rmse
         else: 
             if target != 0:
                 if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
                     target = 0
+                    target_aux = 0.0
                 else:
                     target = 1
+                    target_aux = event_time - selectedKey
                 
         target = torch.tensor(target)
-        target2 = torch.tensor(target2).type(torch.HalfTensor)
+        target_aux = torch.tensor(target_aux).type(torch.HalfTensor)
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
         cxr_time = -1
         if "cxr_input" in data_pkl:
@@ -726,8 +719,8 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             if "tdecoder" in args.auxiliary_loss_type:
-                    reports_tokens = torch.zeros(1024, dtype=torch.long)
-                    reports_lengths = torch.tensor(0)
+                reports_tokens = torch.zeros(1024, dtype=torch.long)
+                reports_lengths = torch.tensor(0)
             missing.append(True)
         
         if args.berttype == "biobert" and args.txt_tokenization == "bert":
@@ -772,10 +765,7 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
 
         missing = torch.Tensor(missing)
-        # event_time = torch.tensor(event_time)
-        if "tdecoder" in args.auxiliary_loss_type:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target2, reports_tokens, reports_lengths
-        return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target2
+        return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
 
 class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
 
@@ -1257,7 +1247,10 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
         type_list = self._type_list[index]
         early_nones = 0
         late_nones = 0
-        target2 = 0
+        target_aux = 0
+        reports_tokens = 0
+        reports_lengths = 0
+
         file_name = pkl_path.split("/")[-1]
         with open(pkl_path, 'rb') as _f:
             data_pkl = pkl.load(_f)
@@ -1341,36 +1334,26 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
             elif "bceandsoftmax" == self.loss_types:
                 multi_target = list(self.neg_multi_target)
                 multi_target[target] = 1
-                target2 =multi_target 
+                target_aux =multi_target 
                 
             # rmse
             elif "rmse" == self.loss_types:
                 target = event_time - selectedKey
             
             # softmax
-            else:
-                pass 
         
-        # detection and rmse # bce+rmse        
-        elif self.model_types == "bce_rmse":        
-            if target != 0:
-                if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
-                    target = 0
-                    target2 = 0.0
-                else:
-                    target = 1
-                    target2 = event_time - selectedKey
-        
-        # detection # bce
+        # detection # bce or bce with rmse
         else: 
             if target != 0:
                 if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
                     target = 0
+                    target_aux = 0.0
                 else:
                     target = 1
-                
+                    target_aux = event_time - selectedKey
+                    
         target = torch.tensor(target)
-        target2 = torch.tensor(target2).type(torch.HalfTensor)
+        target_aux = torch.tensor(target_aux).type(torch.HalfTensor)
         
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
         cxr_time = -1
@@ -1402,8 +1385,8 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             if "tdecoder" in args.auxiliary_loss_type:
-                    reports_tokens = torch.zeros(1024, dtype=torch.long)
-                    reports_lengths = torch.tensor(0)
+                reports_tokens = torch.zeros(1024, dtype=torch.long)
+                reports_lengths = torch.tensor(0)
             missing.append(True)
         
         if args.berttype == "biobert" and args.txt_tokenization == "bert":
@@ -1447,9 +1430,7 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
                 
         missing = torch.Tensor(missing)
-        if "tdecoder" in args.auxiliary_loss_type:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target2, reports_tokens, reports_lengths
-        return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target2
+        return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
 
 class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
 
@@ -1578,6 +1559,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
             ##### get possibles indices and max lengths here #####
             # If there are no positive cases in indices below args.min_inputlen, we change the case to negative.
             # If outbreak_time is beyond the prediction range of the given data or happened too early, change to 0 target
+            event_time = [(-1, -1)]
             outbreak_times = data_info[tmptimes[taskIndex]]
             if outbreak_times is not None and len(outbreak_times) != 0:
                 outbreak_times = sorted(outbreak_times)
@@ -1590,12 +1572,14 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                     target = 0
                 else:
                     target = 1
+                    event_time = list(outbreak_times)
             else:
                 target = 0
 
             # If target variable negative, get random subsequence of length 3 ~ args.window_size
             possible_indices_dict = {}            
             possible_indices_keys_alltypes = [[] for _ in range(6)]
+            
             if target == 0:
                 target_type = 0
                 possible_indices_keys_alltypes[0] = list([i for i in range(args.min_inputlen-1, sequenceLength - args.prediction_range)])  # feasible data length
@@ -1690,7 +1674,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 for keylist_type, possible_indices_keys in enumerate(possible_indices_keys_alltypes):
                     if keylist_type == 0:               
                         if len(possible_indices_keys) > 0 and possible_indices_keys is not None:# possible_indices_keys가 빈 리스트라면 실행 안됨
-                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target])
+                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time])
                             self._type_list.append(target_type)
                             
                             possible_tpoints = [True if i in possible_indices_dict else False for i in possible_indices_keys]
@@ -1698,7 +1682,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                             negative_tpoints += possible_tpoints.count(False)
                     else:                    
                         if target == 1 and len(possible_indices_keys) > 0 and possible_indices_keys is not None:
-                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0])
+                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time])
                             self._type_list.append(2)
                             negative_tpoints += len(possible_indices_keys)
                                 
@@ -1707,7 +1691,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 for keylist_type, possible_indices_keys in enumerate(possible_indices_keys_alltypes):
                     if keylist_type == 0:               
                         if len(possible_indices_keys) > 0 and possible_indices_keys is not None:# possible_indices_keys가 빈 리스트라면 실행 안됨
-                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target])
+                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time])
                             self._type_list.append(target_type)
                             
                             possible_tpoints = [True if i in possible_indices_dict else False for i in possible_indices_keys]
@@ -1715,7 +1699,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                             negative_tpoints += possible_tpoints.count(False)
                     else:                    
                         if target == 1 and len(possible_indices_keys) > 0 and possible_indices_keys is not None:
-                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0])
+                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time])
                             self._type_list.append(2)
                             negative_tpoints += len(possible_indices_keys)
                             
@@ -1725,7 +1709,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 for keylist_type, possible_indices_keys in enumerate(possible_indices_keys_alltypes):
                     if keylist_type < 2:               
                         if len(possible_indices_keys) > 0 and possible_indices_keys is not None:# possible_indices_keys가 빈 리스트라면 실행 안됨
-                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target])
+                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time])
                             if keylist_type == 0 and target_type == 1 and "txt1" in file_name:
                                 self._type_list.append(0)
                             elif keylist_type == 0 and target_type == 0 and "txt1" in file_name:
@@ -1752,7 +1736,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                         if (args.model_types == "classification"):
                             continue                                 
                         if len(possible_indices_keys) > 0 and possible_indices_keys is not None:
-                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0])
+                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time])
                             if keylist_type == 2 and "txt1" in file_name:
                                 self._type_list.append(1)
                             elif keylist_type == 2 and "txt1" not in file_name:
@@ -1850,11 +1834,14 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         return len(self._data_list)
 
     def __getitem__(self, index):
-        pkl_path, possible_indices_keys, labels_by_dict, win_sizes, target, event_time = self._data_list[index]
+        pkl_path, possible_indices_keys, labels_by_dict, win_sizes, target, event_times = self._data_list[index]
         type_list = self._type_list[index]
         early_nones = 0
         late_nones = 0
-        target2 = 0
+        target_aux = 0
+        reports_tokens = 0
+        reports_lengths = 0
+        
         file_name = pkl_path.split("/")[-1]
         with open(pkl_path, 'rb') as _f:
             data_pkl = pkl.load(_f)
@@ -1871,6 +1858,8 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         pklFeatureMinMaxs = args.feature_maxs - args.feature_mins
         windowIndex = self.window_size - 1
         selectedKey = random.choice(possible_indices_keys)
+        if target != 0:
+            event_time = list(sorted([i[0] for i in event_times if i[0] > selectedKey]))[0]
         oldselectedKey = selectedKey
         randLength = random.choice(win_sizes[selectedKey])
         data_pkl['data'] = np.subtract(data_pkl['data'], pklFeatureMins)
@@ -1941,36 +1930,26 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
             elif "bceandsoftmax" == self.loss_types:
                 multi_target = list(self.neg_multi_target)
                 multi_target[target] = 1
-                target2 =multi_target 
+                target_aux =multi_target 
                 
             # rmse
             elif "rmse" == self.loss_types:
                 target = event_time - selectedKey
             
             # softmax
-            else:
-                pass 
         
-        # detection and rmse # bce+rmse        
-        elif self.model_types == "bce+rmse":        
-            if target != 0:
-                if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
-                    target = 0
-                    target2 = 0.0
-                else:
-                    target = 1
-                    target2 = event_time - selectedKey
-        
-        # detection # bce
+        # detection # bce or bce with rmse
         else: 
             if target != 0:
                 if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
                     target = 0
+                    target_aux = 0.0
                 else:
                     target = 1
+                    target_aux = event_time - selectedKey
                 
         target = torch.tensor(target)
-        target2 = torch.tensor(target2).type(torch.HalfTensor)
+        target_aux = torch.tensor(target_aux).type(torch.HalfTensor)
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
         cxr_time = -1
         if "cxr_input" in data_pkl:
@@ -2001,8 +1980,8 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             if "tdecoder" in args.auxiliary_loss_type:
-                    reports_tokens = torch.zeros(1024, dtype=torch.long)
-                    reports_lengths = torch.tensor(0)
+                reports_tokens = torch.zeros(1024, dtype=torch.long)
+                reports_lengths = torch.tensor(0)
             missing.append(True)
         
         if args.berttype == "biobert" and args.txt_tokenization == "bert":
@@ -2046,9 +2025,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
                 
         missing = torch.Tensor(missing)  
-        if "tdecoder" in args.auxiliary_loss_type:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target2, reports_tokens, reports_lengths
-        return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target2
+        return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
 
 class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
 
@@ -2180,7 +2157,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 self.transform = xray_image_transform_resize_crop_val()
             elif args.image_test_type == "resize_larger":
                 self.transform = xray_image_transform_resize_larger_val()
-
+        
         for idx, pkl_path in enumerate(tqdm(data, desc="Loading files of {}...".format(data_type))):
             file_name = pkl_path.split("/")[-1]
             
@@ -2362,18 +2339,21 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             if target_type == 1 and len(possible_indices_keys_alltypes[3]) > 0 and len(possible_indices_keys_alltypes[0]) == 0:
                 patient_list.append(2)
             
+            event_time = [(-1, -1)]
+            if target == 1:
+                event_time = data_info[tmptimes[taskIndex]]
             ######################################################
             if (('test-full' in args.modality_inclusion and data_type == "validation dataset") or ('test-full' in args.modality_inclusion and data_type == "test dataset")) and "img1" not in args.fullmodal_definition: # (Case1: full_modal with img1 not in fullmodal_definition)
                 possible_indices_keys_alltypes = list([i for idx, i in enumerate(possible_indices_keys_alltypes) if idx in [0, 3]])
                 for keylist_type, possible_indices_keys in enumerate(possible_indices_keys_alltypes):
                     for selected_key in possible_indices_keys:
                         if keylist_type == 0:               
-                            _data_list.append([pkl_path, [selected_key], possible_indices_dict, possibleWinSizes, target])
+                            _data_list.append([pkl_path, [selected_key], possible_indices_dict, possibleWinSizes, target, event_time])
                             _type_list.append(target_type)
                             
                         else:                    
                             if target == 1:
-                                _data_list.append([pkl_path, [selected_key], {}, possibleWinSizes, 0])
+                                _data_list.append([pkl_path, [selected_key], {}, possibleWinSizes, 0, event_time])
                                 _type_list.append(2)
                                 
             elif ('test-full' in args.modality_inclusion and "img1" in args.fullmodal_definition and data_type == "validation dataset") or ('test-full' in args.modality_inclusion and "img1" in args.fullmodal_definition and data_type == "test dataset"): # (Case2: full_modal with img1 in fullmodal_definition)
@@ -2381,12 +2361,12 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 for keylist_type, possible_indices_keys in enumerate(possible_indices_keys_alltypes):
                     for selected_key in possible_indices_keys:
                         if keylist_type == 0:               
-                            _data_list.append([pkl_path, [selected_key], possible_indices_dict, possibleWinSizes, target])
+                            _data_list.append([pkl_path, [selected_key], possible_indices_dict, possibleWinSizes, target, event_time])
                             _type_list.append(target_type)
                             
                         else:                    
                             if target == 1:
-                                _data_list.append([pkl_path, [selected_key], {}, possibleWinSizes, 0])
+                                _data_list.append([pkl_path, [selected_key], {}, possibleWinSizes, 0, event_time])
                                 _type_list.append(2)
                             
             else: # (Case3: missing modal)
@@ -2394,7 +2374,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 for keylist_type, possible_indices_keys in enumerate(possible_indices_keys_alltypes):
                     if keylist_type < 2:               
                         for selected_key in possible_indices_keys:
-                            _data_list.append([pkl_path, [selected_key], possible_indices_dict, possibleWinSizes, target])
+                            _data_list.append([pkl_path, [selected_key], possible_indices_dict, possibleWinSizes, target, event_time])
 
                             if keylist_type == 0 and target_type == 1 and "txt1" in file_name:
                                 _type_list.append(0)
@@ -2419,7 +2399,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                         if (args.model_types == "classification"):
                             continue                   
                         for selected_key in possible_indices_keys:
-                            _data_list.append([pkl_path, [selected_key], {}, possibleWinSizes, 0])
+                            _data_list.append([pkl_path, [selected_key], {}, possibleWinSizes, 0, event_time])
                             if keylist_type == 2 and "txt1" in file_name:
                                 _type_list.append(1)
                             elif keylist_type == 2 and "txt1" not in file_name:
@@ -2440,7 +2420,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             _type_list = [class2dict_missing[i] if i in class2dict_missing else i for i in _type_list]    
             
         for idx, sample in enumerate(_data_list):
-            pkl_pth, p_key, p_dict, possibleWinSizes, t = sample
+            pkl_pth, p_key, p_dict, possibleWinSizes, t, event_time = sample
             if (args.model_types == "classification") and (t != 1):
                 continue
             p_key = p_key[0]
@@ -2454,7 +2434,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 winDict[win_key_name] = win_size
 
             if p_key is not None:
-                self._data_list.append([pkl_pth, [p_key], p_dict, win_size, t]) # pkl_path, possible_indices_keys, labels_by_dict, win_size, target
+                self._data_list.append([pkl_pth, [p_key], p_dict, win_size, t, event_time]) # pkl_path, possible_indices_keys, labels_by_dict, win_size, target
                 self._type_list.append(t_type)
                 
                 if p_key in p_dict:
@@ -2489,35 +2469,14 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             print(" 1-3. w/oimg-wtxt_pp: ", self._type_list.count(2))
             print(" 1-4. w/oimg-w/otxt_pp: ", self._type_list.count(3))
             print("[2]. Number of patients with negative signs: ", patient_list.count(2))
-            # print("2. Number of patient negative samples list for training", self._type_list.count(8)+self._type_list.count(9)+self._type_list.count(10)+self._type_list.count(11))
-            # print(" 2-1. wimg-wtxt-pn: ", self._type_list.count(8))
-            # print(" 2-2. wimg-w/otxt-pn: ", self._type_list.count(9))
-            # print(" 2-3. w/oimg-wtxt-pn: ", self._type_list.count(10))
-            # print(" 2-4. w/oimg-w/otxt-pn: ", self._type_list.count(11))
+
             print("[3]. Number of non-patients: ", patient_list.count(0))
             print("3. Number of non-patient negative samples for training", self._type_list.count(4)+self._type_list.count(5)+self._type_list.count(6)+self._type_list.count(7))
             print(" 3-1. wimg-wtxt-nn: ", self._type_list.count(4))
             print(" 3-2. wimg-w/otxt-nn: ", self._type_list.count(5))
             print(" 3-3. w/oimg-wtxt-nn: ", self._type_list.count(6))
             print(" 3-4. w/oimg-w/otxt-nn: ", self._type_list.count(7))
-            # print("[1]. Number of patients: ", patient_list.count(1))
-            # print("1. Number of patient positive samples for training", self._type_list.count(0)+self._type_list.count(3)+self._type_list.count(6)+self._type_list.count(9))
-            # print(" 1-1. wimg-wtxt_pp: ", self._type_list.count(0))
-            # print(" 1-2. wimg-w/otxt_pp: ", self._type_list.count(3))
-            # print(" 1-3. w/oimg-wtxt_pp: ", self._type_list.count(6))
-            # print(" 1-4. w/oimg-w/otxt_pp: ", self._type_list.count(9))
-            # print("[2]. Number of patients with negative signs: ", patient_list.count(2))
-            # print("2. Number of patient negative samples for training", self._type_list.count(1)+self._type_list.count(4)+self._type_list.count(7)+self._type_list.count(10))
-            # print(" 2-1. wimg-wtxt-pn: ", self._type_list.count(1))
-            # print(" 2-2. wimg-w/otxt-pn: ", self._type_list.count(4))
-            # print(" 2-3. w/oimg-wtxt-pn: ", self._type_list.count(7))
-            # print(" 2-4. w/oimg-w/otxt-pn: ", self._type_list.count(10))
-            # print("[3]. Number of non-patients: ", patient_list.count(0))
-            # print("3. Number of non-patient negative samples for training", self._type_list.count(2)+self._type_list.count(5)+self._type_list.count(8)+self._type_list.count(11))
-            # print(" 3-1. wimg-wtxt-nn: ", self._type_list.count(2))
-            # print(" 3-2. wimg-w/otxt-nn: ", self._type_list.count(5))
-            # print(" 3-3. w/oimg-wtxt-nn: ", self._type_list.count(8))
-            # print(" 3-4. w/oimg-w/otxt-nn: ", self._type_list.count(11))
+
         print("########## Detail Data Info ##########")
         print("Positive time-points: ", positive_tpoints)
         print("Negative time-points: ", negative_tpoints)
@@ -2534,11 +2493,14 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
         return len(self._data_list)
 
     def __getitem__(self, index):
-        pkl_path, possible_indices_keys, labels_by_dict, randLength, target, event_time = self._data_list[index]
+        pkl_path, possible_indices_keys, labels_by_dict, randLength, target, event_times = self._data_list[index]
         type_list = self._type_list[index]
         early_nones = 0
         late_nones = 0
-        target2 = 0
+        target_aux = 0
+        reports_tokens = 0
+        reports_lengths = 0
+        
         file_name = pkl_path.split("/")[-1]
         with open(pkl_path, 'rb') as _f:
             data_pkl = pkl.load(_f)
@@ -2555,10 +2517,10 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
         pklFeatureMinMaxs = args.feature_maxs - args.feature_mins
         data_pkl['data'] = np.subtract(data_pkl['data'], pklFeatureMins)
         data_pkl['data'] = np.divide(data_pkl['data'], pklFeatureMinMaxs)
-
         windowIndex = self.window_size - 1
         selectedKey = possible_indices_keys[0]
-        
+        if target != 0:
+            event_time = list(sorted([i[0] for i in event_times if i[0] > selectedKey]))[0]
         oldselectedKey = selectedKey
         final_seqs = torch.Tensor(self.time_data_array)
         time_data_list = list(data_pkl['data_in_time'][selectedKey-randLength+1:selectedKey+1])
@@ -2622,36 +2584,26 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             elif "bceandsoftmax" == self.loss_types:
                 multi_target = list(self.neg_multi_target)
                 multi_target[target] = 1
-                target2 =multi_target 
+                target_aux =multi_target 
                 
             # rmse
             elif "rmse" == self.loss_types:
                 target = event_time - selectedKey
             
             # softmax
-            else:
-                pass 
         
-        # detection and rmse # bce+rmse        
-        elif self.model_types == "bce_rmse":        
-            if target != 0:
-                if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
-                    target = 0
-                    target2 = 0.0
-                else:
-                    target = 1
-                    target2 = event_time - selectedKey
-        
-        # detection # bce
+        # detection # bce or bce with rmse
         else: 
             if target != 0:
                 if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
                     target = 0
+                    target_aux = 0.0
                 else:
                     target = 1
+                    target_aux = event_time - selectedKey
                 
         target = torch.tensor(target)
-        target2 = torch.tensor(target2).type(torch.HalfTensor)
+        target_aux = torch.tensor(target_aux).type(torch.HalfTensor)
         
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
         cxr_time = -1
@@ -2728,9 +2680,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
                 
         missing = torch.Tensor(missing)
-        if "tdecoder" in args.auxiliary_loss_type:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target2, reports_tokens, reports_lengths
-        return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target2
+        return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
 
 
 

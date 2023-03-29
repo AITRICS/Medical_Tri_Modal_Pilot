@@ -57,10 +57,12 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
             final_target = final_target.unsqueeze(1)
         elif "bceandsoftmax" == args.loss_types: # 1
             final_target = (train_y[0].type(torch.LongTensor).to(device, non_blocking=True), train_y[1].type(torch.FloatTensor).to(device, non_blocking=True))
-    elif args.model_types == "bce_rmse":
-        final_target = (train_y[0].type(torch.FloatTensor).to(device, non_blocking=True), train_y[1].type(torch.FloatTensor).to(device, non_blocking=True).unsqueeze(1))
+        
     else:
-        final_target = train_y.type(torch.FloatTensor).to(device, non_blocking=True)
+        if "rmse" in args.auxiliary_loss_type:
+            final_target = (train_y[0].type(torch.FloatTensor).to(device, non_blocking=True), train_y[1].type(torch.FloatTensor).to(device, non_blocking=True).unsqueeze(1))
+        else:
+            final_target = train_y.type(torch.FloatTensor).to(device, non_blocking=True)
     
     if args.fullmodal_definition == "txt1":
         missing = torch.stack([missing[:,0], missing[:,2]]).permute(1,0).detach().clone() # in case of vslt_txt
@@ -84,7 +86,6 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
         missing = missing.detach().clone()
         # if flow_type == "train" and args.multitoken:
         #     final_target = final_target.repeat(4,1,1).permute(1,0,2).reshape(-1,12) # [2, 64, 12] -> [64, 2, 12] -> [128, 12]
-    
     
     sample_missing = torch.cat([sample_missing, missing], dim = 0)
     _, missing_num = torch.unique(sample_missing, dim=0, sorted=True, return_inverse=True)
@@ -113,10 +114,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
     if flow_type == "train":
         optimizer.zero_grad()
         with torch.cuda.amp.autocast():
-            if "tdecoder" not in args.auxiliary_loss_type:
-                output, aux = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time)
-            else:
-                output, aux = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths)
+            output, aux = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths)
             output = output.squeeze()
             
             if "bceandsoftmax" == args.loss_types:
@@ -124,8 +122,8 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                 loss2 = criterion[1](output, final_target[1])
                 loss = loss1 + loss2
             elif "rmse" == args.loss_types:
-                loss = criterion(output, final_target)
-            elif  args.model_types == "bce_rmse":
+                loss = torch.sqrt(torch.mean(criterion(output, final_target)))
+            elif "rmse" in args.auxiliary_loss_type:
                 loss1 = criterion[0](output[:,0], final_target[0])
                 loss2 = criterion[1](output[:,1], final_target[1])[:,0]
                 loss2 = torch.sqrt(torch.mean(loss2[final_target[0] == 1]))
@@ -145,18 +143,12 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
-        # loss.backward()
-        # nn.utils.clip_grad_norm_(model.parameters(), 5)
-        # optimizer.step()
         scheduler.step(iteration)
         logger.log_lr(scheduler.get_lr()[0], iteration)
     else:
         test_loss = []
         with torch.cuda.amp.autocast():
-            if "tdecoder" not in args.auxiliary_loss_type:
-                output, aux_loss = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time)
-            else:
-                output, aux_loss = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths)
+            output, aux_loss = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths)
             output = output.squeeze()
             loss2 = None
             if "bceandsoftmax" == args.loss_types:
@@ -164,7 +156,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                 loss2 = criterion[1](output, final_target[1])
                 final_target = final_target[0]
                 loss = loss1 + loss2
-            elif  args.model_types == "bce_rmse":
+            if "rmse" == args.auxiliary_loss_type:
                 loss1 = criterion[0](output[:,0], final_target[0])
                 loss2 = criterion[1](output[:,1], final_target[1])[:,0]
                 loss2 = torch.sqrt(torch.mean(loss2[final_target[0] == 1]))
@@ -178,7 +170,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
             
             if args.model_types == "classification":
                 if "rmse" == args.loss_types:
-                    output = loss
+                    output = loss = torch.sqrt(torch.mean(loss))
                 else:
                     output = torch.softmax(output, dim=1)
             else: # detection

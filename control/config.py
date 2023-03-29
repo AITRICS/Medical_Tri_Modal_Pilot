@@ -17,7 +17,7 @@ parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--seed-list', type=list, default=[412, 1004, 2023]) #[0, 1004, 2022, 9209, 119]
 parser.add_argument('--device', type=int, default=1, nargs='+')
 parser.add_argument('--cpu', type=int, default=0)
-parser.add_argument('--num-workers', type=int, default=4)
+parser.add_argument('--num-workers', type=int, default=0)
 parser.add_argument('--gpus', type=int, default=1)
 parser.add_argument('--reset', default=False, action='store_true')
 parser.add_argument('--project-name', type=str, default="small1")
@@ -26,7 +26,7 @@ parser.add_argument('--checkpoint', '-cp', type=bool, default=False)
 parser.add_argument('--prediction-range', type=int, default=12)
 parser.add_argument('--min-inputlen', type=int, default=3)
 parser.add_argument('--window-size', type=int, default=24)
-parser.add_argument('--vslt-type', type=str, default="carryforward", choices=["carryforward", "TIE"])
+parser.add_argument('--vslt-type', type=str, default="carryforward", choices=["carryforward", "TIE", "QIE"])
 parser.add_argument('--TIE-len', type=int, default=1000)
 parser.add_argument('--ar-lowerbound', type=float, default=0.7)
 parser.add_argument('--ar-upperbound', type=float, default=1.3)
@@ -38,9 +38,9 @@ parser.add_argument('--modality-inclusion', type=str, default="train-full_test-f
 parser.add_argument('--fullmodal-definition', type=str, default="txt1_img1", choices=["txt1_img1", "img1", "txt1"])
 
 # Data path setting
-parser.add_argument('--train-data-path', type=str, default="/home/claire/training_data_0320/mimic_cf_icu_size24/train")
-parser.add_argument('--test-data-path', type=str, default="/home/claire/training_data_0320/mimic_cf_icu_size24/test")
-parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/claire/multimodal/MLHC_result")
+parser.add_argument('--train-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/train")
+parser.add_argument('--test-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/test")
+parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/destin/multimodal/MLHC_result")
 parser.add_argument('--image-data-path', type=str, default="/home/claire/")
 # Data Parameters
 parser.add_argument('--cross-fold-val', type=int, default=0, choices=[1, 0], help="1: k-fold, 0: seed-average")
@@ -90,53 +90,38 @@ parser.add_argument('--bert-token-max-length', type=int, default=128)
 parser.add_argument('--enc-depth', type=int, default=3, choices=[1,2,3])
 parser.add_argument('--hidden-size', type=int, default=256)
 parser.add_argument('--transformer-dim', type=int, default=256)
-parser.add_argument('--transformer-num-layers', type=int, default=2)
+parser.add_argument('--transformer-num-layers', type=int, default=6)
 parser.add_argument('--transformer-num-head', type=int, default=4)
 
 # Image Model Parameters
 parser.add_argument('--resnet-num-layers', type=int, default=18, choices=[18,34,50])
 parser.add_argument('--vit-num-layers', type=int, default=8, choices=[4,8,10,12])
 parser.add_argument('--vit-patch-size', type=int, default=16, choices=[8,16])
+
 # Image pretrain model
 parser.add_argument('--img-model-type', type=str, default="swin", choices=["resnet18", "resnet50", "swin", "vit", "maxvit"])
 parser.add_argument("--img-pretrain", type=str, default="Yes", choices = ["No","Yes"])
+
 #Image preprocess argument
 parser.add_argument('--image-size', type=int, default=224, choices=[224,512])
+
 #center is default, resize: image-train-type = ["random"], image-test-type = ["resize"]
 parser.add_argument('--image-train-type', type=str, default="resize_affine_crop", choices=["random", "resize", "resize_crop", "resize_affine_crop", "randaug"])
 parser.add_argument('--image-test-type', type=str, default="resize_crop", choices=["center", "resize", "resize_crop", "resize_larger"])#center: shorter로 resize 후, center crop, resize: aspect ratio 고려 없이 정사각형 resize
 parser.add_argument('--image-norm-type', type=str, default="HE", choices=["HE", "CLAHE"])
 
-# temporal method
-parser.add_argument('--temporal', type=str, default="LSTM", choices=["LSTM", "BLSTM", "TRANSFORMER"])
-parser.add_argument('--graph', type=str, default="gtransformer", choices=["gtransformer", "cnn1d"])
-
 # MBT Model Parameters
 parser.add_argument('--mbt-bottlenecks-n', type=int, default=4)
 parser.add_argument('--mbt-fusion-startIdx', type=int, default=0)
 
-# Final Fusion Model Parameters
-parser.add_argument('--final-num-layers', type=int, default=4)
-parser.add_argument('--final-dropout', type=float, default=0.1)
-parser.add_argument('--final-num-heads', type=int, default=4)
-
 # Model Parameters
-parser.add_argument('--model-types', type=str, default="classification", choices=["detection", "classification", "bce_rmse"])
-# "bce&softmax": for classification
-# "softmax": for classification
-# "bces": for classification
-# "wkappa": for classification
-# "rmse": for classification with time
-# "bce+rmse": for detection and classification with time
-# "bce": for detection
-parser.add_argument('--loss-types', type=str, default="softmax", choices=["bceandsoftmax", "softmax", "bces", "bce", "wkappa", "rmse", "bce_rmse"])
+parser.add_argument('--model-types', type=str, default="detection", choices=["detection", "classification"])
+parser.add_argument('--loss-types', type=str, default="bce", choices=["bceandsoftmax", "softmax", "bces", "bce", "wkappa", "rmse"])
 # Auxiliary loss
 parser.add_argument('--auxiliary-loss-input', type=str, default=None, choices=[None, "directInput", "encOutput"])
-parser.add_argument('--auxiliary-loss-type', type=str, default="cpc", choices=["cpc", "rmse", "tdecoder", "tdecoder_rmse", "tdecoder_cpc", "tdecoder_rmse_cpc"])
+parser.add_argument('--auxiliary-loss-type', type=str, default="None", choices=["None", "rmse", "tdecoder", "tdecoder_rmse"])
 parser.add_argument('--auxiliary-loss-weight', type=float, default=1.0)
-parser.add_argument('--neg-samples-from', type=str, default="Future", choices=["Future", "PastFuture"])
 
-# 'HR', 'RR', 'BT', 'SBP', 'DBP', 'Sat', 'GCS'6, 'Hematocrit', 'PLT', 'WBC', 'Bilirubin', 'pH', 'HCO3', 'Creatinine', 'Lactate', 'Potassium', 'Sodium', 'CRP'17
 parser.add_argument('--mandatory-vitalsign-labtest', type=list, default=['HR', 'RR', 'BT', 'SBP', 'DBP', 'Sat'])  
 parser.add_argument('--vitalsign-labtest', type=list, default=['HR', 'RR', 'BT', 'SBP', 'DBP', 'Sat', 'Hematocrit', 'PLT', 'WBC', 'Bilirubin', 'pH', 'HCO3', 'Creatinine', 'Lactate', 'Potassium', 'Sodium'])  
 parser.add_argument('--model', type=str, default="gru_d") 

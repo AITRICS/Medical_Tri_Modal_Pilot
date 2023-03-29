@@ -52,7 +52,10 @@ class TRI_MT_V1(nn.Module):
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
                     )
-        elif args.vslt_type == "TIE":
+            vslt_pe = True
+            
+        elif args.vslt_type == "TIE" or args.vslt_type == "QIE":
+            vslt_pe = False
             self.ie_vslt = nn.Sequential(
                                         nn.Linear(1, self.model_dim),
                                         nn.LayerNorm(self.model_dim),
@@ -122,15 +125,19 @@ class TRI_MT_V1(nn.Module):
             n_modality = self.n_modality,
             dropout = self.dropout,
             pe_maxlen = 2500,
-            use_pe = [True, False, True],
+            use_pe = [vslt_pe, False, True],
             mask = [True, False, True],
             txt_idx = 2,
         )
 
         ##### Classifier
+        if self.args.vslt_type == "QIE":
+            classifier_dim = self.model_dim
+        else:
+            classifier_dim = self.model_dim*2
         self.layer_norm_final = nn.LayerNorm(self.model_dim)
         self.fc_list = nn.Sequential(
-        nn.Linear(in_features=self.model_dim*2, out_features= self.model_dim, bias=True),
+        nn.Linear(in_features=classifier_dim, out_features= self.model_dim, bias=True),
         nn.BatchNorm1d(self.model_dim),
         self.activations[activation],
         nn.Linear(in_features=self.model_dim, out_features= self.output_dim,  bias=True))
@@ -140,32 +147,42 @@ class TRI_MT_V1(nn.Module):
         self.txt_feat = torch.Tensor([19]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
         
         ##### Reports Generation
-        self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-        self.vocab_size = self.tokenizer.vocab_size
-        self.img_2_txt = TransformerDecoder(self.vocab_size,
-                                                d_model = self.model_dim,
-                                                d_ff = self.model_dim * 4,
-                                                num_layers = self.num_layers,
-                                                num_heads = self.num_heads,
-                                                sos_id = 101,
-                                                eos_id = 102,
-                                                max_length = 1024
-                                                )
-        self.encoder_output_lengths = torch.tensor([1 for i in range(self.args.batch_size)]).to(self.device)### 되나?
+        if ("tdecoder" == self.args.auxiliary_loss_type):
+            self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+            self.vocab_size = self.tokenizer.vocab_size
+            self.img_2_txt = TransformerDecoder(self.vocab_size,
+                                                    d_model = self.model_dim,
+                                                    d_ff = self.model_dim * 4,
+                                                    num_layers = self.num_layers,
+                                                    num_heads = self.num_heads,
+                                                    sos_id = 101,
+                                                    eos_id = 102,
+                                                    max_length = 1024
+                                                    )
+            self.encoder_output_lengths = torch.tensor([1 for i in range(self.args.batch_size)]).to(self.device)### 되나?
         
     def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths):
-        demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1)
-        demo_embedding = self.ie_demo(demographic)
                                 
         if self.args.vslt_type == "carryforward":
+            demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1)
             vslt_embedding = self.vslt_enc(x)
+            demo_embedding = self.ie_demo(demographic)
         elif self.args.vslt_type == "TIE": # [seqlen x 3] 0: time, 1: value, 2: feature    
+            demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1)
             value_embedding = self.ie_vslt(x[:,:,1].unsqueeze(2))
             time_embedding = self.ie_time(x[:,:,0].unsqueeze(2))
             feat = x[:,:,2].type(torch.IntTensor).to(self.device)
             feat_embedding = self.ie_feat(feat)
-            
             vslt_embedding = value_embedding + time_embedding + feat_embedding
+            demo_embedding = self.ie_demo(demographic)
+        elif self.args.vslt_type == "QIE":
+            value_embedding = self.ie_vslt(x[:,:,1].unsqueeze(2))
+            time_embedding = self.ie_time(x[:,:,0].unsqueeze(2))
+            feat = x[:,:,2].type(torch.IntTensor).to(self.device)
+            feat_embedding = self.ie_feat(feat)
+            demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1).unsqueeze(1).repeat(1,x.size(1),1)
+            demo_embedding = self.ie_demo(demographic)
+            vslt_embedding = value_embedding + time_embedding + feat_embedding + demo_embedding
 
         txt_embedding = self.txt_embedding(txts)
         
@@ -180,10 +197,14 @@ class TRI_MT_V1(nn.Module):
             img_embedding = self.patch_embedding(img)
             
         if self.args.imgtxt_time == 1:
-            # img_embedding += self.ie_time(img_time.unsqueeze(1)).unsqueeze(1)
-            # txt_embedding += self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1)
-            img_embedding = img_embedding + self.ie_time(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat)
-            txt_embedding = txt_embedding + self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat)
+            if self.args.vslt_type == "QIE":
+                demographic_it = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1).unsqueeze(1)
+                demo_embedding_it = self.ie_demo(demographic_it)
+                img_embedding = img_embedding + self.ie_time(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat) + demo_embedding_it
+                txt_embedding = txt_embedding + self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat) + demo_embedding_it               
+            else:
+                img_embedding = img_embedding + self.ie_time(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat)
+                txt_embedding = txt_embedding + self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat)
             
         context_vector, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding, txt_embedding], 
             fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1), txt_embedding.size(1)],
@@ -194,14 +215,16 @@ class TRI_MT_V1(nn.Module):
         final_cls_output = context_vector[:,0,:]
             
         classInput = self.layer_norm_final(final_cls_output)
-        classInput = torch.cat([classInput, demo_embedding], dim=1)
+        if self.args.vslt_type != "QIE":
+            classInput = torch.cat([classInput, demo_embedding], dim=1)
         output = self.fc_list(classInput)
         
         
         if (flow_type == "train") and ("tdecoder" in self.args.auxiliary_loss_type):
             # unsqueeze를 한 이유: transformer decoder,의 enc_output, seq_lengths를 1로 주기 위해서 
-            output2 = self.img_2_txt(reports_tokens, context_vector[:,-179,:].unsqueeze(1), encoder_output_lengths = self.encoder_output_lengths) 
+            output2 = self.img_2_txt(reports_tokens, context_vector[:,-178,:].unsqueeze(1), encoder_output_lengths = self.encoder_output_lengths) 
             # exit(1)
         else:
             output2 = None
+ 
         return output, output2

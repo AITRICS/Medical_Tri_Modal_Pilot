@@ -120,25 +120,14 @@ class Evaluator(object):
                 del wauc
                 del wapr
                 del wf1
-        
-        # elif self.args.model_types == "bce_rmse":  
-        #     self.rmse = torch.stack(self.rmse).cuda() 
-        #     f1 =  torch.mean(self.rmse)
-        #     trues = self.y_true_multi.cuda()
-        #     preds = self.y_pred_multi.cuda()
-        #     auc = self.auroc(preds, trues)
-        #     apr = self.auprc(preds, trues)
 
-        #     scores_list = list(np.round(np.array([auc.detach().cpu().numpy(), 
-        #                                         apr.detach().cpu().numpy(), 
-        #                                         f1.detach().cpu().numpy()]), 4))    
-            
-        elif self.args.model_types == "detection" or self.args.model_types == "bce_rmse":     
+        elif self.args.model_types == "detection":     
             trues = self.y_true_multi.cuda()
             preds = self.y_pred_multi.cuda()
             auc = self.auroc(preds, trues)
             apr = self.auprc(preds, trues)
             f1 = 0
+            
             for i in range(1, 100):
                 threshold = i / 100.0    
                 temp_output = preds.detach()
@@ -147,9 +136,16 @@ class Evaluator(object):
                 temp_score = f1_score(temp_output, trues, task="binary", threshold = threshold)
                 if temp_score > f1:
                     f1 = temp_score
-            scores_list = list(np.round(np.array([auc.detach().cpu().numpy(), 
-                                                apr.detach().cpu().numpy(), 
-                                                f1.detach().cpu().numpy()]), 4))    
+            if "rmse" in args.auxiliary_loss_type:
+                rmse =  torch.mean(self.rmse)
+                scores_list = list(np.round(np.array([auc.detach().cpu().numpy(), 
+                                                    apr.detach().cpu().numpy(), 
+                                                    f1.detach().cpu().numpy(),
+                                                    rmse.detach().cpu().numpy()]), 4))    
+            else:
+                scores_list = list(np.round(np.array([auc.detach().cpu().numpy(), 
+                                                    apr.detach().cpu().numpy(), 
+                                                    f1.detach().cpu().numpy()]), 4))    
         
         if "rmse" != args.loss_types:
             del trues

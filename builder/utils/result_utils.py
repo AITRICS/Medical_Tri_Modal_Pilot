@@ -11,6 +11,7 @@ class experiment_results_validation:
         self.auc_final_list = []
         self.apr_final_list = []
         self.f1_final_list = []
+        self.rmse_final_list = []
         self.aucs_final_list = []
         self.aprs_final_list = []
         self.f1s_final_list = []
@@ -21,10 +22,15 @@ class experiment_results_validation:
         os.system("echo  \'#######################################\'")
         seed, result = list_of_test_results_per_seed
 
-        if (self.args.model_types == "detection") or (self.args.model_types == "bce_rmse"):
-            auc, apr, f1 = result
+        if (self.args.model_types == "detection"):
             os.system("echo  \'##### validation results #####\'")
-            os.system("echo  \'seed_case:{} - auc: {}, apr: {}, f1_score: {}\'".format(str(seed), str(auc), str(apr), str(f1)))
+            if "rmse" in self.args.auxiliary_loss_type:
+                auc, apr, f1, rmse = result
+                os.system("echo  \'auc: {}, apr: {}, f1_score: {}, rmse: {}\'".format(str(auc), str(apr), str(f1), str(rmse)))
+                self.rmse_final_list.append(rmse)
+            else:
+                auc, apr, f1 = result
+                os.system("echo  \'seed_case:{} - auc: {}, apr: {}, f1_score: {}\'".format(str(seed), str(auc), str(apr), str(f1)))
             
         elif (self.args.model_types == "classification"):
             nresult, wresult = result
@@ -54,6 +60,11 @@ class experiment_results_validation:
             str(np.std(self.auc_final_list, axis=0)), 
             str(np.std(self.apr_final_list, axis=0)), 
             str(np.std(self.f1_final_list, axis=0))))
+        
+        if "rmse" in self.args.auxiliary_loss_type:
+            os.system("echo  \'Total validation rmse -- avg: {}, std: {}\'".format(
+                str(np.mean(self.rmse_final_list, axis=0)),
+                str(np.std(self.rmse_final_list, axis=0))))    
     
         if (self.args.model_types == "classification"):
             os.system("echo  \'Total validation average -- Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(
@@ -73,6 +84,7 @@ class experiment_results_test:
         self.auc_final_list = []
         self.apr_final_list = []
         self.f1_final_list = []
+        self.rmse_final_list = []        
         self.aucs_final_list = []
         self.aprs_final_list = []
         self.f1s_final_list = []
@@ -83,10 +95,15 @@ class experiment_results_test:
         os.system("echo  \'#######################################\'")
         seed, result = list_of_test_results_per_seed
 
-        if (self.args.model_types == "detection") or (self.args.model_types == "bce_rmse"):
-            auc, apr, f1 = result
+        if (self.args.model_types == "detection"):
             os.system("echo  \'##### test results #####\'")
-            os.system("echo  \'seed_case:{} - auc: {}, apr: {}, f1_score: {}\'".format(str(seed), str(auc), str(apr), str(f1)))
+            if "rmse" in self.args.auxiliary_loss_type:
+                auc, apr, f1, rmse = result
+                os.system("echo  \'auc: {}, apr: {}, f1_score: {}, rmse: {}\'".format(str(auc), str(apr), str(f1), str(rmse)))
+                self.rmse_final_list.append(rmse)
+            else:
+                auc, apr, f1 = result
+                os.system("echo  \'seed_case:{} - auc: {}, apr: {}, f1_score: {}\'".format(str(seed), str(auc), str(apr), str(f1)))
             
         elif (self.args.model_types == "classification"):
             nresult, wresult = result
@@ -117,6 +134,11 @@ class experiment_results_test:
             str(np.std(self.apr_final_list, axis=0)), 
             str(np.std(self.f1_final_list, axis=0))))
     
+        if "rmse" in self.args.auxiliary_loss_type:
+            os.system("echo  \'Total validation rmse -- avg: {}, std: {}\'".format(
+                str(np.mean(self.rmse_final_list, axis=0)),
+                str(np.std(self.rmse_final_list, axis=0))))    
+    
         if (self.args.model_types == "classification"):
             os.system("echo  \'Total test average -- Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(
                 str(np.mean(self.aucs_final_list, axis=0)), 
@@ -128,17 +150,3 @@ class experiment_results_test:
                 str(np.std(self.aprs_final_list, axis=0)), 
                 str(np.std(self.f1s_final_list, axis=0))))
             
-        # os.system("echo  \'{} fold cross validation results each fold with {} seeds\'".format(str(self.args.seed_list), str(len(self.args.seed_list))))
-        # os.system("echo  \'Total validation average -- auc: {}, apr: {}, f1_score: {}\'".format(
-        #     str(np.mean(self.auc_final_list, axis=0)), 
-        #     str(np.mean(self.apr_final_list, axis=0)), 
-        #     str(np.mean(self.f1_final_list, axis=0)))) 
-        #     # str(np.mean(self.tpr_final_list)), 
-        #     # str(np.mean(self.tnr_final_list))))
-
-        # os.system("echo  \'Total validation std -- auc: {}, apr: {}, f1_score: {}\'".format(
-        #     str(np.std(self.auc_final_list, axis=0)), 
-        #     str(np.std(self.apr_final_list, axis=0)), 
-        #     str(np.std(self.f1_final_list, axis=0))))
-        
-        
