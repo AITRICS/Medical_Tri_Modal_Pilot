@@ -29,7 +29,10 @@ class Evaluator(object):
         self.n_labels = args.output_dim
         self.confusion_matrix = np.zeros((self.n_labels, self.n_labels))
         self.batch_size = args.batch_size
-        self.best_auc = 0
+        if args.model_types == "classification" and args.loss_types == "rmse":
+            self.best_auc = float('inf')
+        else:
+            self.best_auc = 0
         self.labels_list = [i for i in range(self.n_labels)]
 
         self.y_true_multi = []

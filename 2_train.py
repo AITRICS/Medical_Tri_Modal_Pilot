@@ -65,7 +65,10 @@ for k_indx, seed_num in enumerate(args.seed_list):
     
     # set logger
     logger = Logger(args)
-    logger.evaluator.best_auc = 0
+    if args.model_types == "classification" and args.loss_types == "rmse":
+        logger.evaluator.best_auc = float('inf')
+    else:
+        logger.evaluator.best_auc = 0
     
     print("########## Experiment Begins ##########")
     print(args.input_types)
@@ -125,7 +128,10 @@ for k_indx, seed_num in enumerate(args.seed_list):
     
     # no model checkpoint: train model from scratch
     else:
-        logger.best_auc = 0
+        if args.model_types == "classification" and args.loss_types == "rmse":
+            logger.best_auc = float('inf')
+        else:
+            logger.best_auc = 0
         start_epoch = 1
 
     # set optimizer
