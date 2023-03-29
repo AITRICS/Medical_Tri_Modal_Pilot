@@ -636,7 +636,7 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             final_seqs[0].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(dataSequence, args.vslt_mask, axis = 1)))
             final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
             final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
-        if self.vslt_type == "TIE":        
+        if self.vslt_type == "TIE" or self.vslt_type == "QIE":        
             feature_init = np.expand_dims(dataSequence[0,:], 1)
             delta_init = (np.expand_dims(deltaSequence[0,:], 1) * -1) + selectedKey - randLength + 2
             idx_init = np.expand_dims(self.featureidx, 1)
@@ -1301,7 +1301,7 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
             final_seqs[0].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(dataSequence, args.vslt_mask, axis = 1)))
             final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
             final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
-        if self.vslt_type == "TIE":        
+        if self.vslt_type == "TIE" or self.vslt_type == "QIE":        
             feature_init = np.expand_dims(dataSequence[0,:], 1)
             delta_init = (np.expand_dims(deltaSequence[0,:], 1) * -1) + selectedKey - randLength + 2
             idx_init = np.expand_dims(self.featureidx, 1)
@@ -1897,7 +1897,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
             final_seqs[0].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(dataSequence, args.vslt_mask, axis = 1)))
             final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
             final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
-        if self.vslt_type == "TIE":        
+        if self.vslt_type == "TIE" or self.vslt_type == "QIE":        
             feature_init = np.expand_dims(dataSequence[0,:], 1)
             delta_init = (np.expand_dims(deltaSequence[0,:], 1) * -1) + selectedKey - randLength + 2
             idx_init = np.expand_dims(self.featureidx, 1)
@@ -2551,7 +2551,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             final_seqs[0].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(dataSequence, args.vslt_mask, axis = 1)))
             final_seqs[1].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(maskSequence, args.vslt_mask, axis = 1)))
             final_seqs[2].narrow(0, 0, sample_len).copy_(torch.Tensor(np.delete(deltaSequence, args.vslt_mask, axis = 1)))
-        if self.vslt_type == "TIE":        
+        if self.vslt_type == "TIE" or self.vslt_type == "QIE":        
             feature_init = np.expand_dims(dataSequence[0,:], 1)
             delta_init = (np.expand_dims(deltaSequence[0,:], 1) * -1) + selectedKey - randLength + 2
             idx_init = np.expand_dims(self.featureidx, 1)

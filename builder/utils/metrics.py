@@ -137,7 +137,7 @@ class Evaluator(object):
                 if temp_score > f1:
                     f1 = temp_score
             if "rmse" in args.auxiliary_loss_type:
-                rmse =  torch.mean(self.rmse)
+                rmse =  torch.mean(torch.stack(self.rmse).cuda())
                 scores_list = list(np.round(np.array([auc.detach().cpu().numpy(), 
                                                     apr.detach().cpu().numpy(), 
                                                     f1.detach().cpu().numpy(),
