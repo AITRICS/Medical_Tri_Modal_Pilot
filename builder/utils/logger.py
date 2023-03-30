@@ -104,7 +104,7 @@ class Logger:
         else:
             os.system("echo  \'Weighted auc: {}, apr: {}, f1: {}\'".format(str(wauc), str(wapr), str(wf1)))
         os.system("echo  \'Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(str(aucs), str(aprs), str(f1s)))
-        os.system("echo  \'Positives Mean auc: {}, apr: {}, f1: {}\'".format(str(np.mean(aucs[1:])), str(np.mean(aprs[1:])), str(np.mean(f1s[1:]))))
+        os.system("echo  \'Mean auc: {}, apr: {}, f1: {}\'".format(str(np.mean(aucs)), str(np.mean(aprs)), str(np.mean(f1s))))
 
         self.writer.add_scalar('val/avg_auc', np.mean(aucs), global_step=step)
         self.writer.add_scalar('val/avg_apr', np.mean(aprs), global_step=step)
@@ -130,7 +130,7 @@ class Logger:
         else:
             os.system("echo  \'Weighted auc: {}, apr: {}, f1: {}\'".format(str(wauc), str(wapr), str(wf1)))
         os.system("echo  \'Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(str(aucs), str(aprs), str(f1s)))
-        os.system("echo  \'Positives Mean auc: {}, apr: {}, f1: {}\'".format(str(np.mean(aucs[1:])), str(np.mean(aprs[1:])), str(np.mean(f1s[1:]))))
+        os.system("echo  \'Mean auc: {}, apr: {}, f1: {}\'".format(str(np.mean(aucs)), str(np.mean(aprs)), str(np.mean(f1s))))
 
         self.writer.flush()
 

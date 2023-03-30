@@ -184,9 +184,9 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
             
         test_loss.append(loss)
         if "rmse" == args.auxiliary_loss_type:
-            logger.evaluator.add_batch(final_target, output, rmse)
+            logger.evaluator.add_batch(final_target[0], output, rmse)
         else:
-            logger.evaluator.add_batch(final_target, output)
+            logger.evaluator.add_batch(final_target[0], output)
 
     return model, loss.item()
 

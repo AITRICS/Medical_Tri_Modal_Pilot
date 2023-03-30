@@ -78,22 +78,13 @@ class Evaluator(object):
         wf1 = self.wf1(preds, trues).detach().cpu().numpy()
                 
         if "rmse" in args.auxiliary_loss_type:
-            rmse =  torch.mean(torch.tensor(self.rmse).cuda())
-            scores_list = list([np.round(np.array([wauc.detach().cpu().numpy(), 
-                                                    wapr.detach().cpu().numpy(), 
-                                                    wf1.detach().cpu().numpy(),
-                                                    rmse.detach().cpu().numpy()]), 4),
-                                np.round(np.array([auc.detach().cpu().numpy(), 
-                                                    apr.detach().cpu().numpy(), 
-                                                    f1.detach().cpu().numpy()]), 4)])    
+            rmse =  torch.mean(torch.tensor(self.rmse).cuda()).detach().cpu().numpy()
+            scores_list = list([np.round(np.array([wauc, wapr, wf1, rmse]), 4),
+                                np.round(np.array([auc, apr, f1]), 4)])    
             del rmse
         else:
-            scores_list = list([np.round(np.array([wauc.detach().cpu().numpy(), 
-                                                    wapr.detach().cpu().numpy(), 
-                                                    wf1.detach().cpu().numpy()]), 4),
-                                np.round(np.array([auc.detach().cpu().numpy(), 
-                                                    apr.detach().cpu().numpy(), 
-                                                    f1.detach().cpu().numpy()]), 4)])    
+            scores_list = list([np.round(np.array([wauc, wapr, wf1]), 4),
+                                np.round(np.array([auc, apr, f1]), 4)])    
     
         del trues
         del preds
