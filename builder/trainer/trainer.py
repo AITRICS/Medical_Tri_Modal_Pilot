@@ -60,7 +60,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
         
     else:
         if "rmse" in args.auxiliary_loss_type:
-            final_target = (train_y[0].type(torch.FloatTensor).to(device, non_blocking=True), train_y[1].type(torch.FloatTensor).to(device, non_blocking=True).unsqueeze(1))
+            final_target = (train_y[0].type(torch.FloatTensor).to(device, non_blocking=True), train_y[1].type(torch.FloatTensor).to(device, non_blocking=True))
         else:
             final_target = train_y.type(torch.FloatTensor).to(device, non_blocking=True)
     
@@ -125,7 +125,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                 loss = torch.sqrt(torch.mean(criterion(output, final_target)))
             elif "rmse" in args.auxiliary_loss_type:
                 loss1 = criterion[0](output[:,0], final_target[0])
-                loss2 = criterion[1](output[:,1], final_target[1])[:,0]
+                loss2 = criterion[1](output[:,1], final_target[1])
                 loss2 = torch.sqrt(torch.mean(loss2[final_target[0] == 1]))
                 loss2 = torch.nan_to_num(loss2, nan=0.0)
                 loss = loss1 + loss2
@@ -134,9 +134,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                 
             if aux is not None:
                 exist_reports_idx = (reports_tokens[:,0]!=0).nonzero(as_tuple=True)[0]
-                if len(exist_reports_idx) == 0: # 이미지가 모두 없는 batch
-                    loss = loss
-                else:
+                if len(exist_reports_idx) != 0: # 이미지가 모두 없는 batch
                     aux_loss = criterion_aux(aux[exist_reports_idx].contiguous().view(-1, 30522), reports_tokens[exist_reports_idx][:,1:].contiguous().view(-1))
                     loss = loss + (args.auxiliary_loss_weight * aux_loss)
                 
@@ -158,13 +156,13 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                 loss = loss1 + loss2
             if "rmse" == args.auxiliary_loss_type:
                 loss1 = criterion[0](output[:,0], final_target[0])
-                loss2 = criterion[1](output[:,1], final_target[1])[:,0]
-                loss2 = torch.sqrt(torch.mean(loss2[final_target[0] == 1]))
-                loss2 = torch.nan_to_num(loss2, nan=0.0)
+                rmse = criterion[1](output[:,1], final_target[1])
+                rmse = torch.sqrt(torch.mean(rmse[final_target[0] == 1]))
+                rmse = torch.nan_to_num(rmse, nan=0.0)
                 output = output[:,0]
                 final_target = final_target[0]
                 
-                loss = loss1 + loss2
+                loss = loss1 + rmse
             else:
                 loss = criterion(output, final_target)
             
@@ -177,7 +175,10 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                 output = torch.sigmoid(output)
             
         test_loss.append(loss)
-        logger.evaluator.add_batch(final_target, output)
+        if "rmse" == args.auxiliary_loss_type:
+            logger.evaluator.add_batch(final_target, output, rmse)
+        else:
+            logger.evaluator.add_batch(final_target, output)
 
     return model, loss.item()
 

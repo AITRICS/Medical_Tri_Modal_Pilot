@@ -29,7 +29,10 @@ class Evaluator(object):
         self.n_labels = args.output_dim
         self.confusion_matrix = np.zeros((self.n_labels, self.n_labels))
         self.batch_size = args.batch_size
-        self.best_auc = 0
+        if args.model_types == "classification" and args.loss_types == "rmse":
+            self.best_auc = float('inf')
+        else:
+            self.best_auc = 0
         self.labels_list = [i for i in range(self.n_labels)]
 
         self.y_true_multi = []
@@ -137,7 +140,7 @@ class Evaluator(object):
                 if temp_score > f1:
                     f1 = temp_score
             if "rmse" in args.auxiliary_loss_type:
-                rmse =  torch.mean(torch.stack(self.rmse).cuda())
+                rmse =  torch.mean(torch.tensor(self.rmse).cuda())
                 scores_list = list(np.round(np.array([auc.detach().cpu().numpy(), 
                                                     apr.detach().cpu().numpy(), 
                                                     f1.detach().cpu().numpy(),
@@ -145,7 +148,7 @@ class Evaluator(object):
             else:
                 scores_list = list(np.round(np.array([auc.detach().cpu().numpy(), 
                                                     apr.detach().cpu().numpy(), 
-                                                    f1.detach().cpu().numpy()]), 4))    
+                                                    f1]), 4))    
         
         if "rmse" != args.loss_types:
             del trues
