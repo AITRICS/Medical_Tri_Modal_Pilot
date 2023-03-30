@@ -14,10 +14,10 @@ parser = argparse.ArgumentParser()
 
 # General Parameters
 parser.add_argument('--seed', type=int, default=0)
-parser.add_argument('--seed-list', type=list, default=[412, 1004, 2023]) #[0, 1004, 2022, 9209, 119]
+parser.add_argument('--seed-list', type=list, default=[412, 1004]) #[0, 1004, 2022, 9209, 119]
 parser.add_argument('--device', type=int, default=1, nargs='+')
 parser.add_argument('--cpu', type=int, default=0)
-parser.add_argument('--num-workers', type=int, default=4)
+parser.add_argument('--num-workers', type=int, default=2)
 parser.add_argument('--gpus', type=int, default=1)
 parser.add_argument('--reset', default=False, action='store_true')
 parser.add_argument('--project-name', type=str, default="small1")
@@ -117,6 +117,7 @@ parser.add_argument('--mbt-fusion-startIdx', type=int, default=0)
 # Model Parameters
 parser.add_argument('--model-types', type=str, default="detection", choices=["detection", "classification"])
 parser.add_argument('--loss-types', type=str, default="bce", choices=["bceandsoftmax", "softmax", "bces", "bce", "wkappa", "rmse"])
+parser.add_argument('--loss-weight', type=str, default=None, choices=[None, "patnum"])
 # Auxiliary loss
 parser.add_argument('--auxiliary-loss-input', type=str, default=None, choices=[None, "directInput", "encOutput"])
 parser.add_argument('--auxiliary-loss-type', type=str, default="None", choices=["None", "rmse", "tdecoder", "tdecoder_rmse"])

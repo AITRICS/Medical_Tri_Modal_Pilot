@@ -680,12 +680,23 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         # detection # bce or bce with rmse
         else: 
             if target != 0:
-                if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
-                    target = 0
-                    target_aux = 0.0
-                else:
-                    target = 1
-                    target_aux = event_time - selectedKey
+                target = labels_by_dict[oldselectedKey][0][-1] + late_nones
+            if target > 12:
+                target = 0
+            # target 0~12
+            
+            if target == 0:
+                target_aux = 0.0
+            else:
+                target_aux = event_time - selectedKey
+            
+            # if target != 0:
+            #     if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
+            #         target = 0
+            #         target_aux = 0.0
+            #     else:
+            #         target = 1
+            #         target_aux = event_time - selectedKey
                 
         target = torch.tensor(target)
         target_aux = torch.tensor(target_aux).type(torch.HalfTensor)
@@ -1345,12 +1356,23 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
         # detection # bce or bce with rmse
         else: 
             if target != 0:
-                if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
-                    target = 0
-                    target_aux = 0.0
-                else:
-                    target = 1
-                    target_aux = event_time - selectedKey
+                target = labels_by_dict[oldselectedKey][0][-1] + late_nones
+            if target > 12:
+                target = 0
+            # target 0~12
+            
+            if target == 0:
+                target_aux = 0.0
+            else:
+                target_aux = event_time - selectedKey
+                
+            # if target != 0:
+            #     if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
+            #         target = 0
+            #         target_aux = 0.0
+            #     else:
+            #         target = 1
+            #         target_aux = event_time - selectedKey
                     
         target = torch.tensor(target)
         target_aux = torch.tensor(target_aux).type(torch.HalfTensor)
@@ -1941,12 +1963,23 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         # detection # bce or bce with rmse
         else: 
             if target != 0:
-                if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
-                    target = 0
-                    target_aux = 0.0
-                else:
-                    target = 1
-                    target_aux = event_time - selectedKey
+                target = labels_by_dict[oldselectedKey][0][-1] + late_nones
+            if target > 12:
+                target = 0
+            # target 0~12
+            
+            if target == 0:
+                target_aux = 0.0
+            else:
+                target_aux = event_time - selectedKey
+                
+            # if target != 0:
+            #     if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
+            #         target = 0
+            #         target_aux = 0.0
+            #     else:
+            #         target = 1
+            #         target_aux = event_time - selectedKey
                 
         target = torch.tensor(target)
         target_aux = torch.tensor(target_aux).type(torch.HalfTensor)
@@ -2595,12 +2628,23 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
         # detection # bce or bce with rmse
         else: 
             if target != 0:
-                if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
-                    target = 0
-                    target_aux = 0.0
-                else:
-                    target = 1
-                    target_aux = event_time - selectedKey
+                target = labels_by_dict[oldselectedKey][0][-1] + late_nones
+            if target > 12:
+                target = 0
+            # target 0~12
+            
+            if target == 0:
+                target_aux = 0.0
+            else:
+                target_aux = event_time - selectedKey
+                
+            # if target != 0:
+            #     if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
+            #         target = 0
+            #         target_aux = 0.0
+            #     else:
+            #         target = 1
+            #         target_aux = event_time - selectedKey
                 
         target = torch.tensor(target)
         target_aux = torch.tensor(target_aux).type(torch.HalfTensor)

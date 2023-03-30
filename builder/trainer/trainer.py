@@ -59,10 +59,13 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
             final_target = (train_y[0].type(torch.LongTensor).to(device, non_blocking=True), train_y[1].type(torch.FloatTensor).to(device, non_blocking=True))
         
     else:
+        bces_target = torch.zeros([args.batch_size, 13]).to(device, non_blocking=True)
+        target_idx = torch.arange(0, args.batch_size).type(torch.LongTensor)
+        bces_target[target_idx,train_y[0].type(torch.LongTensor)] = 1
         if "rmse" in args.auxiliary_loss_type:
-            final_target = (train_y[0].type(torch.FloatTensor).to(device, non_blocking=True), train_y[1].type(torch.FloatTensor).to(device, non_blocking=True))
+            final_target = (train_y[0].type(torch.FloatTensor).to(device, non_blocking=True), bces_target, train_y[1].type(torch.FloatTensor).to(device, non_blocking=True))
         else:
-            final_target = train_y.type(torch.FloatTensor).to(device, non_blocking=True)
+            final_target = (train_y.type(torch.FloatTensor).to(device, non_blocking=True), bces_target)
     
     if args.fullmodal_definition == "txt1":
         missing = torch.stack([missing[:,0], missing[:,2]]).permute(1,0).detach().clone() # in case of vslt_txt
@@ -114,9 +117,8 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
     if flow_type == "train":
         optimizer.zero_grad()
         with torch.cuda.amp.autocast():
-            output, aux = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths)
+            output, timeaux, imgaux = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths)
             output = output.squeeze()
-            
             if "bceandsoftmax" == args.loss_types:
                 loss1 = criterion[0](output, final_target[0])
                 loss2 = criterion[1](output, final_target[1])
@@ -124,18 +126,22 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
             elif "rmse" == args.loss_types:
                 loss = torch.sqrt(torch.mean(criterion(output, final_target)))
             elif "rmse" in args.auxiliary_loss_type:
-                loss1 = criterion[0](output[:,0], final_target[0])
-                loss2 = criterion[1](output[:,1], final_target[1])
-                loss2 = torch.sqrt(torch.mean(loss2[final_target[0] == 1]))
-                loss2 = torch.nan_to_num(loss2, nan=0.0)
-                loss = loss1 + loss2
+                loss1 = criterion[0](output, final_target[0].type(torch.LongTensor).to(device))           # softmax
+                loss2 = criterion[1](output, final_target[1].type(torch.FloatTensor).to(device))           # bces
+                loss3 = criterion[2](timeaux, final_target[2])                                                  # rmse
+                loss3 = torch.sqrt(torch.mean(loss3[final_target[0] != 0]))
+                loss3 = torch.nan_to_num(loss3, nan=0.0)
+                loss = loss1 + loss2 + loss3
             else:
-                loss = criterion(output, final_target)
+                loss1 = criterion[0](output, final_target[0].type(torch.LongTensor).to(device))           # softmax
+                loss2 = criterion[1](output, final_target[1].type(torch.FloatTensor).to(device))           # bces
+                loss = loss1 + loss2
                 
-            if aux is not None:
+                
+            if imgaux is not None:
                 exist_reports_idx = (reports_tokens[:,0]!=0).nonzero(as_tuple=True)[0]
                 if len(exist_reports_idx) != 0: # 이미지가 모두 없는 batch
-                    aux_loss = criterion_aux(aux[exist_reports_idx].contiguous().view(-1, 30522), reports_tokens[exist_reports_idx][:,1:].contiguous().view(-1))
+                    aux_loss = criterion_aux(imgaux[exist_reports_idx].contiguous().view(-1, 30522), reports_tokens[exist_reports_idx][:,1:].contiguous().view(-1))
                     loss = loss + (args.auxiliary_loss_weight * aux_loss)
                 
         scaler.scale(loss).backward()
@@ -145,8 +151,9 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
         logger.log_lr(scheduler.get_lr()[0], iteration)
     else:
         test_loss = []
+        rmse = None
         with torch.cuda.amp.autocast():
-            output, aux_loss = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths)
+            output, timeaux, imgaux = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths)
             output = output.squeeze()
             loss2 = None
             if "bceandsoftmax" == args.loss_types:
@@ -155,16 +162,16 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                 final_target = final_target[0]
                 loss = loss1 + loss2
             if "rmse" == args.auxiliary_loss_type:
-                loss1 = criterion[0](output[:,0], final_target[0])
-                rmse = criterion[1](output[:,1], final_target[1])
-                rmse = torch.sqrt(torch.mean(rmse[final_target[0] == 1]))
+                loss1 = criterion[0](output, final_target[0].type(torch.LongTensor).to(device))           # softmax
+                loss2 = criterion[1](output, final_target[1].type(torch.FloatTensor).to(device))           # bces
+                rmse = criterion[2](timeaux, final_target[2])                                                  # rmse
+                rmse = torch.sqrt(torch.mean(rmse[final_target[0] != 0]))
                 rmse = torch.nan_to_num(rmse, nan=0.0)
-                output = output[:,0]
-                final_target = final_target[0]
-                
-                loss = loss1 + rmse
+                loss = loss1 + loss2 + rmse
             else:
-                loss = criterion(output, final_target)
+                loss1 = criterion[0](output, final_target[0].type(torch.LongTensor).to(device))           # softmax
+                loss2 = criterion[1](output, final_target[1].type(torch.FloatTensor).to(device))           # bces
+                loss = loss1 + loss2
             
             if args.model_types == "classification":
                 if "rmse" == args.loss_types:
@@ -172,7 +179,8 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                 else:
                     output = torch.softmax(output, dim=1)
             else: # detection
-                output = torch.sigmoid(output)
+                # output = torch.sigmoid(output)
+                output = torch.softmax(output, dim=1)
             
         test_loss.append(loss)
         if "rmse" == args.auxiliary_loss_type:

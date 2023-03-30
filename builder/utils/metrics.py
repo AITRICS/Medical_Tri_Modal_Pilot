@@ -38,13 +38,13 @@ class Evaluator(object):
         self.y_true_multi = []
         self.y_pred_multi = []
         self.rmse = []
-        self.nauroc = MulticlassAUROC(num_classes=12, average="none")
-        self.nauprc = MulticlassAveragePrecision(num_classes=12, average="none")
-        self.nf1 = MulticlassF1Score(num_classes=12, average="none").to(args.device)
+        self.nauroc = MulticlassAUROC(num_classes=13, average="none")
+        self.nauprc = MulticlassAveragePrecision(num_classes=13, average="none")
+        self.nf1 = MulticlassF1Score(num_classes=13, average="none").to(args.device)
         
-        self.wauroc = MulticlassAUROC(num_classes=12, average="weighted")
-        self.wauprc = MulticlassAveragePrecision(num_classes=12, average="weighted")
-        self.wf1 = MulticlassF1Score(num_classes=12, average="weighted").to(args.device)
+        self.wauroc = MulticlassAUROC(num_classes=13, average="weighted")
+        self.wauprc = MulticlassAveragePrecision(num_classes=13, average="weighted")
+        self.wf1 = MulticlassF1Score(num_classes=13, average="weighted").to(args.device)
         
         self.auroc = AUROC(task="binary")
         self.auprc = AveragePrecision(task="binary")
@@ -66,96 +66,43 @@ class Evaluator(object):
         self.y_pred_multi = torch.stack(self.y_pred_multi).cuda()
         self.y_pred_multi = torch.nan_to_num(self.y_pred_multi)
         
-        if self.args.model_types == "classification":
-            if "softmax" == args.loss_types or "bceandsoftmax" == args.loss_types:
-                trues = self.y_true_multi.reshape(-1).cuda()
-                preds = self.y_pred_multi.reshape(-1, 12).cuda()
-                
-                auc = self.nauroc(preds, trues).detach().cpu().numpy()
-                apr = self.nauprc(preds, trues).detach().cpu().numpy()
-                f1 = self.nf1(preds, trues).detach().cpu().numpy()
-                
-                wauc = self.wauroc(preds, trues).detach().cpu().numpy()
-                wapr = self.wauprc(preds, trues).detach().cpu().numpy()
-                wf1 = self.wf1(preds, trues).detach().cpu().numpy()
-                
-            elif "bces" == args.loss_types:
-                trues = self.y_true_multi.reshape(-1, 12).cuda()
-                preds = self.y_pred_multi.reshape(-1, 12).cuda()
-                
-                auc = []
-                apr = []
-                f1 = []
-                for i in range(12):
-                    trues_i = trues[:,i]
-                    preds_i = preds[:,i]
-                    auc.append(self.auroc(preds_i, trues_i).detach().cpu().numpy())
-                    apr.append(self.auprc(preds_i, trues_i).detach().cpu().numpy())
-                    f1i = 0
-                    for i in range(1, 100):
-                        threshold = i / 100.0    
-                        temp_output = preds.detach()
-                        temp_output[temp_output>=threshold] = 1
-                        temp_output[temp_output<threshold] = 0        
-                        temp_score = f1_score(temp_output, trues, task="binary", threshold = threshold)
-                        if temp_score > f1i:
-                            f1i = temp_score
-                    f1.append(f1i.detach().cpu().numpy())
-                    
-                auc = np.array(auc)
-                apr = np.array(apr)
-                f1 = np.array(f1)
-                wauc = np.mean(auc)
-                wapr = np.mean(apr)
-                wf1 = np.mean(f1)
-                
-            elif "rmse" == args.loss_types:
-                preds = self.y_pred_multi.detach().cpu().numpy()
-                rmse_avg = np.mean(preds)
-                scores_list = list([np.round(np.array([rmse_avg, rmse_avg, rmse_avg]), 4),
-                                np.round(np.array([rmse_avg, rmse_avg, rmse_avg]), 4)])
-                
-                del rmse_avg
-                
-            if "rmse" != args.loss_types:
-                scores_list = list([np.round(np.array([auc, apr, f1]), 4),
-                                    np.round(np.array([wauc, wapr, wf1]), 4)])        
-                del wauc
-                del wapr
-                del wf1
-
-        elif self.args.model_types == "detection":     
-            trues = self.y_true_multi.cuda()
-            preds = self.y_pred_multi.cuda()
-            auc = self.auroc(preds, trues)
-            apr = self.auprc(preds, trues)
-            f1 = 0
-            
-            for i in range(1, 100):
-                threshold = i / 100.0    
-                temp_output = preds.detach()
-                temp_output[temp_output>=threshold] = 1
-                temp_output[temp_output<threshold] = 0        
-                temp_score = f1_score(temp_output, trues, task="binary", threshold = threshold)
-                if temp_score > f1:
-                    f1 = temp_score
-            if "rmse" in args.auxiliary_loss_type:
-                rmse =  torch.mean(torch.tensor(self.rmse).cuda())
-                scores_list = list(np.round(np.array([auc.detach().cpu().numpy(), 
-                                                    apr.detach().cpu().numpy(), 
-                                                    f1.detach().cpu().numpy(),
-                                                    rmse.detach().cpu().numpy()]), 4))    
-            else:
-                scores_list = list(np.round(np.array([auc.detach().cpu().numpy(), 
-                                                    apr.detach().cpu().numpy(), 
-                                                    f1]), 4))    
+        trues = self.y_true_multi.reshape(-1).cuda()
+        preds = self.y_pred_multi.reshape(-1, 13).cuda()
         
-        if "rmse" != args.loss_types:
-            del trues
-            del preds
-            del auc
-            del apr
-            del f1
+        auc = self.nauroc(preds, trues).detach().cpu().numpy()
+        apr = self.nauprc(preds, trues).detach().cpu().numpy()
+        f1 = self.nf1(preds, trues).detach().cpu().numpy()
+        
+        wauc = self.wauroc(preds, trues).detach().cpu().numpy()
+        wapr = self.wauprc(preds, trues).detach().cpu().numpy()
+        wf1 = self.wf1(preds, trues).detach().cpu().numpy()
+                
+        if "rmse" in args.auxiliary_loss_type:
+            rmse =  torch.mean(torch.tensor(self.rmse).cuda())
+            scores_list = list([np.round(np.array([wauc.detach().cpu().numpy(), 
+                                                    wapr.detach().cpu().numpy(), 
+                                                    wf1.detach().cpu().numpy(),
+                                                    rmse.detach().cpu().numpy()]), 4),
+                                np.round(np.array([auc.detach().cpu().numpy(), 
+                                                    apr.detach().cpu().numpy(), 
+                                                    f1.detach().cpu().numpy()]), 4)])    
+            del rmse
+        else:
+            scores_list = list([np.round(np.array([wauc.detach().cpu().numpy(), 
+                                                    wapr.detach().cpu().numpy(), 
+                                                    wf1.detach().cpu().numpy()]), 4),
+                                np.round(np.array([auc.detach().cpu().numpy(), 
+                                                    apr.detach().cpu().numpy(), 
+                                                    f1.detach().cpu().numpy()]), 4)])    
+    
+        del trues
+        del preds
+        del auc
+        del apr
+        del f1
+        del wauc
+        del wapr
+        del wf1
         torch.cuda.empty_cache()
         return scores_list
 
@@ -164,3 +111,103 @@ class Evaluator(object):
         self.y_true_multi = []
         self.y_pred_multi = []
         self.rmse = []
+
+
+
+# def performance_metric(self):
+#         self.y_true_multi = torch.stack(self.y_true_multi).type(torch.ByteTensor).cuda()
+#         self.y_pred_multi = torch.stack(self.y_pred_multi).cuda()
+#         self.y_pred_multi = torch.nan_to_num(self.y_pred_multi)
+        
+#         if self.args.model_types == "classification":
+#             if "softmax" == args.loss_types or "bceandsoftmax" == args.loss_types:
+#                 trues = self.y_true_multi.reshape(-1).cuda()
+#                 preds = self.y_pred_multi.reshape(-1, 12).cuda()
+                
+#                 auc = self.nauroc(preds, trues).detach().cpu().numpy()
+#                 apr = self.nauprc(preds, trues).detach().cpu().numpy()
+#                 f1 = self.nf1(preds, trues).detach().cpu().numpy()
+                
+#                 wauc = self.wauroc(preds, trues).detach().cpu().numpy()
+#                 wapr = self.wauprc(preds, trues).detach().cpu().numpy()
+#                 wf1 = self.wf1(preds, trues).detach().cpu().numpy()
+                
+#             elif "bces" == args.loss_types:
+#                 trues = self.y_true_multi.reshape(-1, 12).cuda()
+#                 preds = self.y_pred_multi.reshape(-1, 12).cuda()
+                
+#                 auc = []
+#                 apr = []
+#                 f1 = []
+#                 for i in range(12):
+#                     trues_i = trues[:,i]
+#                     preds_i = preds[:,i]
+#                     auc.append(self.auroc(preds_i, trues_i).detach().cpu().numpy())
+#                     apr.append(self.auprc(preds_i, trues_i).detach().cpu().numpy())
+#                     f1i = 0
+#                     for i in range(1, 100):
+#                         threshold = i / 100.0    
+#                         temp_output = preds.detach()
+#                         temp_output[temp_output>=threshold] = 1
+#                         temp_output[temp_output<threshold] = 0        
+#                         temp_score = f1_score(temp_output, trues, task="binary", threshold = threshold)
+#                         if temp_score > f1i:
+#                             f1i = temp_score
+#                     f1.append(f1i.detach().cpu().numpy())
+                    
+#                 auc = np.array(auc)
+#                 apr = np.array(apr)
+#                 f1 = np.array(f1)
+#                 wauc = np.mean(auc)
+#                 wapr = np.mean(apr)
+#                 wf1 = np.mean(f1)
+                
+#             elif "rmse" == args.loss_types:
+#                 preds = self.y_pred_multi.detach().cpu().numpy()
+#                 rmse_avg = np.mean(preds)
+#                 scores_list = list([np.round(np.array([rmse_avg, rmse_avg, rmse_avg]), 4),
+#                                 np.round(np.array([rmse_avg, rmse_avg, rmse_avg]), 4)])
+                
+#                 del rmse_avg
+                
+#             if "rmse" != args.loss_types:
+#                 scores_list = list([np.round(np.array([auc, apr, f1]), 4),
+#                                     np.round(np.array([wauc, wapr, wf1]), 4)])        
+#                 del wauc
+#                 del wapr
+#                 del wf1
+
+#         elif self.args.model_types == "detection":     
+#             trues = self.y_true_multi.cuda()
+#             preds = self.y_pred_multi.cuda()
+#             auc = self.auroc(preds, trues)
+#             apr = self.auprc(preds, trues)
+#             f1 = 0
+            
+#             for i in range(1, 100):
+#                 threshold = i / 100.0    
+#                 temp_output = preds.detach()
+#                 temp_output[temp_output>=threshold] = 1
+#                 temp_output[temp_output<threshold] = 0        
+#                 temp_score = f1_score(temp_output, trues, task="binary", threshold = threshold)
+#                 if temp_score > f1:
+#                     f1 = temp_score
+#             if "rmse" in args.auxiliary_loss_type:
+#                 rmse =  torch.mean(torch.tensor(self.rmse).cuda())
+#                 scores_list = list(np.round(np.array([auc.detach().cpu().numpy(), 
+#                                                     apr.detach().cpu().numpy(), 
+#                                                     f1.cpu(),
+#                                                     rmse.detach().cpu().numpy()]), 4))    
+#             else:
+#                 scores_list = list(np.round(np.array([auc.detach().cpu().numpy(), 
+#                                                     apr.detach().cpu().numpy(), 
+#                                                     f1.cpu()]), 4))    
+        
+#         if "rmse" != args.loss_types:
+#             del trues
+#             del preds
+#             del auc
+#             del apr
+#             del f1
+#         torch.cuda.empty_cache()
+#         return scores_list
