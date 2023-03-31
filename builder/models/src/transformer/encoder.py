@@ -86,7 +86,6 @@ class TransformerEncoder(nn.Module):
             padded_input = torch.cat([cls_tokens, padded_input], axis=1)
         
         if self.mask:
-            input_lengths += 1
             if time_padded_input is None:
                 slf_attn_mask = get_attn_pad_mask(padded_input, input_lengths, padded_input.size(1))
         else:

@@ -75,7 +75,6 @@ for k_indx, seed_num in enumerate(args.seed_list):
     print(args.modality_inclusion)
     
     train_loader, val_loader, test_loader = get_data_loader(args, patient_dict, keys_list, k_indx)
-    
     # set loss function
     if args.model_types == "classification":
         if "softmax" == args.loss_types:
@@ -193,6 +192,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
         for train_batch in train_loader:
             # get X, y, input_lengths, ...
             train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, txt_time, missing, f_indices, train_y2, train_reports_tokens, train_reports_lengths = train_batch
+            
             if "vslt" in args.input_types:
                 input_lengths = input_lengths.to(device, non_blocking=True)
                 static_x      = static_x.to(device, non_blocking=True)

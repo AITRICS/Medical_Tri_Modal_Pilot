@@ -156,7 +156,7 @@ class TRI_MBT_V1(nn.Module):
             self.img_2_txt = TransformerDecoder(self.vocab_size,
                                                     d_model = self.model_dim,
                                                     d_ff = self.model_dim * 4,
-                                                    num_layers = self.num_layers,
+                                                    num_layers = 2,
                                                     num_heads = self.num_heads,
                                                     sos_id = 101,
                                                     eos_id = 102,

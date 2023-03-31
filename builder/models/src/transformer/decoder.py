@@ -101,7 +101,7 @@ class TransformerDecoder(BaseDecoder):
             num_classes: int,               # number of classes
             d_model: int = 512,             # dimension of model
             d_ff: int = 512,                # dimension of feed forward network
-            num_layers: int = 6,            # number of decoder layers
+            num_layers: int = 2,            # number of decoder layers
             num_heads: int = 8,             # number of attention heads
             dropout_p: float = 0.3,         # probability of dropout
             pad_id: int = 0,                # identification of pad token
@@ -134,7 +134,7 @@ class TransformerDecoder(BaseDecoder):
             Linear(d_model, num_classes, bias=False),
         )
 
-    def forward(self, targets_copy: Tensor, encoder_outputs: Tensor, encoder_output_lengths: Tensor) -> Tensor:
+    def forward(self, targets: Tensor, encoder_outputs: Tensor, encoder_output_lengths: Tensor) -> Tensor:
         """
         Forward propagate a `encoder_outputs` for training.
 
@@ -147,19 +147,23 @@ class TransformerDecoder(BaseDecoder):
         Returns:
             * predicted_log_probs (torch.FloatTensor): Log probability of model predictions.
         """
+        print(targets)
+        # batch_size = targets_copy.size(0)
+        # # missing일 경우 뒤의 0을 제거, missing이 아닐 경우 self.eos_id 제거
+        # targets = torch.empty(targets_copy.shape[0],targets_copy.shape[1]-1, dtype = torch.long).to(args.device)
+        # for i in range (batch_size):
+        #     if self.eos_id not in targets_copy[i]:
+        #         targets[i] = targets_copy[i][:-1]
+        #     else:
+        #         targets[i] = targets_copy[i][targets_copy[i] != self.eos_id ]
         
-        batch_size = targets_copy.size(0)
-        # missing일 경우 뒤의 0을 제거, missing이 아닐 경우 self.eos_id 제거
-        targets = torch.empty(targets_copy.shape[0],targets_copy.shape[1]-1, dtype = torch.long).to(args.device)
-        for i in range (batch_size):
-            if self.eos_id not in targets_copy[i]:
-                targets[i] = targets_copy[i][:-1]
-            else:
-                targets[i] = targets_copy[i][targets_copy[i] != self.eos_id ]
-                
         #targets = targets[targets != self.eos_id].view(batch_size, -1)
+        
+        print("targets: ", targets.shape)
         targets = targets.view(batch_size, -1)
+        print("targets: ", targets.shape)
         target_length = targets.size(1)
+        print("targets: ", target_length)
         
         
         # decoder_inputs=targets,
@@ -178,11 +182,13 @@ class TransformerDecoder(BaseDecoder):
         
         #seq_k -> context vector, seq_q-> target, pad_id 이지만 디코더의 마스크드 셀프 어텐션 : Query = Key = Value
         self_attn_mask = get_decoder_self_attn_mask(targets, targets, self.pad_id) #디코더의 마스크드 셀프 어텐션
+        print("self_attn_mask: ", self_attn_mask.shape)
         encoder_outputs_mask = get_attn_pad_mask(encoder_outputs, encoder_output_lengths, target_length)
-
+        print("encoder_outputs_mask: ", encoder_outputs_mask.shape)
         outputs = self.embedding(targets) + self.positional_encoding(target_length)
+        print("outputs: ", outputs.shape)
         outputs = self.input_dropout(outputs)
-
+        print("outputs: ", outputs.shape)
         for layer in self.layers:
             outputs, self_attn, memory_attn = layer(
                 inputs=outputs,
@@ -190,9 +196,10 @@ class TransformerDecoder(BaseDecoder):
                 self_attn_mask=self_attn_mask,
                 encoder_outputs_mask=encoder_outputs_mask,
             )
-
+            print("1 outputs: ", outputs.shape)
+        
         predicted_log_probs = self.fc(outputs).log_softmax(dim=-1)
-
+        print("predicted_log_probs: ", predicted_log_probs.shape)
         return predicted_log_probs
 
     @torch.no_grad()
