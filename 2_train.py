@@ -91,12 +91,8 @@ for k_indx, seed_num in enumerate(args.seed_list):
             args.output_dim = 1
       
     elif args.model_types == "detection":   
-        if "rmse" in args.auxiliary_loss_type:
-            criterion = (nn.BCEWithLogitsLoss(size_average=True, reduction='mean'), nn.MSELoss(reduction='none'))
-            args.output_dim = 2
-        else:
-            criterion = nn.BCEWithLogitsLoss(size_average=True, reduction='mean')
-            args.output_dim = 1
+        criterion = nn.BCEWithLogitsLoss(size_average=True, reduction='mean')
+        args.output_dim = 1
         
     pad_id = 0
     criterion_img_aux = nn.CrossEntropyLoss(ignore_index = pad_id).to(device, non_blocking=True)
@@ -211,7 +207,6 @@ for k_indx, seed_num in enumerate(args.seed_list):
                 if "tdecoder" in args.auxiliary_loss_type:
                     train_reports_tokens = train_reports_tokens.to(device, non_blocking=True)
                     train_reports_lengths = train_reports_lengths.to(device, non_blocking=True)
-        
             # set vars to selected device
             train_x         = train_x.type(torch.HalfTensor).to(device, non_blocking=True)
             

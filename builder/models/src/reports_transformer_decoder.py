@@ -135,32 +135,21 @@ class TransformerDecoder(BaseDecoder):
         )
 
     def forward(self, targets_copy: Tensor, encoder_outputs: Tensor, encoder_output_lengths: Tensor) -> Tensor:
-        """
-        Forward propagate a `encoder_outputs` for training.
-
-        Args:
-            targets (torch.LongTensr): A target sequence passed to decoder. `IntTensor` of size ``(batch, seq_length)``
-            encoder_outputs (torch.FloatTensor): A output sequence of encoder. `FloatTensor` of size
-                ``(batch, seq_length, dimension)`` #seq_len가 1이어도 되는 것인지 확인 중에 있음 
-            encoder_output_lengths: The length of encoder outputs. ``(batch)``
-
-        Returns:
-            * predicted_log_probs (torch.FloatTensor): Log probability of model predictions.
-        """
         
         batch_size = targets_copy.size(0)
-        # missing일 경우 뒤의 0을 제거, missing이 아닐 경우 self.eos_id 제거
-        targets = torch.empty(targets_copy.shape[0],targets_copy.shape[1]-1, dtype = torch.long).to(args.device)
-        for i in range (batch_size):
-            if self.eos_id not in targets_copy[i]:
-                targets[i] = targets_copy[i][:-1]
-            else:
-                targets[i] = targets_copy[i][targets_copy[i] != self.eos_id ]
+        # # missing일 경우 뒤의 0을 제거, missing이 아닐 경우 self.eos_id 제거
+        # targets = torch.empty(targets_copy.shape[0],targets_copy.shape[1]-1, dtype = torch.long).to(args.device)
+        # for i in range (batch_size):
+        #     if self.eos_id not in targets_copy[i]:
+        #         targets[i] = targets_copy[i][:-1]
+        #     else:
+        #         targets[i] = targets_copy[i][targets_copy[i] != self.eos_id ]
                 
         #targets = targets[targets != self.eos_id].view(batch_size, -1)
-        targets = targets.view(batch_size, -1)
+        # targets[i] = targets_copy[i][targets_copy[i] != self.eos_id ]
+        targets_copy = targets_copy[:,:-1]
+        targets = targets_copy.view(batch_size, -1)
         target_length = targets.size(1)
-        
         
         # decoder_inputs=targets,
         # decoder_input_lengths=target_lengths,
@@ -172,9 +161,6 @@ class TransformerDecoder(BaseDecoder):
         #     decoder_inputs, decoder_input_lengths, decoder_inputs.size(1)
         # )
         # dec_self_attn_subsequent_mask = get_attn_subsequent_mask(decoder_inputs)
-        
-        
-        
         
         #seq_k -> context vector, seq_q-> target, pad_id 이지만 디코더의 마스크드 셀프 어텐션 : Query = Key = Value
         self_attn_mask = get_decoder_self_attn_mask(targets, targets, self.pad_id) #디코더의 마스크드 셀프 어텐션
@@ -193,24 +179,23 @@ class TransformerDecoder(BaseDecoder):
 
         # predicted_log_probs = self.fc(outputs).log_softmax(dim=-1)
         no_predicted_log_probs = self.fc(outputs)
-
         return no_predicted_log_probs
 
-    @torch.no_grad()
-    def decode(self, encoder_outputs: Tensor, encoder_output_lengths: Tensor) -> Tensor:
-        pass
-        # batch_size = encoder_outputs.size(0)
+    # @torch.no_grad()
+    # def decode(self, encoder_outputs: Tensor, encoder_output_lengths: Tensor) -> Tensor:
+    #     pass
+    #     # batch_size = encoder_outputs.size(0)
         
-        # predictions = encoder_outputs.new_zeros(batch_size, self.max_length).long()
-        # predictions[:, 0] = self.sos_id
+    #     # predictions = encoder_outputs.new_zeros(batch_size, self.max_length).long()
+    #     # predictions[:, 0] = self.sos_id
 
-        # for di in range(1, self.max_length):
-        #     step_outputs = self.forward(predictions, encoder_outputs, encoder_output_lengths)
-        #     step_outputs = step_outputs.max(dim=-1, keepdim=False)[1]# [batch_size, 1023]
-        #     predictions[:, di] = step_outputs[:, di-1]
-        #     if di == 1023:
-        #         print("end")
+    #     # for di in range(1, self.max_length):
+    #     #     step_outputs = self.forward(predictions, encoder_outputs, encoder_output_lengths)
+    #     #     step_outputs = step_outputs.max(dim=-1, keepdim=False)[1]# [batch_size, 1023]
+    #     #     predictions[:, di] = step_outputs[:, di-1]
+    #     #     if di == 1023:
+    #     #         print("end")
 
-        # return step_outputs #predictions
+    #     # return step_outputs #predictions
     
   

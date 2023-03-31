@@ -40,7 +40,8 @@ def get_trainer(args,
                                         model, logger, device, scheduler, optimizer, criterion, 
                                         scaler, flow_type, output_lengths, 
                                         seq_lengths=seq_lengths, x_img=x_img, x_txt=x_txt, 
-                                        txt_lengths=txt_lengths, imgtxt_time=imgtxt_time, missing=missing, criterion_aux = criterion_aux)
+                                        txt_lengths=txt_lengths, imgtxt_time=imgtxt_time, missing=missing, 
+                                        reports_tokens=reports_tokens, reports_lengths=reports_lengths, criterion_aux = criterion_aux)
         
 
     return model, iter_loss

@@ -135,18 +135,7 @@ class TransformerDecoder(BaseDecoder):
         )
 
     def forward(self, targets: Tensor, encoder_outputs: Tensor, encoder_output_lengths: Tensor) -> Tensor:
-        """
-        Forward propagate a `encoder_outputs` for training.
 
-        Args:
-            targets (torch.LongTensr): A target sequence passed to decoder. `IntTensor` of size ``(batch, seq_length)``
-            encoder_outputs (torch.FloatTensor): A output sequence of encoder. `FloatTensor` of size
-                ``(batch, seq_length, dimension)`` #seq_len가 1이어도 되는 것인지 확인 중에 있음 
-            encoder_output_lengths: The length of encoder outputs. ``(batch)``
-
-        Returns:
-            * predicted_log_probs (torch.FloatTensor): Log probability of model predictions.
-        """
         print(targets)
         # batch_size = targets_copy.size(0)
         # # missing일 경우 뒤의 0을 제거, missing이 아닐 경우 self.eos_id 제거
@@ -202,20 +191,20 @@ class TransformerDecoder(BaseDecoder):
         print("predicted_log_probs: ", predicted_log_probs.shape)
         return predicted_log_probs
 
-    @torch.no_grad()
-    def decode(self, encoder_outputs: Tensor, encoder_output_lengths: Tensor) -> Tensor:
-        batch_size = encoder_outputs.size(0)
+    # @torch.no_grad()
+    # def decode(self, encoder_outputs: Tensor, encoder_output_lengths: Tensor) -> Tensor:
+    #     batch_size = encoder_outputs.size(0)
         
-        predictions = encoder_outputs.new_zeros(batch_size, self.max_length).long()
-        predictions[:, 0] = self.sos_id
+    #     predictions = encoder_outputs.new_zeros(batch_size, self.max_length).long()
+    #     predictions[:, 0] = self.sos_id
 
-        for di in range(1, self.max_length):
-            step_outputs = self.forward(predictions, encoder_outputs, encoder_output_lengths)
-            step_outputs = step_outputs.max(dim=-1, keepdim=False)[1]# [batch_size, 1023]
-            predictions[:, di] = step_outputs[:, di-1]
-            if di == 1023:
-                print("end")
+    #     for di in range(1, self.max_length):
+    #         step_outputs = self.forward(predictions, encoder_outputs, encoder_output_lengths)
+    #         step_outputs = step_outputs.max(dim=-1, keepdim=False)[1]# [batch_size, 1023]
+    #         predictions[:, di] = step_outputs[:, di-1]
+    #         if di == 1023:
+    #             print("end")
 
-        return step_outputs #predictions
+    #     return step_outputs #predictions
     
   
