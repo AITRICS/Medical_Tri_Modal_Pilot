@@ -38,13 +38,13 @@ class Evaluator(object):
         self.y_true_multi = []
         self.y_pred_multi = []
         self.rmse = []
-        self.nauroc = MulticlassAUROC(num_classes=12, average="none")
-        self.nauprc = MulticlassAveragePrecision(num_classes=12, average="none")
-        self.nf1 = MulticlassF1Score(num_classes=12, average="none").to(args.device)
+        # self.nauroc = MulticlassAUROC(num_classes=12, average="none")
+        # self.nauprc = MulticlassAveragePrecision(num_classes=12, average="none")
+        # self.nf1 = MulticlassF1Score(num_classes=12, average="none").to(args.device)
         
-        self.wauroc = MulticlassAUROC(num_classes=12, average="weighted")
-        self.wauprc = MulticlassAveragePrecision(num_classes=12, average="weighted")
-        self.wf1 = MulticlassF1Score(num_classes=12, average="weighted").to(args.device)
+        # self.wauroc = MulticlassAUROC(num_classes=12, average="weighted")
+        # self.wauprc = MulticlassAveragePrecision(num_classes=12, average="weighted")
+        # self.wf1 = MulticlassF1Score(num_classes=12, average="weighted").to(args.device)
         
         self.auroc = AUROC(task="binary")
         self.auprc = AveragePrecision(task="binary")
@@ -84,12 +84,12 @@ class Evaluator(object):
             rmse =  torch.mean(torch.tensor(self.rmse).cuda())
             scores_list = list(np.round(np.array([auc.detach().cpu().numpy(), 
                                                 apr.detach().cpu().numpy(), 
-                                                f1.cpu(),
+                                                f1,
                                                 rmse.detach().cpu().numpy()]), 4))    
         else:
             scores_list = list(np.round(np.array([auc.detach().cpu().numpy(), 
                                                 apr.detach().cpu().numpy(), 
-                                                f1.cpu()]), 4))    
+                                                f1]), 4))    
         
         del trues
         del preds
