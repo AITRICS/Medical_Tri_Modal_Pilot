@@ -41,7 +41,7 @@ def get_data_loader(args, patient_dict, keys_list, k_indx):
     # get test data
     test_dir = search_walk({'path': args.test_data_path, 'extension': ".pkl"})
     args.vslt_mask = [True if i not in args.vitalsign_labtest else False for i in VITALSIGN_LABTEST] # True to remove
-    
+
     print("train_data_list: ", len(train_data_list))
     print("val_data_list: ", len(val_data_list))
     print("test_dir: ", len(test_dir))

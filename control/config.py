@@ -17,7 +17,7 @@ parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--seed-list', type=list, default=[412, 1004, 2023]) #[0, 1004, 2022, 9209, 119]
 parser.add_argument('--device', type=int, default=1, nargs='+')
 parser.add_argument('--cpu', type=int, default=0)
-parser.add_argument('--num-workers', type=int, default=8)
+parser.add_argument('--num-workers', type=int, default=2)
 parser.add_argument('--gpus', type=int, default=1)
 parser.add_argument('--reset', default=False, action='store_true')
 parser.add_argument('--project-name', type=str, default="small1")
@@ -42,14 +42,14 @@ parser.add_argument('--train-data-path', type=str, default="/home/destin/trainin
 parser.add_argument('--test-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/test")
 parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/destin/multimodal/MLHC_result")
 parser.add_argument('--image-data-path', type=str, default="/home/destin/")
+
 # Data Parameters
 parser.add_argument('--cross-fold-val', type=int, default=0, choices=[1, 0], help="1: k-fold, 0: seed-average")
 parser.add_argument('--val-data-ratio', type=float, default=0.1)
-parser.add_argument('--carry-back', type=bool, default=True)
 parser.add_argument('--imgtxt-time', type=int, default=0, choices=[0,1])
 
 # Training Parameters
-parser.add_argument('--epochs', type=int, default=150)
+parser.add_argument('--epochs', type=int, default=50)
 parser.add_argument('--batch-size', type=int, default=32)
 parser.add_argument('--l2-coeff', type=float, default=0.002)
 parser.add_argument('--dropout', type=float, default=0.1)
@@ -66,9 +66,9 @@ parser.add_argument('--weight_decay', '-wd', type=float, default=1e-6, help='Wei
 
 parser.add_argument('--patient-time', default=False)
 parser.add_argument('--threshold', type=float, default=0.5)
-parser.add_argument('--collate', type=int, default=2) 
-parser.add_argument('--quantization', type=bool, default=False)
-parser.add_argument('--show-roc', type=bool, default=False)
+# parser.add_argument('--collate', type=int, default=2) 
+# parser.add_argument('--quantization', type=bool, default=False)
+# parser.add_argument('--show-roc', type=bool, default=False)
 parser.add_argument('--output-dim', type=int, default=1)
 
 # Text Transformer Parameters
@@ -117,7 +117,6 @@ parser.add_argument('--mbt-fusion-startIdx', type=int, default=0)
 # Model Parameters
 parser.add_argument('--model-types', type=str, default="detection", choices=["detection", "classification"])
 parser.add_argument('--loss-types', type=str, default="bce", choices=["bceandsoftmax", "softmax", "bces", "bce", "wkappa", "rmse"])
-parser.add_argument('--loss-weight', type=str, default=None, choices=[None, "patnum"])
 # Auxiliary loss
 parser.add_argument('--auxiliary-loss-input', type=str, default=None, choices=[None, "directInput", "encOutput"])
 parser.add_argument('--auxiliary-loss-type', type=str, default="None", choices=["None", "rmse", "tdecoder", "tdecoder_rmse"])

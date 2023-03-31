@@ -75,21 +75,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
     print(args.modality_inclusion)
     
     train_loader, val_loader, test_loader = get_data_loader(args, patient_dict, keys_list, k_indx)
-
-    # weight to loss function
-    if args.output_type == "mortality":
-        numSample_list = [30870, 3486/12, 3486/12, 3486/12, 3486/12, 3486/12, 3486/12, 3486/12, 3486/12, 3486/12, 3486/12, 3486/12, 3486/12]
-        weights = [1 - (x / sum(numSample_list)) for x in numSample_list]
-        weights = torch.HalfTensor(weights).to(device)
-    elif args.output_type == "vasso":
-        numSample_list = [37948, 16737/12, 16737/12, 16737/12, 16737/12, 16737/12, 16737/12, 16737/12, 16737/12, 16737/12, 16737/12, 16737/12, 16737/12]
-        weights = [1 - (x / sum(numSample_list)) for x in numSample_list]
-        weights = torch.HalfTensor(weights).to(device)
-    elif args.output_type == "intubation":
-        numSample_list = [44230, 10455/12, 10455/12, 10455/12, 10455/12, 10455/12, 10455/12, 10455/12, 10455/12, 10455/12, 10455/12, 10455/12, 10455/12]
-        weights = [1 - (x / sum(numSample_list)) for x in numSample_list]
-        weights = torch.HalfTensor(weights).to(device)
-
+    
     # set loss function
     if args.model_types == "classification":
         if "softmax" == args.loss_types:
@@ -107,17 +93,11 @@ for k_indx, seed_num in enumerate(args.seed_list):
       
     elif args.model_types == "detection":   
         if "rmse" in args.auxiliary_loss_type:
-            if args.loss_weight == "patnum":
-                criterion = (nn.CrossEntropyLoss(reduction='mean', weight=weights), nn.BCEWithLogitsLoss(size_average=True, reduction='mean', pos_weight=weights), nn.MSELoss(reduction='none'))
-            else:
-                criterion = (nn.CrossEntropyLoss(reduction='mean'), nn.BCEWithLogitsLoss(size_average=True, reduction='mean'), nn.MSELoss(reduction='none'))
-            args.output_dim = 13
+            criterion = (nn.BCEWithLogitsLoss(size_average=True, reduction='mean'), nn.MSELoss(reduction='none'))
+            args.output_dim = 2
         else:
-            if args.loss_weight == "patnum":
-                criterion = (nn.CrossEntropyLoss(reduction='mean', weight=weights), nn.BCEWithLogitsLoss(size_average=True, reduction='mean', pos_weight=weights))
-            else:
-                criterion = (nn.CrossEntropyLoss(reduction='mean'), nn.BCEWithLogitsLoss(size_average=True, reduction='mean'))
-            args.output_dim = 13
+            criterion = nn.BCEWithLogitsLoss(size_average=True, reduction='mean')
+            args.output_dim = 1
         
     pad_id = 0
     criterion_img_aux = nn.CrossEntropyLoss(ignore_index = pad_id).to(device, non_blocking=True)

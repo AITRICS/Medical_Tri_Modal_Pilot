@@ -142,9 +142,6 @@ class TRI_MT_V1(nn.Module):
         self.activations[activation],
         nn.Linear(in_features=self.model_dim, out_features= self.output_dim,  bias=True))
         
-        if "rmse" in self.args.auxiliary_loss_type:
-            self.rmse_layer = nn.Linear(in_features=classifier_dim, out_features= 1, bias=True)
-        
         self.fixed_lengths = [0, 25]
         self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
         self.txt_feat = torch.Tensor([19]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
@@ -165,8 +162,7 @@ class TRI_MT_V1(nn.Module):
             self.encoder_output_lengths = torch.tensor([1 for i in range(self.args.batch_size)]).to(self.device)### 되나?
         
     def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths):
-        output2 = None
-        output3 = None              
+                                
         if self.args.vslt_type == "carryforward":
             demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1)
             vslt_embedding = self.vslt_enc(x)
@@ -223,11 +219,12 @@ class TRI_MT_V1(nn.Module):
             classInput = torch.cat([classInput, demo_embedding], dim=1)
         output = self.fc_list(classInput)
         
-        if "rmse" in self.args.auxiliary_loss_type:
-            output2 = self.rmse_layer(classInput)
         
         if (flow_type == "train") and ("tdecoder" in self.args.auxiliary_loss_type):
             # unsqueeze를 한 이유: transformer decoder,의 enc_output, seq_lengths를 1로 주기 위해서 
-            output3 = self.img_2_txt(reports_tokens, context_vector[:,-178,:].unsqueeze(1), encoder_output_lengths = self.encoder_output_lengths) 
+            output2 = self.img_2_txt(reports_tokens, context_vector[:,-178,:].unsqueeze(1), encoder_output_lengths = self.encoder_output_lengths) 
+            # exit(1)
+        else:
+            output2 = None
  
-        return output, output2, output3
+        return output, output2

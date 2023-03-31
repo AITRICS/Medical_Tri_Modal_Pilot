@@ -90,47 +90,76 @@ class Logger:
 
     def add_validation_logs(self, step):
         result = self.evaluator.performance_metric()
-        wresult, nresult = result
-        if "rmse" in self.args.auxiliary_loss_type:
-            wauc, wapr, wf1, rmse = wresult
-        else:
+
+        if (self.args.model_types == "detection"):
+            if "rmse" in self.args.auxiliary_loss_type:
+                auc, apr, f1, rmse = result
+                anchor = auc + apr
+                os.system("echo  \'##### Current Validation results #####\'")
+                os.system("echo  \'auc: {}, apr: {}, f1_score: {}, rmse: {}\'".format(str(auc), str(apr), str(f1), str(rmse)))
+                
+                self.writer.add_scalar('val/auc', np.mean(auc), global_step=step)
+                self.writer.add_scalar('val/apr', np.mean(apr), global_step=step)
+                self.writer.add_scalar('val/f1', np.mean(f1), global_step=step)
+            
+            else:
+                auc, apr, f1 = result
+                anchor = auc + apr
+                os.system("echo  \'##### Current Validation results #####\'")
+                os.system("echo  \'auc: {}, apr: {}, f1_score: {}\'".format(str(auc), str(apr), str(f1)))
+                
+                self.writer.add_scalar('val/auc', np.mean(auc), global_step=step)
+                self.writer.add_scalar('val/apr', np.mean(apr), global_step=step)
+                self.writer.add_scalar('val/f1', np.mean(f1), global_step=step)
+            
+            if self.best_auc < anchor:
+                self.best_iter = step
+                self.best_auc = anchor
+                self.best_result_so_far = list(result)
+            
+            if "rmse" in self.args.auxiliary_loss_type:
+                auc, apr, f1, rmse = self.best_result_so_far 
+                os.system("echo  \'##### Best Validation results in history #####\'")
+                os.system("echo  \'auc: {}, apr: {}, f1_score: {}, rmse: {}\'".format(str(auc), str(apr), str(f1), str(rmse)))
+            else:
+                auc, apr, f1 = self.best_result_so_far 
+                os.system("echo  \'##### Best Validation results in history #####\'")
+                os.system("echo  \'auc: {}, apr: {}, f1_score: {}\'".format(str(auc), str(apr), str(f1)))
+
+            
+        elif (self.args.model_types == "classification"):
+            nresult, wresult = result
+            aucs, aprs, f1s = nresult
             wauc, wapr, wf1 = wresult
-        aucs, aprs, f1s = nresult
-        anchor = np.mean(aucs) + np.mean(aprs)
-        
-        os.system("echo  \'##### Current Validation results #####\'")
-        if "rmse" in self.args.auxiliary_loss_type:
-            os.system("echo  \'Weighted auc: {}, apr: {}, f1_score: {}, rmse: {}\'".format(str(wauc), str(wapr), str(wf1), str(rmse)))
-        else:
+            anchor = wf1
+            os.system("echo  \'##### Current Validation results #####\'")
             os.system("echo  \'Weighted auc: {}, apr: {}, f1: {}\'".format(str(wauc), str(wapr), str(wf1)))
-        os.system("echo  \'Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(str(aucs), str(aprs), str(f1s)))
-        os.system("echo  \'Mean auc: {}, apr: {}, f1: {}\'".format(str(np.mean(aucs)), str(np.mean(aprs)), str(np.mean(f1s))))
+            os.system("echo  \'Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(str(aucs), str(aprs), str(f1s)))
 
-        self.writer.add_scalar('val/avg_auc', np.mean(aucs), global_step=step)
-        self.writer.add_scalar('val/avg_apr', np.mean(aprs), global_step=step)
-        self.writer.add_scalar('val/avg_f1', np.mean(f1s), global_step=step)
-        self.writer.add_scalar('val/w_auc', wauc, global_step=step)
-        self.writer.add_scalar('val/w_apr', wapr, global_step=step)
-        self.writer.add_scalar('val/w_f1', wf1, global_step=step)
+            self.writer.add_scalar('val/avg_auc', np.mean(aucs), global_step=step)
+            self.writer.add_scalar('val/avg_apr', np.mean(aprs), global_step=step)
+            self.writer.add_scalar('val/avg_f1', np.mean(f1s), global_step=step)
+            self.writer.add_scalar('val/w_auc', wauc, global_step=step)
+            self.writer.add_scalar('val/w_apr', wapr, global_step=step)
+            self.writer.add_scalar('val/w_f1', wf1, global_step=step)
 
-        if self.best_auc < anchor:
-            self.best_iter = step
-            self.best_auc = anchor
-            self.best_result_so_far = list(result)
+            if self.args.loss_types != "rmse":
+                if self.best_auc < anchor:
+                    self.best_iter = step
+                    self.best_auc = anchor
+                    self.best_result_so_far = list(result)
+            else:
+                if self.best_auc > anchor:
+                    self.best_iter = step
+                    self.best_auc = anchor
+                    self.best_result_so_far = list(result)
 
-        wresult, nresult = self.best_result_so_far 
-        aucs, aprs, f1s = nresult
-        if "rmse" in self.args.auxiliary_loss_type:
-            wauc, wapr, wf1, rmse = wresult
-        else:
+            nresult, wresult = self.best_result_so_far 
+            aucs, aprs, f1s = nresult
             wauc, wapr, wf1 = wresult
-        os.system("echo  \'##### Best Validation results in history #####\'")
-        if "rmse" in self.args.auxiliary_loss_type:
-            os.system("echo  \'Weighted auc: {}, apr: {}, f1_score: {}, rmse: {}\'".format(str(wauc), str(wapr), str(wf1), str(rmse)))
-        else:
+            os.system("echo  \'##### Best Validation results in history #####\'")
             os.system("echo  \'Weighted auc: {}, apr: {}, f1: {}\'".format(str(wauc), str(wapr), str(wf1)))
-        os.system("echo  \'Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(str(aucs), str(aprs), str(f1s)))
-        os.system("echo  \'Mean auc: {}, apr: {}, f1: {}\'".format(str(np.mean(aucs)), str(np.mean(aprs)), str(np.mean(f1s))))
+            os.system("echo  \'Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(str(aucs), str(aprs), str(f1s)))
 
         self.writer.flush()
 
@@ -150,39 +179,40 @@ class Logger:
     def test_result_only(self):
         result = self.evaluator.performance_metric()
         os.system("echo  \'##### Test results #####\'")
-        wresult, nresult = result
-        aucs, aprs, f1s = nresult
-        if "rmse" in self.args.auxiliary_loss_type:
-            wauc, wapr, wf1, rmse = wresult
-        else:
+        if (self.args.model_types == "detection"):
+            if "rmse" in self.args.auxiliary_loss_type:
+                auc, apr, f1, rmse = result
+                os.system("echo  \'auc: {}, apr: {}, f1_score: {}, rmse: {}\'".format(str(auc), str(apr), str(f1), str(rmse)))
+            else:
+                auc, apr, f1 = result
+                os.system("echo  \'auc: {}, apr: {}, f1_score: {}\'".format(str(auc), str(apr), str(f1)))
+            
+        elif (self.args.model_types == "classification"):
+            nresult, wresult = result
+            aucs, aprs, f1s = nresult
             wauc, wapr, wf1 = wresult
-        if "rmse" in self.args.auxiliary_loss_type:
-            os.system("echo  \'Weighted auc: {}, apr: {}, f1_score: {}, rmse: {}\'".format(str(wauc), str(wapr), str(wf1), str(rmse)))
-        else:
             os.system("echo  \'Weighted auc: {}, apr: {}, f1: {}\'".format(str(wauc), str(wapr), str(wf1)))
-        os.system("echo  \'Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(str(aucs), str(aprs), str(f1s)))
-        os.system("echo  \'Mean auc: {}, apr: {}, f1: {}\'".format(str(np.mean(aucs)), str(np.mean(aprs)), str(np.mean(f1s))))
+            os.system("echo  \'Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(str(aucs), str(aprs), str(f1s)))        
 
         self.test_results = list([self.args.seed, result])
 
     def val_result_only(self):
         os.system("echo  \'##### Validation results #####\'")
-        wresult, nresult = self.best_result_so_far 
-        aucs, aprs, f1s = nresult
-        if "rmse" in self.args.auxiliary_loss_type:
-            wauc, wapr, wf1, rmse = wresult
-        else:
+        if (self.args.model_types == "detection"):
+            if "rmse" in self.args.auxiliary_loss_type:
+                auc, apr, f1, rmse = self.best_result_so_far 
+                os.system("echo  \'auc: {}, apr: {}, f1_score: {}, rmse: {}\'".format(str(auc), str(apr), str(f1), str(rmse)))
+            else:
+                auc, apr, f1 = self.best_result_so_far 
+                os.system("echo  \'auc: {}, apr: {}, f1_score: {}\'".format(str(auc), str(apr), str(f1)))
+            
+        elif (self.args.model_types == "classification"):
+            nresult, wresult = self.best_result_so_far 
+            aucs, aprs, f1s = nresult
             wauc, wapr, wf1 = wresult
-        if "rmse" in self.args.auxiliary_loss_type:
-            os.system("echo  \'Weighted auc: {}, apr: {}, f1_score: {}, rmse: {}\'".format(str(wauc), str(wapr), str(wf1), str(rmse)))
-        else:
             os.system("echo  \'Weighted auc: {}, apr: {}, f1: {}\'".format(str(wauc), str(wapr), str(wf1)))
-        os.system("echo  \'Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(str(aucs), str(aprs), str(f1s)))
-        os.system("echo  \'Mean auc: {}, apr: {}, f1: {}\'".format(str(np.mean(aucs)), str(np.mean(aprs)), str(np.mean(f1s))))
+            os.system("echo  \'Each range auc: {}, \n Each range apr: {}, \n Each range f1: {}\'".format(str(aucs), str(aprs), str(f1s)))       
 
         self.val_results = list([self.args.seed, self.best_result_so_far])
             
-          
-          
-          
           
