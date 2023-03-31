@@ -84,12 +84,12 @@ class Evaluator(object):
             rmse =  torch.mean(torch.tensor(self.rmse).cuda())
             scores_list = list(np.round(np.array([auc.detach().cpu().numpy(), 
                                                 apr.detach().cpu().numpy(), 
-                                                f1,
+                                                f1.cpu(),
                                                 rmse.detach().cpu().numpy()]), 4))    
         else:
             scores_list = list(np.round(np.array([auc.detach().cpu().numpy(), 
                                                 apr.detach().cpu().numpy(), 
-                                                f1]), 4))    
+                                                f1.cpu()]), 4))    
         
         del trues
         del preds
