@@ -33,7 +33,7 @@ class BimodalTransformerEncoder_MBT(nn.Module):
 
         self.mbt_bottlenecks_type = mbt_bottlenecks_type
         self.use_pe = use_pe
-        self.n_modality = n_modality
+        self.n_modality = 2
         self.fusion_idx = fusion_startidx
         self.txt_idx = txt_idx
         self.n_layers = n_layers
@@ -66,7 +66,6 @@ class BimodalTransformerEncoder_MBT(nn.Module):
         cls_token_per_modality = [cls_token.repeat(enc_outputs[0].size(0), 1, 1) for cls_token in self.cls_token_per_modality]
         bottlenecks = self.bottlenecks.repeat(enc_outputs[0].size(0), 1, 1)
         enc_inputs = [torch.cat([cls_token_per_modality[idx], enc_input], axis=1) for idx, enc_input in enumerate(enc_outputs)]
-        
         self_attn_masks = []
         bottleneck_self_attn_masks = []
         for n_modal in range(self.n_modality):
@@ -97,40 +96,32 @@ class BimodalTransformerEncoder_MBT(nn.Module):
         for idx, enc_layers in enumerate(self.layer_stacks):
             enc_inputs = list(enc_outputs)
             enc_outputs = list()
-            if idx < self.fusion_idx:
-                for modal_idx, enc_layer in enumerate(enc_layers):
-                    enc_output, _ = enc_layer(enc_inputs[modal_idx], self_attn_masks[modal_idx])
-                    enc_outputs.append(enc_output)      
+            # if idx < self.fusion_idx:
+            #     for modal_idx, enc_layer in enumerate(enc_layers):
+            #         enc_output, _ = enc_layer(enc_inputs[modal_idx], self_attn_masks[modal_idx])
+            #         enc_outputs.append(enc_output)      
                     
-            else:
-                bottleneck_outputs = []
-                for modal_idx, enc_layer in enumerate(enc_layers):
-                    b_enc_output = torch.cat([bottlenecks, enc_inputs[modal_idx]], axis=1) #bottleneck, cls, input
-                    if len(bottleneck_self_attn_masks) < self.n_modality:
-                        if self.mask[modal_idx]:
-                            b_mask = get_attn_pad_mask(b_enc_output, varying_lengths[modal_idx]+self.bottlenecks_n, b_enc_output.size(1))
-                            bottleneck_self_attn_masks.append(b_mask)
-                        else:
-                            bottleneck_self_attn_masks.append(None)
-                    print("1: ", b_enc_output.shape)
-                    print("2: ", bottleneck_self_attn_masks[modal_idx].shape)
-                    enc_output, _ = enc_layer(b_enc_output, bottleneck_self_attn_masks[modal_idx])
-                    bottleneck_outputs.append(enc_output[:, :self.bottlenecks_n, :])
-                    enc_output = enc_output[:, self.bottlenecks_n:, :]
-                    enc_outputs.append(enc_output)
-                    
-                bottleneck_outputs_stack = torch.stack(bottleneck_outputs)
-                bottlenecks_bi_mean = torch.mean(bottleneck_outputs_stack, dim=0)
-                all_bottleneck_stack = torch.stack([bottlenecks_bi_mean, bottleneck_outputs_stack[0,:,:,:]])
+            # else:
+            bottleneck_outputs = []
+            for modal_idx, enc_layer in enumerate(enc_layers):
+                b_enc_output = torch.cat([bottlenecks, enc_inputs[modal_idx]], axis=1) #bottleneck, cls, input
+                if len(bottleneck_self_attn_masks) < self.n_modality:
+                    if self.mask[modal_idx]:
+                        b_mask = get_attn_pad_mask(b_enc_output, varying_lengths[modal_idx]+self.bottlenecks_n, b_enc_output.size(1))
+                        bottleneck_self_attn_masks.append(b_mask)
+                    else:
+                        bottleneck_self_attn_masks.append(None)
+                enc_output, _ = enc_layer(b_enc_output, bottleneck_self_attn_masks[modal_idx])
+                bottleneck_outputs.append(enc_output[:, :self.bottlenecks_n, :])
+                enc_output = enc_output[:, self.bottlenecks_n:, :]
+                enc_outputs.append(enc_output)
+                
+            bottleneck_outputs_stack = torch.stack(bottleneck_outputs)
+            bottlenecks_bi_mean = torch.mean(bottleneck_outputs_stack, dim=0)
+            all_bottleneck_stack = torch.stack([bottlenecks_bi_mean, bottleneck_outputs_stack[0,:,:,:]])
 
-                print("all_bottleneck_stack: ", all_bottleneck_stack.shape)
-                print("missing: ", missing.shape)
-                print("self.idx_order: ", self.idx_order.shape)
-                bottlenecks = all_bottleneck_stack[missing, self.idx_order, :, :]
-                
-                # bottlenecks = torch.where(missing[1].unsqueeze(1).unsqueeze(1) == 0, bottleneck_outputs[0], bottlenecks_mean)
-                # bottlenecks = torch.where(varying_lengths[1].unsqueeze(1).unsqueeze(1) == 0, bottleneck_outputs[0], bottlenecks_mean)
-                
+            bottlenecks = all_bottleneck_stack[missing, self.idx_order, :, :]
+            
         return enc_outputs, 0
 
 class TrimodalTransformerEncoder_MBT(nn.Module):

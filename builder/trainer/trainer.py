@@ -30,14 +30,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
     img_time, txt_time = imgtxt_time
     img_time = img_time.type(torch.HalfTensor).to(device, non_blocking=True)
     txt_time = txt_time.type(torch.HalfTensor).to(device, non_blocking=True)
-    
-    if args.input_types == "vslt_txt":
-        missing[missing == 2] = 0
-        missing[missing == 3] = 1
-    elif args.input_types == "vslt_img":
-        missing[missing == 1] = 0
-        missing[missing == 3] = 1
-    
+
     if args.vslt_type == "carryforward":
         train_x = train_x.permute(1, 0, 2, 3)
         data = train_x[0]
@@ -117,6 +110,14 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
     age = age.type(torch.FloatTensor).to(device, non_blocking=True)
     gender = gender.type(torch.FloatTensor).to(device, non_blocking=True)
     x_txt = x_txt.to(device, non_blocking=True)
+    
+        
+    if args.input_types == "vslt_txt":
+        missing_num[missing_num == 2] = 0
+        missing_num[missing_num == 3] = 1
+    elif args.input_types == "vslt_img":
+        missing_num[missing_num == 1] = 0
+        missing_num[missing_num == 3] = 1
     
     if flow_type == "train":
         optimizer.zero_grad()

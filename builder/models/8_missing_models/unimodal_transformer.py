@@ -121,7 +121,7 @@ class UNIMODAL_TRANSFORMER(nn.Module):
             if self.args.vslt_type != "QIE":
                 classInput = torch.cat([classInput, demo_embedding], dim=1)
             output = self.fc_list(classInput) 
-            return output, None
+            return output, None, None
 
 
 

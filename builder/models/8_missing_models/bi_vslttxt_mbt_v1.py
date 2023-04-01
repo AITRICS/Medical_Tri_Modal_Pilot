@@ -81,7 +81,7 @@ class BI_VSLTTXT_MBT_V1(nn.Module):
         self.fusion_transformer = BimodalTransformerEncoder_MBT(
             batch_size = args.batch_size,
             n_modality = 2,
-            bottlenecks_n = self.bottlenecks_n,      # https://arxiv.org/pdf/2107.00135.pdf # according to section 4.2 implementation details
+            bottlenecks_n = 4,      # https://arxiv.org/pdf/2107.00135.pdf # according to section 4.2 implementation details
             fusion_startidx = args.mbt_fusion_startIdx,
             d_input = self.model_dim,
             n_layers = self.num_layers,
@@ -122,7 +122,6 @@ class BI_VSLTTXT_MBT_V1(nn.Module):
         # age = age.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
         # gen = gen.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)    
         # x = torch.cat([x, age, gen], axis=2)
-
         demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1)
         demo_embedding = self.ie_demo(demographic)
                                 
@@ -169,14 +168,12 @@ class BI_VSLTTXT_MBT_V1(nn.Module):
 
         if self.args.vslt_type != "QIE":
             classInput = torch.cat([classInput, demo_embedding.repeat(3,1)], dim=1)
-        outputs_stack = self.fc_list(classInput).reshape(3, -1, self.output_dim)
+        outputs_stack = self.fc_list(classInput).reshape(2, -1, self.output_dim)
         
         if "rmse" in self.args.auxiliary_loss_type:
-            output2_stack = self.rmse_layer(classInput).reshape(3, -1)
-            tri_mean2 = torch.mean(output2_stack, dim=0)
-            vslttxt_mean2 = torch.mean(torch.stack([output2_stack[0, :], output2_stack[2, :]]), dim=0)
-            vsltimg_mean2 = torch.mean(torch.stack([output2_stack[0, :], output2_stack[1, :]]), dim=0)
-            all_cls_stack2 = torch.stack([tri_mean2, vsltimg_mean2, vslttxt_mean2, output2_stack[0, :]])
+            output2_stack = self.rmse_layer(classInput).reshape(2, -1)
+            bi_mean2 = torch.mean(output2_stack, dim=0)
+            all_cls_stack2 = torch.stack([bi_mean2, output2_stack[0, :]])
             output2 = all_cls_stack2[missing, self.idx_order]
         else:
             output2 = None
@@ -189,7 +186,5 @@ class BI_VSLTTXT_MBT_V1(nn.Module):
             # exit(1)
         else:
             output3 = None
-            
-        exit(1)
             
         return output, output2, output3
