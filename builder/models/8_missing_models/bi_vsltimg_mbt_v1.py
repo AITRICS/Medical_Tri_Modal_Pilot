@@ -231,7 +231,7 @@ class BI_VSLTIMG_MBT_V1(nn.Module):
         classInput = self.layer_norms_after_concat(outputs_list).reshape(-1, self.model_dim)
 
         if self.args.vslt_type != "QIE":
-            classInput = torch.cat([classInput, demo_embedding.repeat(3,1)], dim=1)
+            classInput = torch.cat([classInput, demo_embedding.repeat(2,1)], dim=1)
         outputs_stack = self.fc_list(classInput).reshape(2, -1, self.output_dim)
         
         if "rmse" in self.args.auxiliary_loss_type:
