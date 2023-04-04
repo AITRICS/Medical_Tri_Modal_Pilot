@@ -775,19 +775,11 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
 
         missing = torch.Tensor(missing)
-<<<<<<< HEAD
         if len(img.unique()) == 1:
             exist_img = torch.tensor(0)
         else:
             exist_img = torch.tensor(1)
         return final_seqs, static_inputs, target, inputLength, img, exist_img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
-=======
-        
-        if args.realtime == 1:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
-        else:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, 0, missing, f_indices, target_aux, reports_tokens, reports_lengths
->>>>>>> 4c80bba8089573b532360f10b220efd43bb28567
 
 class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
 
@@ -1462,18 +1454,11 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
                 
         missing = torch.Tensor(missing)
-<<<<<<< HEAD
         if len(img.unique()) == 1:
             exist_img = torch.tensor(0)
         else:
             exist_img = torch.tensor(1)
         return final_seqs, static_inputs, target, inputLength, img, exist_img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
-=======
-        if args.realtime == 1:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
-        else:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, 0, missing, f_indices, target_aux, reports_tokens, reports_lengths
->>>>>>> 4c80bba8089573b532360f10b220efd43bb28567
 
 class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
 
@@ -2070,18 +2055,11 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
                 
         missing = torch.Tensor(missing)  
-<<<<<<< HEAD
         if len(img.unique()) == 1:
             exist_img = torch.tensor(0)
         else:
             exist_img = torch.tensor(1)
         return final_seqs, static_inputs, target, inputLength, img, exist_img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
-=======
-        if args.realtime == 1:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
-        else:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, 0, missing, f_indices, target_aux, reports_tokens, reports_lengths
->>>>>>> 4c80bba8089573b532360f10b220efd43bb28567
 
 class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
 
@@ -2738,19 +2716,12 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
                 
         missing = torch.Tensor(missing)
-<<<<<<< HEAD
         if len(img.unique()) == 1:
             exist_img = torch.tensor(0)
         else:
             exist_img = torch.tensor(1)
         return final_seqs, static_inputs, target, inputLength, img, exist_img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
 
-=======
-        if args.realtime == 1:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
-        else:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, 0, missing, f_indices, target_aux, reports_tokens, reports_lengths
->>>>>>> 4c80bba8089573b532360f10b220efd43bb28567
 
 
         # imgs = []
