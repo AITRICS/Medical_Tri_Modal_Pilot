@@ -24,7 +24,7 @@
                     "--transformer-num-layers", "6",
                     "--vslt-type", "carryforward",
                     "--model-types", "detection",
-                    "--berttype", "biobert",
+                    "--berttype", "bert",
                     "--biobert-path", "./data/mimic4_clstoken.h5",
                     // "--fuse-baseline", "Medfuse",
                     // "--auxiliary-loss-type","tdecoder"

@@ -79,19 +79,19 @@ class MMVED(nn.Module):
         self.sigm = nn.Sigmoid()
         
         ### Mask ###
-        # H_U_P, H_U_T, H_U_I, H_b1_pt, H_b2_pi, H_b3_it, H_t_P, H_t_T, H_t_I
-        missing_size = [self.args.batch_size, 512, 24]
+        # H_U_P, H_U_T, H_U_I, H_b1_pt, H_b2_pi, H_b3_ti, H_t_P, H_t_T, H_t_I
+        missing_size = [self.args.batch_size, 512]
         missing_false = torch.zeros(missing_size, dtype=torch.bool)
         missing_true = torch.ones(missing_size, dtype=torch.bool)
         self.mask_img = torch.cat([missing_false,missing_false, missing_true,
                                     missing_false, missing_true, missing_true,
-                                    missing_false, missing_false, missing_true], axis=1)# F,F,T, F,T,T, F,F,T
+                                    missing_false, missing_false, missing_true], axis=1).to(self.args.device)# F,F,T, F,T,T, F,F,T
         self.mask_txt = torch.cat([missing_false, missing_true, missing_false,
                                    missing_true, missing_false, missing_true,
-                                   missing_false, missing_true, missing_false], axis=1)# F,T,F, T,F,T, F,T,F
+                                   missing_false, missing_true, missing_false], axis=1).to(self.args.device)# F,T,F, T,F,T, F,T,F
         self.mask_txt_img = torch.cat([missing_false, missing_true, missing_true,
                                        missing_true, missing_true, missing_true,
-                                       missing_false, missing_true, missing_true], axis=1)# F,T,T, T,T,T, F,T,T 
+                                       missing_false, missing_true, missing_true], axis=1).to(self.args.device)# F,T,T, T,T,T, F,T,T 
 
         activation = 'relu'
         self.activations = nn.ModuleDict([
@@ -105,7 +105,7 @@ class MMVED(nn.Module):
         ])
 
         self.fc = nn.Sequential(
-            nn.Linear(in_features=511, out_features= 64, bias=True),
+            nn.Linear(in_features=1151, out_features= 64, bias=True),
             nn.BatchNorm1d(64),
             self.activations[activation],
             nn.Linear(in_features=64, out_features= 1,  bias=True))
@@ -178,7 +178,7 @@ class MMVED(nn.Module):
                              H_b1_b_T_unpacked[torch.arange(H_b1_b_T_unpacked.size(0)),0,:]], axis=1)
         H_b2_pi = torch.cat([H_b2_f_P_unpacked[torch.arange(H_b2_f_P_unpacked.size(0)),modify_input_lengths,:], 
                              H_b2_b_I_unpacked[torch.arange(H_b2_b_I_unpacked.size(0)),0,:]], axis=1)
-        H_b3_it = torch.cat([H_b3_f_T_unpacked[torch.arange(H_b3_f_T_unpacked.size(0)),modify_txt_lengths,:], 
+        H_b3_ti = torch.cat([H_b3_f_T_unpacked[torch.arange(H_b3_f_T_unpacked.size(0)),modify_txt_lengths,:], 
                              H_b3_b_I_unpacked[torch.arange(H_b3_b_I_unpacked.size(0)),0,:]], axis=1)
         
 
@@ -210,30 +210,45 @@ class MMVED(nn.Module):
         
         ### Non-redundant Information Learning Layer ###       
         # loss_p_t = torch.div(torch.square(torch.inner(H_t_P, H_t_T)), x.size(0))
-        loss_p_t = torch.sum(torch.diagonal(loss_p_t, 0))
         # loss_t_p = torch.div(torch.square(torch.inner(H_t_T, H_t_P)), x.size(0))
         # loss_t_i = torch.div(torch.square(torch.inner(H_t_T, H_t_I)), x.size(0))
         # loss_i_t = torch.div(torch.square(torch.inner(H_t_I, H_t_T)), x.size(0))
         # loss_p_i = torch.div(torch.square(torch.inner(H_t_P, H_t_I)), x.size(0))
         # loss_i_p = torch.div(torch.square(torch.inner(H_t_I, H_t_P)), x.size(0))
         
-        aux_loss = (loss_p_t + loss_t_p + loss_t_i + loss_i_t + loss_p_i + loss_i_p) / 6
+        
+
+        inner_p_t = torch.inner(H_t_P, H_t_T)
+        diag_p_t = torch.diagonal(torch.square(inner_p_t), 0)
+        selected_loss_p_t = diag_p_t[missing_num == 2]
+        selected_loss_p_t_tri = diag_p_t[missing_num == 0]
+        final_loss_p_t = torch.mean(torch.cat([selected_loss_p_t, selected_loss_p_t_tri]))
+        
+        inner_p_i = torch.inner(H_t_P, H_t_I)
+        diag_p_i = torch.diagonal(torch.square(inner_p_i), 0)
+        selected_loss_p_i = diag_p_i[missing_num == 1]
+        selected_loss_p_i_tri = diag_p_i[missing_num == 0]
+        final_loss_p_i = torch.mean(torch.cat([selected_loss_p_i, selected_loss_p_i_tri]))
+        
+        inner_t_i = torch.inner(H_t_T, H_t_I)
+        diag_t_i = torch.diagonal(torch.square(inner_t_i), 0)
+        selected_loss_t_i = diag_t_i[(missing_num == 0)]
+        final_loss_t_i = torch.mean(selected_loss_t_i)
+        
+        aux_loss = (final_loss_p_t + final_loss_p_i + final_loss_t_i) / 3
         
         ### Self-Attention Layer ###        
-        C_f = torch.cat([H_U_P, H_U_T, H_U_I, H_b1_pt, H_b2_pi, H_b3_it, H_t_P, H_t_T, H_t_I], axis=1)
-        C_f_self = self.wp1_linear(self.wq1_tanh(self.wq1_linear(C_f)))
+        C_f = torch.cat([H_U_P, H_U_T, H_U_I, H_b1_pt, H_b2_pi, H_b3_ti, H_t_P, H_t_T, H_t_I], axis=1)
+        C_f_self = self.wp1_linear(self.wq1_tanh(self.wq1_linear(C_f.float())))
         ## Missing ##
         # missing_num == 0: txt + vslt + img
         # missing_num == 2: txt + vslt
         # missing_num == 1: vslt + img
         # missing_num == 3: vslt
 
-        if missing_num == 1:
-            C_f_self.masked_fill_(self.mask_img, -65504)
-        if missing_num == 2:
-            C_f_self.masked_fill_(self.mask_txt, -65504)
-        if missing_num == 3:
-            C_f_self.masked_fill_(self.mask_txt_img, -65504)
+        C_f_self[missing_num == 2].masked_fill_(self.mask_img[missing_num == 2], -65504) #이미지를 마스킹함
+        C_f_self[missing_num == 1].masked_fill_(self.mask_txt[missing_num == 1], -65504)
+        C_f_self[missing_num == 3].masked_fill_(self.mask_txt_img[missing_num == 3], -65504)
         
         ####
         C_f_self = self.selfattn_softmax(C_f_self)
