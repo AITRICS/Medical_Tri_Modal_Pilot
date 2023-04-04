@@ -644,7 +644,8 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             init_tie = np.delete(init_tie, init_tie[:, 0]==(selectedKey - randLength + 1), axis=0)
             time_data_np = np.concatenate([i for i in time_data_list if i is not None])
             time_data_np = np.concatenate([init_tie, time_data_np], axis = 0)
-            time_data_np[:,0] -= selectedKey
+            if args.realtime == 1:
+                time_data_np[:,0] -= selectedKey
             time_data_tensor = torch.Tensor(time_data_np)   # [seq, 3]
             if time_data_tensor.size(0) > args.TIE_len:
                 time_data_tensor = time_data_tensor[:args.TIE_len, :]
@@ -723,7 +724,8 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                     reports_tokens = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][0])
                     reports_lengths = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][1]) 
                 missing.append(False)
-                cxr_time -= selectedKey
+                if args.realtime == 1:
+                    cxr_time -= selectedKey
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             if "tdecoder" in args.auxiliary_loss_type:
@@ -773,7 +775,11 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
 
         missing = torch.Tensor(missing)
-        return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
+        
+        if args.realtime == 1:
+            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
+        else:
+            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, 0, missing, f_indices, target_aux, reports_tokens, reports_lengths
 
 class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
 
@@ -1317,7 +1323,8 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
             init_tie = np.delete(init_tie, init_tie[:, 0]==(selectedKey - randLength + 1), axis=0)
             time_data_np = np.concatenate([i for i in time_data_list if i is not None])
             time_data_np = np.concatenate([init_tie, time_data_np], axis = 0)
-            time_data_np[:,0] -= selectedKey
+            if args.realtime == 1:
+                time_data_np[:,0] -= selectedKey
             time_data_tensor = torch.Tensor(time_data_np)   # [seq, 3]
             if time_data_tensor.size(0) > args.TIE_len:
                 time_data_tensor = time_data_tensor[:args.TIE_len, :]
@@ -1397,7 +1404,8 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                     reports_tokens = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][0])
                     reports_lengths = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][1]) 
                 missing.append(False)
-                cxr_time -= selectedKey
+                if args.realtime == 1:
+                    cxr_time -= selectedKey
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             if "tdecoder" in args.auxiliary_loss_type:
@@ -1446,7 +1454,10 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
                 
         missing = torch.Tensor(missing)
-        return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
+        if args.realtime == 1:
+            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
+        else:
+            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, 0, missing, f_indices, target_aux, reports_tokens, reports_lengths
 
 class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
 
@@ -1921,7 +1932,8 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
             init_tie = np.delete(init_tie, init_tie[:, 0]==(selectedKey - randLength + 1), axis=0)
             time_data_np = np.concatenate([i for i in time_data_list if i is not None])
             time_data_np = np.concatenate([init_tie, time_data_np], axis = 0)
-            time_data_np[:,0] -= selectedKey
+            if args.realtime == 1:
+                time_data_np[:,0] -= selectedKey
             time_data_tensor = torch.Tensor(time_data_np)   # [seq, 3]
             if time_data_tensor.size(0) > args.TIE_len:
                 time_data_tensor = time_data_tensor[:args.TIE_len, :]
@@ -1992,7 +2004,8 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                     reports_tokens = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][0])
                     reports_lengths = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][1]) 
                 missing.append(False)
-                cxr_time -= selectedKey
+                if args.realtime == 1:
+                    cxr_time -= selectedKey
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             if "tdecoder" in args.auxiliary_loss_type:
@@ -2041,7 +2054,10 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
                 
         missing = torch.Tensor(missing)  
-        return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
+        if args.realtime == 1:
+            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
+        else:
+            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, 0, missing, f_indices, target_aux, reports_tokens, reports_lengths
 
 class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
 
@@ -2575,7 +2591,8 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             init_tie = np.delete(init_tie, init_tie[:, 0]==(selectedKey - randLength + 1), axis=0)
             time_data_np = np.concatenate([i for i in time_data_list if i is not None])
             time_data_np = np.concatenate([init_tie, time_data_np], axis = 0)
-            time_data_np[:,0] -= selectedKey
+            if args.realtime == 1:
+                time_data_np[:,0] -= selectedKey
             time_data_tensor = torch.Tensor(time_data_np)   # [seq, 3]
             if time_data_tensor.size(0) > args.TIE_len:
                 time_data_tensor = time_data_tensor[:args.TIE_len, :]
@@ -2647,7 +2664,8 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                     reports_tokens = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][0])
                     reports_lengths = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][1]) 
                 missing.append(False)
-                cxr_time -= selectedKey
+                if args.realtime == 1:
+                    cxr_time -= selectedKey
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             if "tdecoder" in args.auxiliary_loss_type:
@@ -2696,8 +2714,10 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 missing.append(True)
                 
         missing = torch.Tensor(missing)
-        return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
-
+        if args.realtime == 1:
+            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
+        else:
+            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, 0, missing, f_indices, target_aux, reports_tokens, reports_lengths
 
 
         # imgs = []
