@@ -28,14 +28,20 @@ from control.config import args
 def sequenceGenerator(args, randIndex, randLength, windowIndex, data_pkl):
     # If there are sufficient characters to sample randLength characters from
     if(randIndex >= randLength - 1):
-        dataSequence = np.append(data_pkl['data'][randIndex-randLength+1:randIndex+1], np.zeros((args.window_size - randLength, 18)), axis=0)
+        if args.model =="retain":
+            dataSequence = np.append(reversed(data_pkl['data'][randIndex-randLength+1:randIndex+1]), np.zeros((args.window_size - randLength, 18)), axis=0)
+        else:
+            dataSequence = np.append(data_pkl['data'][randIndex-randLength+1:randIndex+1], np.zeros((args.window_size - randLength, 18)), axis=0)
         maskSequence = np.append(data_pkl['mask'][randIndex-randLength+1:randIndex+1], np.zeros((args.window_size - randLength, 18)), axis=0)
         deltaSequence = np.append(data_pkl['delta'][randIndex-randLength+1:randIndex+1], np.zeros((args.window_size - randLength, 18)), axis=0)
         inputLength = randLength
                 
     # Insufficient amount of characters -> more zero-padding at back
     else:
-        dataSequence = np.append(data_pkl['data'][:randIndex+1], np.zeros((windowIndex - randIndex, 18)), axis=0)
+        if args.model =="retain":
+            dataSequence = np.append(reversed(data_pkl['data'][:randIndex+1]), np.zeros((windowIndex - randIndex, 18)), axis=0)
+        else:
+            dataSequence = np.append(data_pkl['data'][:randIndex+1], np.zeros((windowIndex - randIndex, 18)), axis=0)
         maskSequence = np.append(data_pkl['mask'][:randIndex+1], np.zeros((windowIndex - randIndex, 18)), axis=0)
         deltaSequence = np.append(data_pkl['delta'][:randIndex+1], np.zeros((windowIndex - randIndex, 18)), axis=0)
         inputLength = randIndex + 1
@@ -43,6 +49,9 @@ def sequenceGenerator(args, randIndex, randLength, windowIndex, data_pkl):
     return dataSequence, maskSequence, deltaSequence, inputLength
 
 def sequenceGenerator_pretrain(args, randIndex, randLength, windowIndex, data_pkl):
+    if args.model =="retain":
+        print("data_utils.py, Becareful of fusiontype: retain it must be reversed")
+        exit(1)
     if(randIndex >= randLength - 1):
         dataSequence = np.append(data_pkl['data'][randIndex-randLength+1:randIndex+1], np.zeros((args.window_size - randLength, 18)), axis=0)
         dataSequence = np.append(dataSequence, data_pkl['data'][randIndex+1:randIndex+13], axis=0)
@@ -85,6 +94,9 @@ def sequenceGenerator_pretrain(args, randIndex, randLength, windowIndex, data_pk
     return dataSequence, maskSequence, deltaSequence, inputLength, f_indices
 
 def testSequenceGenerator(args, randIndex, randLength, windowIndex, data_pkl):
+    if args.model =="retain":
+        print("data_utils.py, Becareful of fusiontype: retain it must be reversed")
+        exit(1)
     # If there are sufficient characters to sample randLength characters from
     if(randIndex >= randLength - 1):
         dataSequence = np.append(data_pkl['data'][randIndex-randLength+1:randIndex+1], np.zeros((args.test_window_size - randLength, 18)), axis=0)

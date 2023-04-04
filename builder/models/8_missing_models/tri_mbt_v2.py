@@ -14,7 +14,7 @@ from builder.models.src.swin_transformer import swin_t_m, Swin_T_Weights
 from builder.models.src.reports_transformer_decoder import TransformerDecoder
 from transformers import AutoTokenizer
 
-class TRI_MBT_V1(nn.Module):
+class TRI_MBT_V2(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
@@ -169,6 +169,7 @@ class TRI_MBT_V1(nn.Module):
             self.rmse_layer = nn.Linear(in_features=classifier_dim, out_features= 1, bias=True)
         
     def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths):
+        
         # x-TIE:  torch.Size([bs, vslt_len, 3])
         # x-Carryforward:  torch.Size([bs, 24, 16])
         # txts:  torch.Size([bs, 128, 768])         --> ([bs, 128, 256])
@@ -201,7 +202,7 @@ class TRI_MBT_V1(nn.Module):
             demo_embedding = self.ie_demo(demographic)
             vslt_embedding = value_embedding + time_embedding + feat_embedding +demo_embedding
 
-        txt_embedding = self.txt_embedding(txts)
+        txt_embedding = self.txt_embedding(txts.type(torch.LongTensor).to(self.device))
         
         if self.img_model_type == "vit":
             img_embedding = self.img_encoder(img)#[16, 1000] #ViT_B_16_Weights.IMAGENET1K_V1
@@ -257,4 +258,5 @@ class TRI_MBT_V1(nn.Module):
             # exit(1)
         else:
             output3 = None
+            
         return output, output2, output3

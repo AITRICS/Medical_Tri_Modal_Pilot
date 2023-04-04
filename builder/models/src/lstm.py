@@ -45,4 +45,7 @@ class LSTM(nn.Module):
             feats = self.do(feats)
         out = self.dense_layer(feats)
         scores = torch.sigmoid(out)
-        return scores, feats
+        if args.fusion_type == "uni_ehr":
+            return scores, out
+        else:
+            return scores, feats

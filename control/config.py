@@ -17,7 +17,7 @@ parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--seed-list', type=list, default=[412, 1004, 2023]) #[0, 1004, 2022, 9209, 119]
 parser.add_argument('--device', type=int, default=1, nargs='+')
 parser.add_argument('--cpu', type=int, default=0)
-parser.add_argument('--num-workers', type=int, default=4)
+parser.add_argument('--num-workers', type=int, default=5)
 parser.add_argument('--gpus', type=int, default=1)
 parser.add_argument('--reset', default=False, action='store_true')
 parser.add_argument('--project-name', type=str, default="small1")
@@ -27,6 +27,7 @@ parser.add_argument('--prediction-range', type=int, default=12)
 parser.add_argument('--min-inputlen', type=int, default=3)
 parser.add_argument('--window-size', type=int, default=24)
 parser.add_argument('--vslt-type', type=str, default="carryforward", choices=["carryforward", "TIE", "QIE"])
+parser.add_argument('--realtime', type=int, default=1, choices=[0, 1])
 parser.add_argument('--TIE-len', type=int, default=1000)
 parser.add_argument('--ar-lowerbound', type=float, default=0.7)
 parser.add_argument('--ar-upperbound', type=float, default=1.3)
@@ -38,18 +39,18 @@ parser.add_argument('--modality-inclusion', type=str, default="train-full_test-f
 parser.add_argument('--fullmodal-definition', type=str, default="txt1_img1", choices=["txt1_img1", "img1", "txt1"])
 
 # Data path setting
-parser.add_argument('--train-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/train")
-parser.add_argument('--test-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/test")
-parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/destin/multimodal/MLHC_result")
+parser.add_argument('--train-data-path', type=str, default="/home/claire/training_data_0320/mimic_cf_icu_size24/train")
+parser.add_argument('--test-data-path', type=str, default="/home/claire/training_data_0320/mimic_cf_icu_size24/test")
+parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/claire/multimodal/MLHC_result")
 parser.add_argument('--image-data-path', type=str, default="/home/claire/")
+
 # Data Parameters
 parser.add_argument('--cross-fold-val', type=int, default=0, choices=[1, 0], help="1: k-fold, 0: seed-average")
 parser.add_argument('--val-data-ratio', type=float, default=0.1)
-parser.add_argument('--carry-back', type=bool, default=True)
 parser.add_argument('--imgtxt-time', type=int, default=0, choices=[0,1])
 
 # Training Parameters
-parser.add_argument('--epochs', type=int, default=150)
+parser.add_argument('--epochs', type=int, default=50)
 parser.add_argument('--batch-size', type=int, default=32)
 parser.add_argument('--l2-coeff', type=float, default=0.002)
 parser.add_argument('--dropout', type=float, default=0.1)
@@ -66,12 +67,13 @@ parser.add_argument('--weight_decay', '-wd', type=float, default=1e-6, help='Wei
 
 parser.add_argument('--patient-time', default=False)
 parser.add_argument('--threshold', type=float, default=0.5)
-parser.add_argument('--collate', type=int, default=2) 
-parser.add_argument('--quantization', type=bool, default=False)
-parser.add_argument('--show-roc', type=bool, default=False)
+# parser.add_argument('--collate', type=int, default=2) 
+# parser.add_argument('--quantization', type=bool, default=False)
+# parser.add_argument('--show-roc', type=bool, default=False)
 parser.add_argument('--output-dim', type=int, default=1)
 
 # Text Transformer Parameters
+# parser.add_argument('--usepe', type=bool, default=False)
 parser.add_argument('--txt-num-layers', type=int, default=8)
 parser.add_argument('--txt-dropout', type=float, default=0.1)
 parser.add_argument('--txt-model-dim', type=int, default=256)
@@ -134,7 +136,7 @@ parser.add_argument('--PatPosSampleN', type=int, default=5)
 parser.add_argument('--best', default=True, action='store_true')
 parser.add_argument('--last', default=False, action='store_true')
 
-parser.add_argument('--fuse-baseline', type=str, default=None, choices=["Medfuse", "MMTM","DAFT","Retain","Multi"])
+parser.add_argument('--fuse-baseline', type=str, default=None, choices=["Medfuse", "MMTM","DAFT","retain","Multi"])
 parser.add_argument('--mmtm-ratio', type=float, default=4, help='mmtm ratio hyperparameter')
 parser.add_argument('--daft_activation', type=str, default='linear', help='daft activation ')
 parser.add_argument('--fusion-type', type=str, default='fused_ehr', help='train or eval for [fused_ehr, fused_cxr, uni_cxr, uni_ehr]')

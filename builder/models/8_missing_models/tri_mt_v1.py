@@ -142,18 +142,22 @@ class TRI_MT_V1(nn.Module):
         self.activations[activation],
         nn.Linear(in_features=self.model_dim, out_features= self.output_dim,  bias=True))
         
+        if "rmse" in self.args.auxiliary_loss_type:
+            self.rmse_layer = nn.Linear(in_features=classifier_dim, out_features= 1, bias=True)
+        
         self.fixed_lengths = [0, 25]
         self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
         self.txt_feat = torch.Tensor([19]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
         
         ##### Reports Generation
         if ("tdecoder" == self.args.auxiliary_loss_type):
-            self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-            self.vocab_size = self.tokenizer.vocab_size
+            # self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+            # self.vocab_size = self.tokenizer.vocab_size
+            self.vocab_size = 30522
             self.img_2_txt = TransformerDecoder(self.vocab_size,
                                                     d_model = self.model_dim,
                                                     d_ff = self.model_dim * 4,
-                                                    num_layers = self.num_layers,
+                                                    num_layers = 2,
                                                     num_heads = self.num_heads,
                                                     sos_id = 101,
                                                     eos_id = 102,
@@ -219,12 +223,17 @@ class TRI_MT_V1(nn.Module):
             classInput = torch.cat([classInput, demo_embedding], dim=1)
         output = self.fc_list(classInput)
         
+        if "rmse" in self.args.auxiliary_loss_type:
+            output2 = self.rmse_layer(classInput)
+        else:
+            output2 = None
+        
         
         if (flow_type == "train") and ("tdecoder" in self.args.auxiliary_loss_type):
             # unsqueeze를 한 이유: transformer decoder,의 enc_output, seq_lengths를 1로 주기 위해서 
-            output2 = self.img_2_txt(reports_tokens, context_vector[:,-178,:].unsqueeze(1), encoder_output_lengths = self.encoder_output_lengths) 
+            output3 = self.img_2_txt(reports_tokens, context_vector[:,-178,:].unsqueeze(1), encoder_output_lengths = self.encoder_output_lengths) 
             # exit(1)
         else:
-            output2 = None
+            output3 = None
  
-        return output, output2
+        return output, output2, output3

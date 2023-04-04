@@ -7,7 +7,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 import sys; sys.path.append('..')
 # from torch.optim.lr_scheduler import ReduceLROnPlateau
-from builder.models.src.baseline_medfuse import Fusion
+from builder.models.src.baseline_medfuse import Fusion, Fusion_img
 from builder.models.src.baseline_mmtm import FusionMMTM
 from builder.models.src.baseline_daft import FusionDAFT
 # from models.ehr_models import LSTM
@@ -40,11 +40,11 @@ class FUSIONTRAINER(nn.Module):
         models = [self.ehr_model, self.cxr_model]
         model_dict = models[0].state_dict()
         if self.args.output_type == "mortality":
-            dir = "/mnt/aitrics_ext/ext01/claire/multimodal/MLHC_result/ehr_lstm_Mortal_1e-4/ckpts/best_fold0_seed0.pth"
+            dir = "/mnt/aitrics_ext/ext01/claire/multimodal/mlhc_pretrained_model/ehr_image_reports_Mortal_swin_1e-4_0328/best_fold2_seed2023.pth"
         elif self.args.output_type == "vasso":
-            dir = "/mnt/aitrics_ext/ext01/claire/multimodal/MLHC_result/ehr_lstm_Vasso_1e-5/ckpts/best_fold0_seed0.pth"
+            dir = "/mnt/aitrics_ext/ext01/claire/multimodal/mlhc_pretrained_model/ehr_image_reports_Intub_swin_1e-4_0328/best_fold1_seed1004.pth"
         elif self.args.output_type =="intubation":
-            dir = "/mnt/aitrics_ext/ext01/claire/multimodal/MLHC_result/ehr_lstm_Intub_1e-4/ckpts/best_fold1_seed1004.pth"
+            dir = "/mnt/aitrics_ext/ext01/claire/multimodal/mlhc_pretrained_model/ehr_image_reports_Vasso_swin_1e-4_0328/best_fold0_seed412.pth"
         old_weights=torch.load(dir)['model']
         new_weights=torch.load(dir)['model']
         new_weights = {key.replace('ehr_model.', ''): new_weights.pop(key) for key in old_weights.keys()}
@@ -53,8 +53,8 @@ class FUSIONTRAINER(nn.Module):
         models[0].load_state_dict(new_weights)
 
         model_dict = models[1].state_dict()
-        old_weights=torch.load("/mnt/aitrics_ext/ext01/claire/multimodal/best_result/image_reports_Intub_swin_1e-6_modify/best_fold0_seed0.pth")['model']
-        new_weights=torch.load("/mnt/aitrics_ext/ext01/claire/multimodal/best_result/image_reports_Intub_swin_1e-6_modify/best_fold0_seed0.pth")['model']
+        old_weights=torch.load("/mnt/aitrics_ext/ext01/claire/multimodal/mlhc_pretrained_model/image_reports_swin_1e-6_resize_affine_crop-resize_crop_0323/best_fold0_seed0.pth")['model']
+        new_weights=torch.load("/mnt/aitrics_ext/ext01/claire/multimodal/mlhc_pretrained_model/image_reports_swin_1e-6_resize_affine_crop-resize_crop_0323/best_fold0_seed0.pth")['model']
         new_weights = {key.replace('img_encoder.', ''): new_weights.pop(key) for key in old_weights.keys()}
         new_weights = {k: v for k, v in new_weights.items() if k in model_dict}
         model_dict.update(new_weights)
@@ -67,7 +67,10 @@ class FUSIONTRAINER(nn.Module):
                 p.requires_grad = False
 
         if args.fuse_baseline == "Medfuse":
-            self.model = Fusion(args, self.ehr_model, self.cxr_model ).to(self.device)
+            if self.args.input_types =="vslt_img":
+                self.model = Fusion_img(args, self.ehr_model, self.cxr_model ).to(self.device)
+            else:
+                self.model = Fusion(args, self.ehr_model, self.cxr_model ).to(self.device)
         elif args.fuse_baseline == "MMTM":
             self.model = FusionMMTM(args, self.ehr_model, self.cxr_model ).to(self.device)
         elif args.fuse_baseline == "DAFT":
@@ -78,16 +81,16 @@ class FUSIONTRAINER(nn.Module):
 
 
 
-        self.pairs = [True for item in range(args.batch_size)]# full model만 가능 
+        # self.pairs = [True for item in range(args.batch_size)]# full model만 가능 
         
-    def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices):
+    def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, exist_img, missing, f_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths):
         age = age.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
         gen = gen.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
         x = torch.cat([x, age, gen], axis=2)
-        # vslt_embedding = self.init_fc(x)
-        # pairs = [False if item[1] is None else True for item in batch]
-        # final_output = self.model(x, input_lengths, img, pairs)
-        final_output = self.model(x, input_lengths, img, txts, txt_lengths, self.pairs)
+        pairs_txt = torch.tensor(txt_lengths.to("cpu"), dtype=bool)
+        pairs_img = torch.tensor(exist_img.to("cpu"), dtype=bool)
 
+        final_output = self.model(x, input_lengths, img, txts, txt_lengths, pairs_img, pairs_txt, missing)
+        # input_lengths: list of sequence lengths of each batch element
 
         return final_output, None

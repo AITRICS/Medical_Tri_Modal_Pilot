@@ -6,7 +6,7 @@ from torch import Tensor
 import math
 from builder.models.src.transformer.utils import *
 from builder.models.src.transformer import *
-from builder.models.src.transformer.mbt_encoder import TrimodalTransformerEncoder_MBT
+from builder.models.src.transformer.mbt_encoder import BimodalTransformerEncoder_MBT
 from builder.models.src.transformer.module import LayerNorm
 from monai.networks.blocks.patchembedding import PatchEmbeddingBlock
 from builder.models.src.vision_transformer import vit_b_16_m, ViT_B_16_Weights
@@ -14,7 +14,9 @@ from builder.models.src.swin_transformer import swin_t_m, Swin_T_Weights
 from builder.models.src.reports_transformer_decoder import TransformerDecoder
 from transformers import AutoTokenizer
 
-class TRI_MBT_V1(nn.Module):
+
+
+class BI_VSLTIMG_MBT_V1(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
@@ -76,11 +78,6 @@ class TRI_MBT_V1(nn.Module):
                                     nn.ReLU(inplace=True),
                 )
         
-        if args.berttype == "bert": # BERT
-            self.txt_embedding = nn.Embedding(30000, self.model_dim)
-        elif args.berttype == "biobert": # BIOBERT
-            self.txt_embedding = nn.Linear(768, self.model_dim)
-        
         self.img_model_type = args.img_model_type
         self.img_pretrain = args.img_pretrain
         if self.img_model_type == "vit":
@@ -117,10 +114,10 @@ class TRI_MBT_V1(nn.Module):
         self.flatten = nn.Flatten(1,2)
 
         ##### Fusion Part
-        self.fusion_transformer = TrimodalTransformerEncoder_MBT(
+        self.fusion_transformer = BimodalTransformerEncoder_MBT(
             batch_size = args.batch_size,
-            n_modality = self.n_modality,
-            bottlenecks_n = self.bottlenecks_n,      # https://arxiv.org/pdf/2107.00135.pdf # according to section 4.2 implementation details
+            n_modality = 2,
+            bottlenecks_n = 4,      # https://arxiv.org/pdf/2107.00135.pdf # according to section 4.2 implementation details
             fusion_startidx = args.mbt_fusion_startIdx,
             d_input = self.model_dim,
             n_layers = self.num_layers,
@@ -128,9 +125,10 @@ class TRI_MBT_V1(nn.Module):
             d_model = self.model_dim,
             d_ff = self.model_dim * 4,
             dropout = self.dropout,
+            txt_idx = 100,
             pe_maxlen = 2500,
-            use_pe = [vslt_pe, False, True],
-            mask = [True, False, True],
+            use_pe = [vslt_pe, True],
+            mask = [True, False],
         )
 
         ##### Classifier
@@ -200,8 +198,6 @@ class TRI_MBT_V1(nn.Module):
             demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1).unsqueeze(1).repeat(1,x.size(1),1)
             demo_embedding = self.ie_demo(demographic)
             vslt_embedding = value_embedding + time_embedding + feat_embedding +demo_embedding
-
-        txt_embedding = self.txt_embedding(txts)
         
         if self.img_model_type == "vit":
             img_embedding = self.img_encoder(img)#[16, 1000] #ViT_B_16_Weights.IMAGENET1K_V1
@@ -218,43 +214,41 @@ class TRI_MBT_V1(nn.Module):
                 demographic_it = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1).unsqueeze(1)
                 demo_embedding_it = self.ie_demo(demographic_it)
                 img_embedding = img_embedding + self.ie_time(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat) + demo_embedding_it
-                txt_embedding = txt_embedding + self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat) + demo_embedding_it               
             else:
                 img_embedding = img_embedding + self.ie_time(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat)
-                txt_embedding = txt_embedding + self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat)
              
-        outputs, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding, txt_embedding], 
-                                      fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1), txt_embedding.size(1)],
-                                      varying_lengths = [input_lengths, img_embedding.size(1), txt_lengths+2],
+        outputs, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding], 
+                                      fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1)],
+                                      varying_lengths = [input_lengths, img_embedding.size(1)],
                                       fusion_idx = None,
                                       missing=missing
                                       )
+        # print("outputs: ", len(outputs))
+        # print("outputs: ", outputs[0].shape)
+        # print("outputs: ", outputs[1].shape)
         
-        outputs_list = torch.stack([outputs[0][:, 0, :], outputs[1][:, 0, :], outputs[2][:, 0, :]]) # vslt, img, txt
+        outputs_list = torch.stack([outputs[0][:, 0, :], outputs[1][:, 0, :]]) 
         classInput = self.layer_norms_after_concat(outputs_list).reshape(-1, self.model_dim)
 
         if self.args.vslt_type != "QIE":
-            classInput = torch.cat([classInput, demo_embedding.repeat(3,1)], dim=1)
-        outputs_stack = self.fc_list(classInput).reshape(3, -1, self.output_dim)
+            classInput = torch.cat([classInput, demo_embedding.repeat(2,1)], dim=1)
+        outputs_stack = self.fc_list(classInput).reshape(2, -1, self.output_dim)
         
         if "rmse" in self.args.auxiliary_loss_type:
-            output2_stack = self.rmse_layer(classInput).reshape(3, -1)
-            tri_mean2 = torch.mean(output2_stack, dim=0)
-            vslttxt_mean2 = torch.mean(torch.stack([output2_stack[0, :], output2_stack[2, :]]), dim=0)
-            vsltimg_mean2 = torch.mean(torch.stack([output2_stack[0, :], output2_stack[1, :]]), dim=0)
-            all_cls_stack2 = torch.stack([tri_mean2, vsltimg_mean2, vslttxt_mean2, output2_stack[0, :]])
+            output2_stack = self.rmse_layer(classInput).reshape(2, -1)
+            bi_mean2 = torch.mean(output2_stack, dim=0)
+            all_cls_stack2 = torch.stack([bi_mean2, output2_stack[0, :]])
             output2 = all_cls_stack2[missing, self.idx_order]
         else:
             output2 = None
             
-        tri_mean = torch.mean(outputs_stack, dim=0) 
-        vslttxt_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[2, :, :]]), dim=0)
-        vsltimg_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[1, :, :]]), dim=0)
-        all_cls_stack = torch.stack([tri_mean, vsltimg_mean, vslttxt_mean, outputs_stack[0, :, :]])
+        bi_mean = torch.mean(outputs_stack, dim=0) 
+        all_cls_stack = torch.stack([bi_mean, outputs_stack[0, :, :]])
         output = all_cls_stack[missing, self.idx_order]
         if (flow_type == "train") and ("tdecoder" in self.args.auxiliary_loss_type):
             output3 = self.img_2_txt(reports_tokens, outputs[1][:,0,:].unsqueeze(1), encoder_output_lengths = self.encoder_output_lengths)
             # exit(1)
         else:
             output3 = None
+            
         return output, output2, output3
