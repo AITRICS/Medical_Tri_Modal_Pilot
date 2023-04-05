@@ -646,6 +646,9 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             time_data_np = np.concatenate([init_tie, time_data_np], axis = 0)
             if args.realtime == 1:
                 time_data_np[:,0] -= selectedKey
+            else:
+                min_time = min(time_data_np[:,0])
+                time_data_np[:,0] -= min_time
             time_data_tensor = torch.Tensor(time_data_np)   # [seq, 3]
             if time_data_tensor.size(0) > args.TIE_len:
                 time_data_tensor = time_data_tensor[:args.TIE_len, :]
@@ -726,6 +729,8 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 missing.append(False)
                 if args.realtime == 1:
                     cxr_time -= selectedKey
+                else:
+                    cxr_time -= min_time
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             if "tdecoder" in args.auxiliary_loss_type:
@@ -1325,6 +1330,9 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
             time_data_np = np.concatenate([init_tie, time_data_np], axis = 0)
             if args.realtime == 1:
                 time_data_np[:,0] -= selectedKey
+            else:
+                min_time = min(time_data_np[:,0])
+                time_data_np[:,0] -= min_time
             time_data_tensor = torch.Tensor(time_data_np)   # [seq, 3]
             if time_data_tensor.size(0) > args.TIE_len:
                 time_data_tensor = time_data_tensor[:args.TIE_len, :]
@@ -1406,6 +1414,8 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                 missing.append(False)
                 if args.realtime == 1:
                     cxr_time -= selectedKey
+                else:
+                    cxr_time -= min_time
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             if "tdecoder" in args.auxiliary_loss_type:
@@ -1934,6 +1944,9 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
             time_data_np = np.concatenate([init_tie, time_data_np], axis = 0)
             if args.realtime == 1:
                 time_data_np[:,0] -= selectedKey
+            else:
+                min_time = min(time_data_np[:,0])
+                time_data_np[:,0] -= min_time
             time_data_tensor = torch.Tensor(time_data_np)   # [seq, 3]
             if time_data_tensor.size(0) > args.TIE_len:
                 time_data_tensor = time_data_tensor[:args.TIE_len, :]
@@ -2006,6 +2019,8 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 missing.append(False)
                 if args.realtime == 1:
                     cxr_time -= selectedKey
+                else:
+                    cxr_time -= min_time
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             if "tdecoder" in args.auxiliary_loss_type:
@@ -2593,6 +2608,9 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             time_data_np = np.concatenate([init_tie, time_data_np], axis = 0)
             if args.realtime == 1:
                 time_data_np[:,0] -= selectedKey
+            else:
+                min_time = min(time_data_np[:,0])
+                time_data_np[:,0] -= min_time
             time_data_tensor = torch.Tensor(time_data_np)   # [seq, 3]
             if time_data_tensor.size(0) > args.TIE_len:
                 time_data_tensor = time_data_tensor[:args.TIE_len, :]
@@ -2666,6 +2684,8 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 missing.append(False)
                 if args.realtime == 1:
                     cxr_time -= selectedKey
+                else:
+                    cxr_time -= min_time
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             if "tdecoder" in args.auxiliary_loss_type:
