@@ -623,8 +623,9 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 late_nones = randLength - nones[-1] - 1
                 
             randLength -= early_nones
-            selectedKey -= late_nones
-            
+            if "test-missing" in args.modality_inclusion:
+                selectedKey -= late_nones
+                
             if late_nones == 0:
                 time_data_list = list(time_data_list[early_nones:])
             else:
@@ -1098,7 +1099,7 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                             possible_indices_keys_alltypes[pidx] = random.sample(possible_indices_keys_type, args.PatNegSampleN)
 
                 if data_type == "test dataset":
-                    patDict[(pat_id, chid)] = possible_indices_keys_alltypes, possible_indices_dict, target, possibleWinSizes, target_type, event_time
+                    patDict[(pat_id, chid)] = possible_indices_keys_alltypes, possible_indices_dict, target, possibleWinSizes, target_type
             
             patient_list.append(target_type)
             # if target_type == 1 and len(possible_indices_keys_alltypes[3]) > 0 and target_type != 2:
@@ -1302,7 +1303,8 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                 late_nones = randLength - nones[-1] - 1
                 
             randLength -= early_nones
-            selectedKey -= late_nones
+            if "test-missing" in args.modality_inclusion:
+                selectedKey -= late_nones
             
             if late_nones == 0:
                 time_data_list = list(time_data_list[early_nones:])
@@ -1912,7 +1914,9 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 late_nones = randLength - nones[-1] - 1
                 
             randLength -= early_nones
-            selectedKey -= late_nones
+            if "train-missing" in args.modality_inclusion:
+                selectedKey -= late_nones
+                
             if late_nones == 0:
                 time_data_list = list(time_data_list[early_nones:])
             else:
@@ -2571,7 +2575,9 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 late_nones = randLength - nones[-1] - 1
                 
             randLength -= early_nones
-            selectedKey -= late_nones
+            if "test-missing" in args.modality_inclusion:
+                selectedKey -= late_nones
+                
             if late_nones == 0:
                 time_data_list = list(time_data_list[early_nones:])
             else:
@@ -2656,6 +2662,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                     reports_lengths = torch.tensor(0)
                 missing.append(True)
             else:
+                
                 cxr_time, cxr_path = sorted(cxr_li)[-1]
                 image = Image.open(self.image_data_path + cxr_path)
                 image = F_t.equalize(image)
