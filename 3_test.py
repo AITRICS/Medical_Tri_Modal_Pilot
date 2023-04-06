@@ -19,6 +19,8 @@ from builder.trainer.trainer import *
 from builder.utils.utils import set_seeds, set_devices
 from builder.trainer import get_trainer
 import warnings
+from builder.utils.result_utils import *
+from builder.utils.utils import *
 
 # log_directory = os.path.join(args.dir_result, args.project_name)
 # settings_file_name = os.path.join(log_directory, "settings.txt")
@@ -67,59 +69,66 @@ import warnings
 
 # warnings.filterwarnings("ignore", category=DeprecationWarning) 
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+# set trainer, setting file, and seed number 
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
+args.seed = 0
+
+if args.cross_fold_val == 1:
+    set_seeds(args)
+    
+# define result class
+save_valid_results = experiment_results_validation(args)
+save_test_results = experiment_results_test(args)
 
 label_method_max = True
 scheduler = None
 optimizer = None
 
+# get patient_dict: {pat_id: pkl list}
+patient_dict, keys_list = patient_wise_ordering(args)
+print("Selected Dataset: ", args.train_data_path.split("/")[-2])
+if args.cross_fold_val == 1:
+    print("K-number of seeds (K-fold-cross-validation): ", len(args.seed_list))
+else:
+    print("K-number of seeds (K-seeds average): ", len(args.seed_list))
+
+
 
 iteration = 1
-set_seeds(args)
-scaler = torch.cuda.amp.GradScaler()
-device = set_devices(args)
-logger = Logger(args)
-logger.loss = 0
-# seed
-torch.manual_seed(args.seed)
-torch.cuda.manual_seed_all(args.seed)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
-np.random.seed(args.seed)
-random.seed(args.seed)
-
-# set loss function
-if args.model_types == "classification":
-    if "softmax" == args.loss_types:
-        criterion = nn.CrossEntropyLoss(reduction='mean')
-        args.output_dim = 12
-    elif "bces" == args.loss_types: 
-        criterion = nn.BCEWithLogitsLoss(size_average=True, reduction='mean')    
-        args.output_dim = 12
-    elif "bceandsoftmax" == args.loss_types:
-        criterion = (nn.CrossEntropyLoss(reduction='mean'), nn.BCEWithLogitsLoss(size_average=True, reduction='mean'))    
-        args.output_dim = 12
-    elif "rmse" == args.loss_types: 
-        criterion = nn.MSELoss(reduction='none')
-        args.output_dim = 1
-    
-elif args.model_types == "detection":   
-    criterion = nn.BCEWithLogitsLoss(size_average=True, reduction='mean')
-    args.output_dim = 1
-    
-pad_id = 0
-criterion_img_aux = nn.CrossEntropyLoss(ignore_index = pad_id).to(device, non_blocking=True)
-criterion_vslt_aux = nn.MSELoss(reduction='none')
-
-
-test_loader = get_test_data_loader(args)
-model = get_model(args)
-model = model(args).to(device)
 name = args.project_name
 
 result_dir = search_walk({"path": args.dir_result + "/" + name + "/ckpts", "extension": ".pth"})
+print("result",result_dir)
+
 
 
 for model_numm, ckpt in enumerate(result_dir):
+    args.log_fold = model_numm
+    if args.cross_fold_val != 1:
+        args.seed = args.seed_list[model_numm]
+        set_seeds(args)
+    scaler = torch.cuda.amp.GradScaler()
+    # set device
+    seed_num = 0
+    device = set_devices(args)
+    args.device = device
+    
+    test_loader = get_test_data_loader(args, patient_dict, keys_list)
+    model = get_model(args)
+    model = model(args).to(device)
+    
+    # set logger
+    logger = Logger(args)
+    if args.model_types == "classification" and args.loss_types == "rmse":
+        logger.evaluator.best_auc = float('inf')
+    else:
+        logger.evaluator.best_auc = 0
+    logger.loss = 0
+    
+    print("########## Experiment Begins ##########")
+    print(args.input_types)
+    print(args.modality_inclusion)
+    
     model_ckpt = torch.load(ckpt, map_location = device)
     state = {k:v for k,v in model_ckpt['model'].items()}
     model.load_state_dict(state)
@@ -129,6 +138,28 @@ for model_numm, ckpt in enumerate(result_dir):
 
     logger.evaluator.reset()
     result_list = []
+    # set loss function
+    if args.model_types == "classification":
+        if "softmax" == args.loss_types:
+            criterion = nn.CrossEntropyLoss(reduction='mean')
+            args.output_dim = 12
+        elif "bces" == args.loss_types: 
+            criterion = nn.BCEWithLogitsLoss(size_average=True, reduction='mean')    
+            args.output_dim = 12
+        elif "bceandsoftmax" == args.loss_types:
+            criterion = (nn.CrossEntropyLoss(reduction='mean'), nn.BCEWithLogitsLoss(size_average=True, reduction='mean'))    
+            args.output_dim = 12
+        elif "rmse" == args.loss_types: 
+            criterion = nn.MSELoss(reduction='none')
+            args.output_dim = 1
+        
+    elif args.model_types == "detection":   
+        criterion = nn.BCEWithLogitsLoss(size_average=True, reduction='mean')
+        args.output_dim = 1
+        
+    pad_id = 0
+    criterion_img_aux = nn.CrossEntropyLoss(ignore_index = pad_id).to(device, non_blocking=True)
+    criterion_vslt_aux = nn.MSELoss(reduction='none')
 
     
     with torch.no_grad():

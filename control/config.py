@@ -17,7 +17,7 @@ parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--seed-list', type=list, default=[412, 1004, 2023]) #[0, 1004, 2022, 9209, 119]
 parser.add_argument('--device', type=int, default=1, nargs='+')
 parser.add_argument('--cpu', type=int, default=0)
-parser.add_argument('--num-workers', type=int, default=5)
+parser.add_argument('--num-workers', type=int, default=2)
 parser.add_argument('--gpus', type=int, default=1)
 parser.add_argument('--reset', default=False, action='store_true')
 parser.add_argument('--project-name', type=str, default="small1")
@@ -39,9 +39,9 @@ parser.add_argument('--modality-inclusion', type=str, default="train-full_test-f
 parser.add_argument('--fullmodal-definition', type=str, default="txt1_img1", choices=["txt1_img1", "img1", "txt1"])
 
 # Data path setting
-parser.add_argument('--train-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/train")
-parser.add_argument('--test-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/test")
-parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/destin/multimodal/MLHC_result")
+parser.add_argument('--train-data-path', type=str, default="/home/claire/training_data_0320/mimic_cf_icu_size24/train")
+parser.add_argument('--test-data-path', type=str, default="/home/claire/training_data_0320/mimic_cf_icu_size24/test")
+parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/claire/multimodal/mlhc_final_models")
 parser.add_argument('--image-data-path', type=str, default="/home/claire/")
 
 # Data Parameters
@@ -140,6 +140,10 @@ parser.add_argument('--fuse-baseline', type=str, default=None, choices=["Medfuse
 parser.add_argument('--mmtm-ratio', type=float, default=4, help='mmtm ratio hyperparameter')
 parser.add_argument('--daft_activation', type=str, default='linear', help='daft activation ')
 parser.add_argument('--fusion-type', type=str, default='fused_ehr', help='train or eval for [fused_ehr, fused_cxr, uni_cxr, uni_ehr]')
+
+# For test.py
+# val,test 시 발생
+parser.add_argument('--missing-prop', type=int, default=0, choices=[0,20,40,60,80, 100])
 
 args = parser.parse_args()
 args.dir_root = os.getcwd()

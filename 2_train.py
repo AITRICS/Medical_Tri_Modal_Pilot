@@ -88,7 +88,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
             args.output_dim = 12
         elif "rmse" == args.loss_types: 
             criterion = nn.MSELoss(reduction='none')
-            args.output_dim = 1
+            args.output_dim = 1 ###########################
       
     elif args.model_types == "detection":   
         criterion = nn.BCEWithLogitsLoss(size_average=True, reduction='mean')

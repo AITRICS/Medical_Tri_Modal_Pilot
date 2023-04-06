@@ -23,7 +23,7 @@ class TRI_MBT_V1(nn.Module):
         self.patch_size = 16
         self.img_num_heads = 4
         self.pos_embed = "conv"
-        self.output_dim = args.output_dim
+        self.output_dim = 2 # args.output_dim
         self.num_layers = args.transformer_num_layers
         self.num_heads = args.transformer_num_head
         self.model_dim = args.transformer_dim
@@ -165,8 +165,8 @@ class TRI_MBT_V1(nn.Module):
                                                     )
             self.encoder_output_lengths = torch.tensor([1 for i in range(self.args.batch_size)]).to(self.device)
         
-        if "rmse" in self.args.auxiliary_loss_type:
-            self.rmse_layer = nn.Linear(in_features=classifier_dim, out_features= 1, bias=True)
+        # if "rmse" in self.args.auxiliary_loss_type:
+        #     self.rmse_layer = nn.Linear(in_features=classifier_dim, out_features= 1, bias=True)
         
     def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths):
         # x-TIE:  torch.Size([bs, vslt_len, 3])
@@ -238,7 +238,7 @@ class TRI_MBT_V1(nn.Module):
         outputs_stack = self.fc_list(classInput).reshape(3, -1, self.output_dim)
         
         if "rmse" in self.args.auxiliary_loss_type:
-            output2_stack = self.rmse_layer(classInput).reshape(3, -1)
+            output2_stack = outputs_stack[:,:,1] #self.rmse_layer(classInput).reshape(3, -1) #########
             tri_mean2 = torch.mean(output2_stack, dim=0)
             vslttxt_mean2 = torch.mean(torch.stack([output2_stack[0, :], output2_stack[2, :]]), dim=0)
             vsltimg_mean2 = torch.mean(torch.stack([output2_stack[0, :], output2_stack[1, :]]), dim=0)
@@ -247,10 +247,10 @@ class TRI_MBT_V1(nn.Module):
         else:
             output2 = None
             
-        tri_mean = torch.mean(outputs_stack, dim=0) 
-        vslttxt_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[2, :, :]]), dim=0)
-        vsltimg_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[1, :, :]]), dim=0)
-        all_cls_stack = torch.stack([tri_mean, vsltimg_mean, vslttxt_mean, outputs_stack[0, :, :]])
+        tri_mean = torch.mean(outputs_stack[:,:,0], dim=0) 
+        vslttxt_mean = torch.mean(torch.stack([outputs_stack[0, :, 0], outputs_stack[2, :, 0]]), dim=0)
+        vsltimg_mean = torch.mean(torch.stack([outputs_stack[0, :, 0], outputs_stack[1, :, 0]]), dim=0)
+        all_cls_stack = torch.stack([tri_mean, vsltimg_mean, vslttxt_mean, outputs_stack[0, :, 0]])
         output = all_cls_stack[missing, self.idx_order]
         if (flow_type == "train") and ("tdecoder" in self.args.auxiliary_loss_type):
             output3 = self.img_2_txt(reports_tokens, outputs[1][:,0,:].unsqueeze(1), encoder_output_lengths = self.encoder_output_lengths)

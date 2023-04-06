@@ -647,6 +647,9 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             time_data_np = np.concatenate([init_tie, time_data_np], axis = 0)
             if args.realtime == 1:
                 time_data_np[:,0] -= selectedKey
+            else:
+                min_time = min(time_data_np[:,0])
+                time_data_np[:,0] -= min_time
             time_data_tensor = torch.Tensor(time_data_np)   # [seq, 3]
             if time_data_tensor.size(0) > args.TIE_len:
                 time_data_tensor = time_data_tensor[:args.TIE_len, :]
@@ -727,6 +730,8 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 missing.append(False)
                 if args.realtime == 1:
                     cxr_time -= selectedKey
+                else:
+                    cxr_time -= min_time
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             if "tdecoder" in args.auxiliary_loss_type:
@@ -1327,6 +1332,9 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
             time_data_np = np.concatenate([init_tie, time_data_np], axis = 0)
             if args.realtime == 1:
                 time_data_np[:,0] -= selectedKey
+            else:
+                min_time = min(time_data_np[:,0])
+                time_data_np[:,0] -= min_time
             time_data_tensor = torch.Tensor(time_data_np)   # [seq, 3]
             if time_data_tensor.size(0) > args.TIE_len:
                 time_data_tensor = time_data_tensor[:args.TIE_len, :]
@@ -1398,16 +1406,27 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                     reports_lengths = torch.tensor(0)
                 missing.append(True)
             else:
-                cxr_time, cxr_path = sorted(cxr_li)[-1]
-                image = Image.open(self.image_data_path + cxr_path)
-                image = F_t.equalize(image)
-                img = self.transform(image)
-                if "tdecoder" in args.auxiliary_loss_type:
-                    reports_tokens = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][0])
-                    reports_lengths = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][1]) 
-                missing.append(False)
-                if args.realtime == 1:
-                    cxr_time -= selectedKey
+                prop=[args.missing_prop/100,(100-args.missing_prop)/100]
+                img_missing_prop = np.random.choice(2,1,replace=True, p=prop) # 0과 1중 random 나옴
+                if img_missing_prop == 0: # missing 될 확률
+                    img = torch.zeros(self.image_size).unsqueeze(0)
+                    if "tdecoder" in args.auxiliary_loss_type:
+                        reports_tokens = torch.zeros(1024, dtype=torch.long)
+                        reports_lengths = torch.tensor(0)
+                    missing.append(True)
+                else: # missing 안될 확률
+                    cxr_time, cxr_path = sorted(cxr_li)[-1]
+                    image = Image.open(self.image_data_path + cxr_path)
+                    image = F_t.equalize(image)
+                    img = self.transform(image)
+                    if "tdecoder" in args.auxiliary_loss_type:
+                        reports_tokens = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][0])
+                        reports_lengths = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][1]) 
+                    missing.append(False)
+                    if args.realtime == 1:
+                        cxr_time -= selectedKey
+                    else:
+                        cxr_time -= min_time
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             if "tdecoder" in args.auxiliary_loss_type:
@@ -1442,14 +1461,21 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                     textLength = 0
                     missing.append(True)
                 else:
-                    textLength = len(tokens)
-                    # UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
-                    # EX) 2 {Sentence Tokens} {1 Padding} 3
-                    # Add Beginnning of Sentence Token
-                    tokens.insert(0, 2)
-                    tokens = torch.Tensor(clinical_note_transform(tokens))
-                    tokens[tokens==1] = 0
-                    missing.append(False)
+                    prop=[args.missing_prop/100,(100-args.missing_prop)/100]
+                    txt_missing_prop = np.random.choice(2,1,replace=True, p=prop)
+                    if txt_missing_prop == 0:
+                        tokens = torch.zeros(self.token_max_length)
+                        textLength = 0
+                        missing.append(True)
+                    else:
+                        textLength = len(tokens)
+                        # UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
+                        # EX) 2 {Sentence Tokens} {1 Padding} 3
+                        # Add Beginnning of Sentence Token
+                        tokens.insert(0, 2)
+                        tokens = torch.Tensor(clinical_note_transform(tokens))
+                        tokens[tokens==1] = 0
+                        missing.append(False)
             else:    
                 tokens = torch.zeros(self.token_max_length)
                 textLength = 0
@@ -1938,6 +1964,9 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
             time_data_np = np.concatenate([init_tie, time_data_np], axis = 0)
             if args.realtime == 1:
                 time_data_np[:,0] -= selectedKey
+            else:
+                min_time = min(time_data_np[:,0])
+                time_data_np[:,0] -= min_time
             time_data_tensor = torch.Tensor(time_data_np)   # [seq, 3]
             if time_data_tensor.size(0) > args.TIE_len:
                 time_data_tensor = time_data_tensor[:args.TIE_len, :]
@@ -2010,6 +2039,8 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 missing.append(False)
                 if args.realtime == 1:
                     cxr_time -= selectedKey
+                else:
+                    cxr_time -= min_time
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             if "tdecoder" in args.auxiliary_loss_type:
@@ -2599,6 +2630,9 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             time_data_np = np.concatenate([init_tie, time_data_np], axis = 0)
             if args.realtime == 1:
                 time_data_np[:,0] -= selectedKey
+            else:
+                min_time = min(time_data_np[:,0])
+                time_data_np[:,0] -= min_time
             time_data_tensor = torch.Tensor(time_data_np)   # [seq, 3]
             if time_data_tensor.size(0) > args.TIE_len:
                 time_data_tensor = time_data_tensor[:args.TIE_len, :]
@@ -2662,17 +2696,27 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                     reports_lengths = torch.tensor(0)
                 missing.append(True)
             else:
-                
-                cxr_time, cxr_path = sorted(cxr_li)[-1]
-                image = Image.open(self.image_data_path + cxr_path)
-                image = F_t.equalize(image)
-                img = self.transform(image)
-                if "tdecoder" in args.auxiliary_loss_type:
-                    reports_tokens = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][0])
-                    reports_lengths = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][1]) 
-                missing.append(False)
-                if args.realtime == 1:
-                    cxr_time -= selectedKey
+                prop=[args.missing_prop/100,(100-args.missing_prop)/100]
+                img_missing_prop = np.random.choice(2,1,replace=True, p=prop)
+                if img_missing_prop == 0:
+                    img = torch.zeros(self.image_size).unsqueeze(0)
+                    if "tdecoder" in args.auxiliary_loss_type:
+                            reports_tokens = torch.zeros(1024, dtype=torch.long)
+                            reports_lengths = torch.tensor(0)
+                    missing.append(True)
+                else:
+                    cxr_time, cxr_path = sorted(cxr_li)[-1]
+                    image = Image.open(self.image_data_path + cxr_path)
+                    image = F_t.equalize(image)
+                    img = self.transform(image)
+                    if "tdecoder" in args.auxiliary_loss_type:
+                        reports_tokens = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][0])
+                        reports_lengths = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][1]) 
+                    missing.append(False)
+                    if args.realtime == 1:
+                        cxr_time -= selectedKey
+                    else:
+                        cxr_time -= min_time
         else:
             img = torch.zeros(self.image_size).unsqueeze(0)
             if "tdecoder" in args.auxiliary_loss_type:
@@ -2707,14 +2751,21 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                     textLength = 0
                     missing.append(True)
                 else:
-                    textLength = len(tokens)
-                    # UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
-                    # EX) 2 {Sentence Tokens} {1 Padding} 3
-                    # Add Beginnning of Sentence Token
-                    tokens.insert(0, 2)
-                    tokens = torch.Tensor(clinical_note_transform(tokens))
-                    tokens[tokens==1] = 0
-                    missing.append(False)
+                    prop=[args.missing_prop/100,(100-args.missing_prop)/100]
+                    txt_missing_prop = np.random.choice(2,1,replace=True, p=prop)
+                    if txt_missing_prop == 0:
+                        tokens = torch.zeros(self.token_max_length)
+                        textLength = 0
+                        missing.append(True)
+                    else:
+                        textLength = len(tokens)
+                        # UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
+                        # EX) 2 {Sentence Tokens} {1 Padding} 3
+                        # Add Beginnning of Sentence Token
+                        tokens.insert(0, 2)
+                        tokens = torch.Tensor(clinical_note_transform(tokens))
+                        tokens[tokens==1] = 0
+                        missing.append(False)
             else:    
                 tokens = torch.zeros(self.token_max_length)
                 textLength = 0

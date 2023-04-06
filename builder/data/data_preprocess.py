@@ -94,16 +94,30 @@ def get_data_loader(args, patient_dict, keys_list, k_indx):
     return train_loader, val_loader, test_loader
 
 
-def get_test_data_loader(args):
+def get_test_data_loader(args, patient_dict, keys_list):
+    train_keys  = keys_list[0]
+    # flatten to data list & shuffle train set (again)
+    train_data_list = [patient_dict[key] for key in train_keys]
+    train_data_list = [item for sublist in train_data_list for item in sublist]
+
+    random.shuffle(train_data_list)
     # get test data
     test_dir = search_walk({'path': args.test_data_path, 'extension': ".pkl"})
     args.vslt_mask = [True if i not in args.vitalsign_labtest else False for i in VITALSIGN_LABTEST] # True to remove
+    
     if args.output_type == 'mortality':
+        train_data        = Onetime_Outbreak_Training_Dataset(args, data=train_data_list, data_type="training dataset")
         test_data         = Onetime_Outbreak_Test_Dataset(args, data=test_dir, data_type="test dataset")
     elif args.output_type == 'cpr' or args.output_type == 'intubation' or\
             args.output_type == 'vasso' or args.output_type == 'transfer':
+        train_data        = Multiple_Outbreaks_Training_Dataset(args, data=train_data_list, data_type="training dataset")
         test_data         = Multiple_Outbreaks_Test_Dataset(args, data=test_dir, data_type="test dataset")
-        
+    
+    args.feature_mins = torch.Tensor([0.0, 0.0, 25.0, 0.0, 0.0, 0.0, 9.0, 0.0, 5.0, 0.0, 0.0, 0.94, 2.0, 0.0, 0.0, 0.8, 67.0, 0.2])
+    args.feature_maxs = torch.Tensor([295.0, 120.0, 43.05555555556, 299.0, 298.0, 100.0, 15.0, 68.6, 1000.0, 100.0, 75.0, 9.38, 50.0, 20.0, 20.0, 14.7, 185.0, 531.3])
+    args.feature_max_mins = args.feature_maxs - args.feature_mins
+    args.feature_means    = torch.Tensor(train_data.feature_means)    
+    args.feature_means = np.delete(args.feature_means, args.vslt_mask, axis = 0)    
     test_loader  = DataLoader(test_data, batch_size=args.batch_size, drop_last=True,
                                 num_workers=args.num_workers, pin_memory=True)
     return test_loader
