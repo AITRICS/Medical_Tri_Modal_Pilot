@@ -261,9 +261,9 @@ class TRI_MBT_V1(nn.Module):
         if "rmse" in self.args.auxiliary_loss_type:
             output2_stack = outputs_stack[:,:,1] #self.rmse_layer(classInput).reshape(3, -1) #########<-원래
             tri_mean2 = torch.mean(output2_stack, dim=0)
-            vslttxt_mean2 = torch.mean(torch.stack([output2_stack[0, :, 1], output2_stack[2, :, 1]]), dim=0)
-            vsltimg_mean2 = torch.mean(torch.stack([output2_stack[0, :, 1], output2_stack[1, :, 1]]), dim=0)
-            all_cls_stack2 = torch.stack([tri_mean2, vsltimg_mean2, vslttxt_mean2, output2_stack[0, :, 1]])
+            vslttxt_mean2 = torch.mean(torch.stack([output2_stack[0, :], output2_stack[2, :]]), dim=0)
+            vsltimg_mean2 = torch.mean(torch.stack([output2_stack[0, :], output2_stack[1, :]]), dim=0)
+            all_cls_stack2 = torch.stack([tri_mean2, vsltimg_mean2, vslttxt_mean2, output2_stack[0, :]])
             output2 = all_cls_stack2[missing, self.idx_order]
         else:
             output2 = None
