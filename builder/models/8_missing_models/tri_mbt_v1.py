@@ -221,7 +221,7 @@ class TRI_MBT_V1(nn.Module):
             img_embedding = self.img_encoder(img)
             img_embedding = self.flatten(img_embedding)
             img_embedding = self.linear(img_embedding)     
-            img_time = img_time.reshape(-1)
+            img_time = img_time.reshape(-1).detach().clone()
         else:
             img_embedding = self.patch_embedding(img)
             
@@ -232,17 +232,26 @@ class TRI_MBT_V1(nn.Module):
                 img_embedding = img_embedding + self.ie_time(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat) + demo_embedding_it
                 txt_embedding = txt_embedding + self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat) + demo_embedding_it               
             else:
+                # print("1: ",img_embedding.shape)
+                # print("2: ",self.ie_time(img_time.unsqueeze(1)).unsqueeze(1).shape)
+                # print("3: ",self.ie_feat(self.img_feat).shape)
                 img_embedding = img_embedding + self.ie_time(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat)
                 txt_embedding = txt_embedding + self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat)
         
         if self.args.multiimages == 1:
             img_embedding = img_embedding.reshape(-1, 3, 49, 256)   
             img_embedding = img_embedding.reshape(-1, 147, 256)
-            img_time = img_time.reshape(-1, 3)
-            img_time[img_time!=10] = 1
-            img_time[img_time==10] = 0
-            img_time = torch.sum(img_time,dim=1) * 49
+            # print("1 img_time: ", img_time)
+            img_time = img_time.reshape(-1, 3) - 10
+            # print("2 img_time: ", img_time)
+            img_time = torch.count_nonzero(img_time, dim=1)
+            img_time = img_time * 49
             img_time = img_time.type(torch.IntTensor)
+            # img_time = img_time.reshape(-1, 3)
+            # img_time[img_time!=10] = 1
+            # img_time[img_time==10] = 0
+            # img_time = torch.sum(img_time,dim=1) * 49
+            # img_time = img_time.type(torch.IntTensor)
         
         outputs, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding, txt_embedding], 
                                       fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1), txt_embedding.size(1)],

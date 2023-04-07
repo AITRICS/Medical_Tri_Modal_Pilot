@@ -28,12 +28,12 @@ from builder.utils.result_utils import *
 from builder.utils.logger import Logger
 from builder.utils.cosine_annealing_with_warmup_v2 import CosineAnnealingWarmupRestarts
 from builder.utils.cosine_annealing_with_warmupSingle import CosineAnnealingWarmUpSingle
-
+torch.autograd.set_detect_anomaly(True)
 # set gpu device
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 
 # set trainer, setting file, and seed number 
-os.environ["TOKENIZERS_PARALLELISM"] = "true"
+# os.environ["TOKENIZERS_PARALLELISM"] = "true"
 args.seed = 0
 make_setting_file(args)
 if args.cross_fold_val == 1:
