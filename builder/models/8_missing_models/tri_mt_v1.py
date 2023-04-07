@@ -25,7 +25,10 @@ class TRI_MT_V1(nn.Module):
         self.num_heads = args.transformer_num_head
         self.model_dim = args.transformer_dim
         self.dropout = args.dropout
-        self.output_dim = args.output_dim
+        if args.output_type =="intubation":
+            self.output_dim = 1#args.output_dim
+        else:
+            self.output_dim = 2#args.output_dim
 
         self.num_nodes = len(args.vitalsign_labtest)
         self.t_len = args.window_size
@@ -142,8 +145,8 @@ class TRI_MT_V1(nn.Module):
         self.activations[activation],
         nn.Linear(in_features=self.model_dim, out_features= self.output_dim,  bias=True))
         
-        if "rmse" in self.args.auxiliary_loss_type:
-            self.rmse_layer = nn.Linear(in_features=classifier_dim, out_features= 1, bias=True)
+        # if "rmse" in self.args.auxiliary_loss_type:
+        #     self.rmse_layer = nn.Linear(in_features=classifier_dim, out_features= 1, bias=True)
         
         self.fixed_lengths = [0, 25]
         self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
@@ -224,7 +227,7 @@ class TRI_MT_V1(nn.Module):
         output = self.fc_list(classInput)
         
         if "rmse" in self.args.auxiliary_loss_type:
-            output2 = self.rmse_layer(classInput)
+            output2 = output[:,1]#self.rmse_layer(classInput)
         else:
             output2 = None
         
@@ -235,5 +238,6 @@ class TRI_MT_V1(nn.Module):
             # exit(1)
         else:
             output3 = None
+        
  
-        return output, output2, output3
+        return output[:,0], output2, output3
