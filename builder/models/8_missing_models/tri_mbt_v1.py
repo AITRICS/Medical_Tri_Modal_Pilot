@@ -267,7 +267,7 @@ class TRI_MBT_V1(nn.Module):
             output2 = all_cls_stack2[missing, self.idx_order]
         else:
             output2 = None
-        output2 = None
+
         tri_mean = torch.mean(outputs_stack[:,:,0], dim=0) 
         vslttxt_mean = torch.mean(torch.stack([outputs_stack[0, :, 0], outputs_stack[2, :, 0]]), dim=0)
         vsltimg_mean = torch.mean(torch.stack([outputs_stack[0, :, 0], outputs_stack[1, :, 0]]), dim=0)
