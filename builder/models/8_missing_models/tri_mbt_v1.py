@@ -133,7 +133,7 @@ class TRI_MBT_V1(nn.Module):
             dropout = self.dropout,
             pe_maxlen = 2500,
             use_pe = [vslt_pe, False, True],
-            mask = [True, False, True],
+            mask = [True, True, True],
         )
 
         ##### Classifier
@@ -149,7 +149,10 @@ class TRI_MBT_V1(nn.Module):
         nn.Linear(in_features=self.model_dim, out_features= self.output_dim,  bias=True))
 
         self.relu = self.activations[activation]
-        self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
+        if self.args.multiimages == 1:
+            self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size * 3).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
+        else:
+            self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
         self.txt_feat = torch.Tensor([19]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
 
         ##### Reports Genertaion
@@ -179,6 +182,9 @@ class TRI_MBT_V1(nn.Module):
         # age = age.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
         # gen = gen.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)    
         # x = torch.cat([x, age, gen], axis=2)
+        # print("img: ", img.shape)
+        # print("img_time: ", img_time)
+        # exit(1)
 
         demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1)
         demo_embedding = self.ie_demo(demographic)
@@ -210,9 +216,12 @@ class TRI_MBT_V1(nn.Module):
             img_embedding = self.img_encoder(img)#[16, 1000] #ViT_B_16_Weights.IMAGENET1K_V1
             img_embedding = self.linear(img_embedding)
         elif self.img_model_type == "swin":
+            if self.args.multiimages == 1:
+                img = img.reshape(-1, 1, 224, 224)
             img_embedding = self.img_encoder(img)
             img_embedding = self.flatten(img_embedding)
             img_embedding = self.linear(img_embedding)     
+            img_time = img_time.reshape(-1)
         else:
             img_embedding = self.patch_embedding(img)
             
@@ -225,10 +234,19 @@ class TRI_MBT_V1(nn.Module):
             else:
                 img_embedding = img_embedding + self.ie_time(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat)
                 txt_embedding = txt_embedding + self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat)
-             
+        
+        if self.args.multiimages == 1:
+            img_embedding = img_embedding.reshape(-1, 3, 49, 256)   
+            img_embedding = img_embedding.reshape(-1, 147, 256)
+            img_time = img_time.reshape(-1, 3)
+            img_time[img_time!=10] = 1
+            img_time[img_time==10] = 0
+            img_time = torch.sum(img_time,dim=1) * 49
+            img_time = img_time.type(torch.IntTensor)
+        
         outputs, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding, txt_embedding], 
                                       fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1), txt_embedding.size(1)],
-                                      varying_lengths = [input_lengths, img_embedding.size(1), txt_lengths+2],
+                                      varying_lengths = [input_lengths, img_time, txt_lengths+2],
                                       fusion_idx = None,
                                       missing=missing
                                       )
@@ -243,13 +261,13 @@ class TRI_MBT_V1(nn.Module):
         if "rmse" in self.args.auxiliary_loss_type:
             output2_stack = outputs_stack[:,:,1] #self.rmse_layer(classInput).reshape(3, -1) #########<-원래
             tri_mean2 = torch.mean(output2_stack, dim=0)
-            vslttxt_mean2 = torch.mean(torch.stack([output2_stack[0, :], output2_stack[2, :]]), dim=0)
-            vsltimg_mean2 = torch.mean(torch.stack([output2_stack[0, :], output2_stack[1, :]]), dim=0)
-            all_cls_stack2 = torch.stack([tri_mean2, vsltimg_mean2, vslttxt_mean2, output2_stack[0, :]])
+            vslttxt_mean2 = torch.mean(torch.stack([output2_stack[0, :, 1], output2_stack[2, :, 1]]), dim=0)
+            vsltimg_mean2 = torch.mean(torch.stack([output2_stack[0, :, 1], output2_stack[1, :, 1]]), dim=0)
+            all_cls_stack2 = torch.stack([tri_mean2, vsltimg_mean2, vslttxt_mean2, output2_stack[0, :, 1]])
             output2 = all_cls_stack2[missing, self.idx_order]
         else:
             output2 = None
-            
+        output2 = None
         tri_mean = torch.mean(outputs_stack[:,:,0], dim=0) 
         vslttxt_mean = torch.mean(torch.stack([outputs_stack[0, :, 0], outputs_stack[2, :, 0]]), dim=0)
         vsltimg_mean = torch.mean(torch.stack([outputs_stack[0, :, 0], outputs_stack[1, :, 0]]), dim=0)

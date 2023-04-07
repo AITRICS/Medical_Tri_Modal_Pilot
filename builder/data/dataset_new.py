@@ -285,7 +285,9 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 self.transform = xray_image_transform_train_resize_affine_crop()
             elif args.image_train_type == "randaug":
                 self.transform = xray_image_transform_train_randaug()
-                
+              
+        real_pat_num = [0, 0, 0, 0, 0]  # patnum, wimg/wtxt, woimg/wtxt, wimg/wotxt, woimg/wotxt
+        real_nonpat_num = [0, 0, 0, 0, 0]
         for idx, pkl_path in enumerate(tqdm(data, desc="Loading files of {}...".format(data_type))):
             file_name = pkl_path.split("/")[-1]
             
@@ -520,6 +522,27 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 pass
             else:
                 lengths.append(sequenceLength)
+            
+            if target == 1:
+                real_pat_num[0] += 1
+                if "txt1_img1" in file_name:
+                    real_pat_num[1] += 1 
+                elif "txt1_img0" in file_name:
+                    real_pat_num[2] += 1 
+                elif "txt0_img1" in file_name:
+                    real_pat_num[3] += 1 
+                elif "txt0_img0" in file_name:
+                    real_pat_num[4] += 1 
+            else:
+                real_nonpat_num[0] += 1
+                if "txt1_img1" in file_name:
+                    real_nonpat_num[1] += 1 
+                elif "txt1_img0" in file_name:
+                    real_nonpat_num[2] += 1 
+                elif "txt0_img1" in file_name:
+                    real_nonpat_num[3] += 1 
+                elif "txt0_img0" in file_name:
+                    real_nonpat_num[4] += 1 
 
         if ('train-full' in args.modality_inclusion):
             ### class 2 방식
@@ -558,6 +581,17 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         print("########## Detail Data Info ##########")
         print("Positive time-points: ", positive_tpoints)
         print("Negative time-points: ", negative_tpoints)
+        print("########## Detail Data Info per patient ##########")
+        print("Used patient number: ", real_pat_num[0])
+        print("Used patient with image and with txt number: ", real_pat_num[1])
+        print("Used patient without image and with txt number: ", real_pat_num[2])
+        print("Used patient with image and without txt number: ", real_pat_num[3])
+        print("Used patient without image and without txt number: ", real_pat_num[4])
+        print("Used non-patient number: ", real_nonpat_num[0])
+        print("Used non-patient with image and with txt number: ", real_nonpat_num[1])
+        print("Used non-patient without image and with txt number: ", real_nonpat_num[2])
+        print("Used non-patient with image and without txt number: ", real_nonpat_num[3])
+        print("Used non-patient without image and without txt number: ", real_nonpat_num[4])
         
         self.feature_mins = self.train_min
         self.feature_maxs = self.train_max
@@ -714,26 +748,64 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 print("collate cxr error")
                 exit(1)
             elif not cxr_li and ('train-missing' in args.modality_inclusion): 
-                img = torch.zeros(self.image_size).unsqueeze(0)
+                #1
+                if args.multiimages == 0:
+                    img = torch.zeros(self.image_size).unsqueeze(0)
+                else:
+                    img_zero = torch.zeros(self.image_size).unsqueeze(0)
+                    img = img_zero.repeat(3,1,1).unsqueeze(1)
+                    cxr_time = torch.Tensor([10,10,10])
+                #
                 if "tdecoder" in args.auxiliary_loss_type:
                     reports_tokens = torch.zeros(1024, dtype=torch.long)
                     reports_lengths = torch.tensor(0)
                 missing.append(True)
             else:
-                cxr_time, cxr_path = sorted(cxr_li)[-1]
-                image = Image.open(self.image_data_path + cxr_path)
-                image = F_t.equalize(image)
-                img = self.transform(image)
+                #2
+                if args.multiimages == 0:
+                    cxr_time, cxr_path = sorted(cxr_li)[-1]
+                    image = Image.open(self.image_data_path + cxr_path)
+                    image = F_t.equalize(image)
+                    img = self.transform(image)
+                    if args.realtime == 1:
+                        cxr_time -= selectedKey
+                    else:
+                        cxr_time -= min_time
+                else:
+                    img = []
+                    cxr_times = []
+                    if len(cxr_li) > 3:
+                        cxr_infos = list(sorted(cxr_li)[-3:])
+                    else:
+                        cxr_infos = list(sorted(cxr_li)[-len(cxr_li):])
+                    for cxr_info in cxr_infos:
+                        cxr_time, cxr_path = cxr_info
+                        image = Image.open(self.image_data_path + cxr_path)
+                        image = F_t.equalize(image)
+                        img1 = self.transform(image)
+                        img.append(img1)
+                        cxr_time -= selectedKey
+                        cxr_times.append(cxr_time)
+                    while len(img) < 3:
+                        img.append(torch.zeros(self.image_size).unsqueeze(0))
+                        cxr_times.append(10)
+                    img = torch.stack(img)
+                    cxr_time = torch.tensor(cxr_times)
+                #
                 if "tdecoder" in args.auxiliary_loss_type:
                     reports_tokens = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][0])
                     reports_lengths = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][1]) 
                 missing.append(False)
-                if args.realtime == 1:
-                    cxr_time -= selectedKey
-                else:
-                    cxr_time -= min_time
+                
         else:
-            img = torch.zeros(self.image_size).unsqueeze(0)
+            #1
+            if args.multiimages == 0:
+                img = torch.zeros(self.image_size).unsqueeze(0)
+            else:
+                img_zero = torch.zeros(self.image_size).unsqueeze(0)
+                img = img_zero.repeat(3,1,1).unsqueeze(1)
+                cxr_time = torch.Tensor([10,10,10])
+            #
             if "tdecoder" in args.auxiliary_loss_type:
                 reports_tokens = torch.zeros(1024, dtype=torch.long)
                 reports_lengths = torch.tensor(0)
@@ -927,7 +999,8 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
             #         print("You need to choose 'center' or 'resize' as image_test_type")
             # else:
             #     print("You need to choose either 224 or 512 as image_size")
-                
+        real_pat_num = [0, 0, 0, 0, 0]  # patnum, wimg/wtxt, woimg/wtxt, wimg/wotxt, woimg/wotxt
+        real_nonpat_num = [0, 0, 0, 0, 0]
         for idx, pkl_path in enumerate(tqdm(data, desc="Loading files of {}...".format(data_type))):
             file_name = pkl_path.split("/")[-1]
             
@@ -1178,7 +1251,26 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                             else:
                                 print("Missing modal error with keylist_type >= 2")
                                 exit(1)
-        
+            if target == 1:
+                real_pat_num[0] += 1
+                if "txt1_img1" in file_name:
+                    real_pat_num[1] += 1 
+                elif "txt1_img0" in file_name:
+                    real_pat_num[2] += 1 
+                elif "txt0_img1" in file_name:
+                    real_pat_num[3] += 1 
+                elif "txt0_img0" in file_name:
+                    real_pat_num[4] += 1 
+            else:
+                real_nonpat_num[0] += 1
+                if "txt1_img1" in file_name:
+                    real_nonpat_num[1] += 1 
+                elif "txt1_img0" in file_name:
+                    real_nonpat_num[2] += 1 
+                elif "txt0_img1" in file_name:
+                    real_nonpat_num[3] += 1 
+                elif "txt0_img0" in file_name:
+                    real_nonpat_num[4] += 1 
         if ('test-full' in args.modality_inclusion):
             ### class 2 방식
             _type_list = [class2dict_full[i] if i in class2dict_full else i for i in _type_list]
@@ -1250,6 +1342,17 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
         print("########## Detail Data Info ##########")
         print("Positive time-points: ", positive_tpoints)
         print("Negative time-points: ", negative_tpoints)
+        print("########## Detail Data Info per patient ##########")
+        print("Used patient number: ", real_pat_num[0])
+        print("Used patient with image and with txt number: ", real_pat_num[1])
+        print("Used patient without image and with txt number: ", real_pat_num[2])
+        print("Used patient with image and without txt number: ", real_pat_num[3])
+        print("Used patient without image and without txt number: ", real_pat_num[4])
+        print("Used non-patient number: ", real_nonpat_num[0])
+        print("Used non-patient with image and with txt number: ", real_nonpat_num[1])
+        print("Used non-patient without image and with txt number: ", real_nonpat_num[2])
+        print("Used non-patient with image and without txt number: ", real_nonpat_num[3])
+        print("Used non-patient without image and without txt number: ", real_nonpat_num[4])
         
         self.feature_mins = self.train_min
         self.feature_maxs = self.train_max
@@ -1400,35 +1503,64 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                 print("collate cxr error")
                 exit(1)
             elif not cxr_li and ('test-missing' in args.modality_inclusion): 
-                img = torch.zeros(self.image_size).unsqueeze(0)
+                #1
+                if args.multiimages == 0:
+                    img = torch.zeros(self.image_size).unsqueeze(0)
+                else:
+                    img_zero = torch.zeros(self.image_size).unsqueeze(0)
+                    img = img_zero.repeat(3,1,1).unsqueeze(1)
+                    cxr_time = torch.Tensor([10,10,10])
+                #
                 if "tdecoder" in args.auxiliary_loss_type:
                     reports_tokens = torch.zeros(1024, dtype=torch.long)
                     reports_lengths = torch.tensor(0)
                 missing.append(True)
             else:
-                prop=[args.missing_prop/100,(100-args.missing_prop)/100]
-                img_missing_prop = np.random.choice(2,1,replace=True, p=prop) # 0과 1중 random 나옴
-                if img_missing_prop == 0: # missing 될 확률
-                    img = torch.zeros(self.image_size).unsqueeze(0)
-                    if "tdecoder" in args.auxiliary_loss_type:
-                        reports_tokens = torch.zeros(1024, dtype=torch.long)
-                        reports_lengths = torch.tensor(0)
-                    missing.append(True)
-                else: # missing 안될 확률
+                #2
+                if args.multiimages == 0:
                     cxr_time, cxr_path = sorted(cxr_li)[-1]
                     image = Image.open(self.image_data_path + cxr_path)
                     image = F_t.equalize(image)
                     img = self.transform(image)
-                    if "tdecoder" in args.auxiliary_loss_type:
-                        reports_tokens = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][0])
-                        reports_lengths = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][1]) 
-                    missing.append(False)
                     if args.realtime == 1:
                         cxr_time -= selectedKey
                     else:
                         cxr_time -= min_time
+                else:
+                    img = []
+                    cxr_times = []
+                    if len(cxr_li) > 3:
+                        cxr_infos = list(sorted(cxr_li)[-3:])
+                    else:
+                        cxr_infos = list(sorted(cxr_li)[-len(cxr_li):])
+                    for cxr_info in cxr_infos:
+                        cxr_time, cxr_path = cxr_info
+                        image = Image.open(self.image_data_path + cxr_path)
+                        image = F_t.equalize(image)
+                        img1 = self.transform(image)
+                        img.append(img1)
+                        cxr_time -= selectedKey
+                        cxr_times.append(cxr_time)
+                    while len(img) < 3:
+                        img.append(torch.zeros(self.image_size).unsqueeze(0))
+                        cxr_times.append(10)
+                    img = torch.stack(img)
+                    cxr_time = torch.tensor(cxr_times)
+                #
+                if "tdecoder" in args.auxiliary_loss_type:
+                    reports_tokens = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][0])
+                    reports_lengths = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][1]) 
+                missing.append(False)
+                
         else:
-            img = torch.zeros(self.image_size).unsqueeze(0)
+            #1
+            if args.multiimages == 0:
+                img = torch.zeros(self.image_size).unsqueeze(0)
+            else:
+                img_zero = torch.zeros(self.image_size).unsqueeze(0)
+                img = img_zero.repeat(3,1,1).unsqueeze(1)
+                cxr_time = torch.Tensor([10,10,10])
+            #
             if "tdecoder" in args.auxiliary_loss_type:
                 reports_tokens = torch.zeros(1024, dtype=torch.long)
                 reports_lengths = torch.tensor(0)
@@ -1564,7 +1696,9 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 self.transform = xray_image_transform_train_resize_affine_crop()
             elif args.image_train_type == "randaug":
                 self.transform = xray_image_transform_train_randaug()
-                
+        
+        real_pat_num = [0, 0, 0, 0, 0]  # patnum, wimg/wtxt, woimg/wtxt, wimg/wotxt, woimg/wotxt
+        real_nonpat_num = [0, 0, 0, 0, 0]
         for idx, pkl_path in enumerate(tqdm(data, desc="Loading files of {}...".format(data_type))):
             file_name = pkl_path.split("/")[-1]
             
@@ -1817,6 +1951,27 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
             else:
                 lengths.append(sequenceLength)
                 
+            if target == 1:
+                real_pat_num[0] += 1
+                if "txt1_img1" in file_name:
+                    real_pat_num[1] += 1 
+                elif "txt1_img0" in file_name:
+                    real_pat_num[2] += 1 
+                elif "txt0_img1" in file_name:
+                    real_pat_num[3] += 1 
+                elif "txt0_img0" in file_name:
+                    real_pat_num[4] += 1 
+            else:
+                real_nonpat_num[0] += 1
+                if "txt1_img1" in file_name:
+                    real_nonpat_num[1] += 1 
+                elif "txt1_img0" in file_name:
+                    real_nonpat_num[2] += 1 
+                elif "txt0_img1" in file_name:
+                    real_nonpat_num[3] += 1 
+                elif "txt0_img0" in file_name:
+                    real_nonpat_num[4] += 1 
+                
         if ('train-full' in args.modality_inclusion):
             ### class 2 방식
             self._type_list = [class2dict_full[i] if i in class2dict_full else i for i in self._type_list]
@@ -1876,6 +2031,17 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         print("########## Detail Data Info ##########")
         print("Positive time-points: ", positive_tpoints)
         print("Negative time-points: ", negative_tpoints)
+        print("########## Detail Data Info per patient ##########")
+        print("Used patient number: ", real_pat_num[0])
+        print("Used patient with image and with txt number: ", real_pat_num[1])
+        print("Used patient without image and with txt number: ", real_pat_num[2])
+        print("Used patient with image and without txt number: ", real_pat_num[3])
+        print("Used patient without image and without txt number: ", real_pat_num[4])
+        print("Used non-patient number: ", real_nonpat_num[0])
+        print("Used non-patient with image and with txt number: ", real_nonpat_num[1])
+        print("Used non-patient without image and with txt number: ", real_nonpat_num[2])
+        print("Used non-patient with image and without txt number: ", real_nonpat_num[3])
+        print("Used non-patient without image and without txt number: ", real_nonpat_num[4])
 
         args.feature_mins = self.train_min
         args.feature_maxs = self.train_max
@@ -2023,26 +2189,64 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 print("collate cxr error")
                 exit(1)
             elif not cxr_li and ('train-missing' in args.modality_inclusion): 
-                img = torch.zeros(self.image_size).unsqueeze(0)
+                #1
+                if args.multiimages == 0:
+                    img = torch.zeros(self.image_size).unsqueeze(0)
+                else:
+                    img_zero = torch.zeros(self.image_size).unsqueeze(0)
+                    img = img_zero.repeat(3,1,1).unsqueeze(1)
+                    cxr_time = torch.Tensor([10,10,10])
+                #
                 if "tdecoder" in args.auxiliary_loss_type:
                     reports_tokens = torch.zeros(1024, dtype=torch.long)
                     reports_lengths = torch.tensor(0)
                 missing.append(True)
             else:
-                cxr_time, cxr_path = sorted(cxr_li)[-1]
-                image = Image.open(self.image_data_path + cxr_path)
-                image = F_t.equalize(image)
-                img = self.transform(image)
+                #2
+                if args.multiimages == 0:
+                    cxr_time, cxr_path = sorted(cxr_li)[-1]
+                    image = Image.open(self.image_data_path + cxr_path)
+                    image = F_t.equalize(image)
+                    img = self.transform(image)
+                    if args.realtime == 1:
+                        cxr_time -= selectedKey
+                    else:
+                        cxr_time -= min_time
+                else:
+                    img = []
+                    cxr_times = []
+                    if len(cxr_li) > 3:
+                        cxr_infos = list(sorted(cxr_li)[-3:])
+                    else:
+                        cxr_infos = list(sorted(cxr_li)[-len(cxr_li):])
+                    for cxr_info in cxr_infos:
+                        cxr_time, cxr_path = cxr_info
+                        image = Image.open(self.image_data_path + cxr_path)
+                        image = F_t.equalize(image)
+                        img1 = self.transform(image)
+                        img.append(img1)
+                        cxr_time -= selectedKey
+                        cxr_times.append(cxr_time)
+                    while len(img) < 3:
+                        img.append(torch.zeros(self.image_size).unsqueeze(0))
+                        cxr_times.append(10)
+                    img = torch.stack(img)
+                    cxr_time = torch.tensor(cxr_times)
+                #
                 if "tdecoder" in args.auxiliary_loss_type:
                     reports_tokens = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][0])
                     reports_lengths = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][1]) 
                 missing.append(False)
-                if args.realtime == 1:
-                    cxr_time -= selectedKey
-                else:
-                    cxr_time -= min_time
+                
         else:
-            img = torch.zeros(self.image_size).unsqueeze(0)
+            #1
+            if args.multiimages == 0:
+                img = torch.zeros(self.image_size).unsqueeze(0)
+            else:
+                img_zero = torch.zeros(self.image_size).unsqueeze(0)
+                img = img_zero.repeat(3,1,1).unsqueeze(1)
+                cxr_time = torch.Tensor([10,10,10])
+            #
             if "tdecoder" in args.auxiliary_loss_type:
                 reports_tokens = torch.zeros(1024, dtype=torch.long)
                 reports_lengths = torch.tensor(0)
@@ -2225,6 +2429,8 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             elif args.image_test_type == "resize_larger":
                 self.transform = xray_image_transform_resize_larger_val()
         
+        real_pat_num = [0, 0, 0, 0, 0]  # patnum, wimg/wtxt, woimg/wtxt, wimg/wotxt, woimg/wotxt
+        real_nonpat_num = [0, 0, 0, 0, 0]
         for idx, pkl_path in enumerate(tqdm(data, desc="Loading files of {}...".format(data_type))):
             file_name = pkl_path.split("/")[-1]
             
@@ -2478,7 +2684,27 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                             else:
                                 print("Missing modal error with keylist_type >= 2")
                                 exit(1)
-        
+            if target == 1:
+                real_pat_num[0] += 1
+                if "txt1_img1" in file_name:
+                    real_pat_num[1] += 1 
+                elif "txt1_img0" in file_name:
+                    real_pat_num[2] += 1 
+                elif "txt0_img1" in file_name:
+                    real_pat_num[3] += 1 
+                elif "txt0_img0" in file_name:
+                    real_pat_num[4] += 1 
+            else:
+                real_nonpat_num[0] += 1
+                if "txt1_img1" in file_name:
+                    real_nonpat_num[1] += 1 
+                elif "txt1_img0" in file_name:
+                    real_nonpat_num[2] += 1 
+                elif "txt0_img1" in file_name:
+                    real_nonpat_num[3] += 1 
+                elif "txt0_img0" in file_name:
+                    real_nonpat_num[4] += 1 
+                    
         if ('test-full' in args.modality_inclusion):
             ### class 2 방식
             _type_list = [class2dict_full[i] if i in class2dict_full else i for i in _type_list]
@@ -2547,6 +2773,17 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
         print("########## Detail Data Info ##########")
         print("Positive time-points: ", positive_tpoints)
         print("Negative time-points: ", negative_tpoints)
+        print("########## Detail Data Info per patient ##########")
+        print("Used patient number: ", real_pat_num[0])
+        print("Used patient with image and with txt number: ", real_pat_num[1])
+        print("Used patient without image and with txt number: ", real_pat_num[2])
+        print("Used patient with image and without txt number: ", real_pat_num[3])
+        print("Used patient without image and without txt number: ", real_pat_num[4])
+        print("Used non-patient number: ", real_nonpat_num[0])
+        print("Used non-patient with image and with txt number: ", real_nonpat_num[1])
+        print("Used non-patient without image and with txt number: ", real_nonpat_num[2])
+        print("Used non-patient with image and without txt number: ", real_nonpat_num[3])
+        print("Used non-patient without image and without txt number: ", real_nonpat_num[4])
         
         self.feature_mins = self.train_min
         self.feature_maxs = self.train_max
@@ -2690,35 +2927,64 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 print("collate cxr error")
                 exit(1)
             elif not cxr_li and ('test-missing' in args.modality_inclusion): 
-                img = torch.zeros(self.image_size).unsqueeze(0)
+                #1
+                if args.multiimages == 0:
+                    img = torch.zeros(self.image_size).unsqueeze(0)
+                else:
+                    img_zero = torch.zeros(self.image_size).unsqueeze(0)
+                    img = img_zero.repeat(3,1,1).unsqueeze(1)
+                    cxr_time = torch.Tensor([10,10,10])
+                #
                 if "tdecoder" in args.auxiliary_loss_type:
                     reports_tokens = torch.zeros(1024, dtype=torch.long)
                     reports_lengths = torch.tensor(0)
                 missing.append(True)
             else:
-                prop=[args.missing_prop/100,(100-args.missing_prop)/100]
-                img_missing_prop = np.random.choice(2,1,replace=True, p=prop)
-                if img_missing_prop == 0:
-                    img = torch.zeros(self.image_size).unsqueeze(0)
-                    if "tdecoder" in args.auxiliary_loss_type:
-                            reports_tokens = torch.zeros(1024, dtype=torch.long)
-                            reports_lengths = torch.tensor(0)
-                    missing.append(True)
-                else:
+                #2
+                if args.multiimages == 0:
                     cxr_time, cxr_path = sorted(cxr_li)[-1]
                     image = Image.open(self.image_data_path + cxr_path)
                     image = F_t.equalize(image)
                     img = self.transform(image)
-                    if "tdecoder" in args.auxiliary_loss_type:
-                        reports_tokens = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][0])
-                        reports_lengths = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][1]) 
-                    missing.append(False)
                     if args.realtime == 1:
                         cxr_time -= selectedKey
                     else:
                         cxr_time -= min_time
+                else:
+                    img = []
+                    cxr_times = []
+                    if len(cxr_li) > 3:
+                        cxr_infos = list(sorted(cxr_li)[-3:])
+                    else:
+                        cxr_infos = list(sorted(cxr_li)[-len(cxr_li):])
+                    for cxr_info in cxr_infos:
+                        cxr_time, cxr_path = cxr_info
+                        image = Image.open(self.image_data_path + cxr_path)
+                        image = F_t.equalize(image)
+                        img1 = self.transform(image)
+                        img.append(img1)
+                        cxr_time -= selectedKey
+                        cxr_times.append(cxr_time)
+                    while len(img) < 3:
+                        img.append(torch.zeros(self.image_size).unsqueeze(0))
+                        cxr_times.append(10)
+                    img = torch.stack(img)
+                    cxr_time = torch.tensor(cxr_times)
+                #
+                if "tdecoder" in args.auxiliary_loss_type:
+                    reports_tokens = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][0])
+                    reports_lengths = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][1]) 
+                missing.append(False)
+                
         else:
-            img = torch.zeros(self.image_size).unsqueeze(0)
+            #1
+            if args.multiimages == 0:
+                img = torch.zeros(self.image_size).unsqueeze(0)
+            else:
+                img_zero = torch.zeros(self.image_size).unsqueeze(0)
+                img = img_zero.repeat(3,1,1).unsqueeze(1)
+                cxr_time = torch.Tensor([10,10,10])
+            #
             if "tdecoder" in args.auxiliary_loss_type:
                     reports_tokens = torch.zeros(1024, dtype=torch.long)
                     reports_lengths = torch.tensor(0)

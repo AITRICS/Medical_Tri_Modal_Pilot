@@ -193,6 +193,9 @@ class TrimodalTransformerEncoder_MBT(nn.Module):
             if n_modal == self.txt_idx:
                     varying_lengths[n_modal][varying_lengths[n_modal] == 3] = 0
             if self.mask[n_modal]:
+                # print("1 ", enc_inputs[n_modal].shape)
+                # print("2 ", varying_lengths[n_modal])
+                # print("3 ", fixed_lengths[n_modal])
                 self_attn_masks.append(get_attn_pad_mask(enc_inputs[n_modal], varying_lengths[n_modal], fixed_lengths[n_modal]))
             else:
                 self_attn_masks.append(None)

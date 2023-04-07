@@ -75,6 +75,16 @@ for k_indx, seed_num in enumerate(args.seed_list):
     print(args.modality_inclusion)
     
     train_loader, val_loader, test_loader = get_data_loader(args, patient_dict, keys_list, k_indx)
+    # for train_batch in train_loader:
+    #     train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, txt_time, missing, f_indices, train_y2, train_reports_tokens, train_reports_lengths = train_batch
+    #     print(" train done ")
+    # for train_batch in val_loader:
+    #     train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, txt_time, missing, f_indices, train_y2, train_reports_tokens, train_reports_lengths = train_batch
+    #     print(" val_loader done ")
+    # for train_batch in test_loader:
+    #     train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, txt_time, missing, f_indices, train_y2, train_reports_tokens, train_reports_lengths = train_batch
+    #     print(" test_loader done ")
+    # exit(1)
     # set loss function
     if args.model_types == "classification":
         if "softmax" == args.loss_types:
