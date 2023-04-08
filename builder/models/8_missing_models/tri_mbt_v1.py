@@ -104,7 +104,8 @@ class TRI_MBT_V1(nn.Module):
                 model_dict.update(new_weights)
                 self.img_encoder.load_state_dict(new_weights)
             else:
-                self.img_encoder = swin_t_m(weights = None)
+                self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
+                # self.img_encoder = swin_t_m(weights = None)
                 
         else:
             self.patch_embedding = PatchEmbeddingBlock(
