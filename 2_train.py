@@ -31,7 +31,7 @@ from builder.utils.cosine_annealing_with_warmupSingle import CosineAnnealingWarm
 torch.autograd.set_detect_anomaly(True)
 # set gpu device
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 # set trainer, setting file, and seed number 
 # os.environ["TOKENIZERS_PARALLELISM"] = "true"
 args.seed = 0

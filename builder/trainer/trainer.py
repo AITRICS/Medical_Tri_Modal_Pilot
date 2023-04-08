@@ -62,7 +62,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
         if "rmse" in args.auxiliary_loss_type:
             final_target = (train_y[0].type(torch.FloatTensor).to(device, non_blocking=True), train_y[1].type(torch.FloatTensor).to(device, non_blocking=True))
         else:
-            final_target = train_y.type(torch.FloatTensor).to(device, non_blocking=True)
+            final_target = train_y.type(torch.FloatTensor).to(device)
     
     if args.fullmodal_definition == "txt1":
         missing = torch.stack([missing[:,0], missing[:,2]]).permute(1,0).detach().clone() # in case of vslt_txt
@@ -84,9 +84,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
         [0., 1., 0.],
         [0., 1., 1.]])
         missing = missing.detach().clone()
-        # if flow_type == "train" and args.multitoken:
-        #     final_target = final_target.repeat(4,1,1).permute(1,0,2).reshape(-1,12) # [2, 64, 12] -> [64, 2, 12] -> [128, 12]
-    
+        
     sample_missing = torch.cat([sample_missing, missing], dim = 0)
     _, missing_num = torch.unique(sample_missing, dim=0, sorted=True, return_inverse=True)
     
@@ -123,7 +121,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
         optimizer.zero_grad()
         with torch.cuda.amp.autocast():
             output, rmse, txt_loss = model(data, h0, mask, delta, mean, age, gender, input_lengths, x_txt, txt_lengths, x_img, missing_num, feasible_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths)
-            output = output.squeeze()
+            output = output.squeeze() # torch.Size([4, 8, 2])
             
             if "bceandsoftmax" == args.loss_types:
                 loss1 = criterion(output, final_target[0])
@@ -132,12 +130,36 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
             elif "rmse" == args.loss_types:
                 loss = torch.sqrt(torch.mean(criterion(output, final_target)))
             elif "rmse" in args.auxiliary_loss_type:
-                loss1 = criterion(output, final_target[0])
-                rmse = criterion_aux[1](rmse, final_target[1])
-                rmse = torch.sqrt(torch.mean(rmse[final_target[0] == 1]))
-                rmse = torch.nan_to_num(rmse, nan=0.0)
-                loss = loss1 + rmse
+                ###
+                if "multi" in args.model:
+                    final_target0 = final_target[0].repeat(4)
+                    # final_target1 = final_target[1].repeat(4)
+                    missing = missing.reshape(-1)   
+                    output = output.reshape(-1, 2)
+                    output0 = output[:,0]
+                    # output1 = output[:,1]
+                    final_target0 = final_target0[missing == 0]
+                    loss = criterion(output0[missing == 0], final_target0)
+                    # rmse = criterion_aux[1](output1[missing == 0], final_target1[missing == 0])
+                    # rmse = torch.sqrt(torch.mean(rmse[final_target0 == 1]))
+                    # rmse = torch.nan_to_num(rmse, nan=0.0)
+                    # # loss = loss1 + rmse
+                else:        
+                    loss1 = criterion(output[:,0], final_target[0])
+                    rmse = criterion_aux[1](output[:,1], final_target[1])
+                    rmse = torch.sqrt(torch.mean(rmse[final_target[0] == 1]))
+                    rmse = torch.nan_to_num(rmse, nan=0.0)
+                    loss = loss1 + rmse
+
             else:
+                # if "multi" in args.model:
+                #     final_target0 = final_target[0].repeat(4)
+                #     missing = missing.reshape(-1)   
+                #     output = output.reshape(-1)
+                #     output0 = output[:]
+                #     final_target0 = final_target0[missing == 0]
+                #     loss = criterion(output0[missing == 0], final_target0)
+                # else:
                 loss = criterion(output, final_target)
                 
             if txt_loss is not None:
@@ -165,16 +187,34 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                 final_target = final_target[0]
                 loss = loss1 + loss2
             if "rmse" == args.auxiliary_loss_type:
-                loss1 = criterion(output, final_target[0])
-                rmse = criterion_aux[1](rmse, final_target[1])
-                rmse = torch.sqrt(torch.mean(rmse[final_target[0] == 1]))
-                rmse = torch.nan_to_num(rmse, nan=0.0)
-                final_target = final_target[0]
-                
-                loss = loss1 + rmse
+                if "multi" in args.model:
+                    idx_order = torch.arange(0, args.batch_size).type(torch.LongTensor).cuda()
+                    output1 = output[:,:,0]
+                    rmse = output[:,:,1]
+                    output = output1[missing_num, idx_order]
+                    rmse = rmse[missing_num, idx_order]
+                    rmse = torch.sqrt(torch.mean(rmse))
+                    rmse = torch.nan_to_num(rmse, nan=0.0)
+                    loss = criterion(output, final_target[0])
+                    final_target = final_target[0]
+                    
+                else:
+                    loss = criterion(output[:,0], final_target[0])
+                    rmse = criterion_aux[1](output[:,1], final_target[1])
+                    rmse = torch.sqrt(torch.mean(rmse[final_target[0] == 1]))
+                    rmse = torch.nan_to_num(rmse, nan=0.0)
+                    output = output[:,0]
+                    final_target = final_target[0]
+                    # loss = loss1 + rmse
             else:
+                # if "multi" in args.model:
+                #     idx_order = torch.arange(0, args.batch_size).type(torch.LongTensor).cuda()
+                #     output = output[missing_num, idx_order]
+                #     loss = criterion(output, final_target[0])
+                    
+                # else:
                 loss = criterion(output, final_target)
-            
+                
             if args.model_types == "classification":
                 if "rmse" == args.loss_types:
                     output = loss = torch.sqrt(torch.mean(loss))
