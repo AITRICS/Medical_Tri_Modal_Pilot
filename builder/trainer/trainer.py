@@ -46,7 +46,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
         final_target = (train_y[0].type(torch.FloatTensor).to(device, non_blocking=True), train_y[1].type(torch.FloatTensor).to(device, non_blocking=True))
     else:
         final_target = train_y.type(torch.FloatTensor).to(device, non_blocking=True)
-
+        
     if args.fullmodal_definition == "txt1":
         missing = torch.stack([missing[:,0], missing[:,2]]).permute(1,0).detach().clone() # in case of vslt_txt
         sample_missing = torch.tensor([[0., 0.],

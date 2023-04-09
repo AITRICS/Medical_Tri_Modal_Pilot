@@ -450,8 +450,9 @@ class TrimodalTransformerEncoder_MBT(nn.Module):
                 # print("self.idx_order: ", self.idx_order.shape)
                 
                 bottlenecks = all_bottleneck_stack[missing, self.idx_order, :, :]
+                # print("bottlenecks: ", bottlenecks.shape) torch.Size([32, 4, 256])
                 if self.resbottle:
-                    bottlenecks += res_bottles
+                    bottlenecks = torch.mean(torch.stack([bottlenecks,res_bottles]), dim=0)
                 
                 # bottlenecks = torch.where(missing[1].unsqueeze(1).unsqueeze(1) == 0, bottleneck_outputs[0], bottlenecks_mean)
                 # bottlenecks = torch.where(varying_lengths[1].unsqueeze(1).unsqueeze(1) == 0, bottleneck_outputs[0], bottlenecks_mean)
