@@ -120,6 +120,10 @@ class TRI_MBT_V1(nn.Module):
         else:
             residual_bottlenecks = False
 
+        if self.args.multiimages == 1:
+            img_mask = True
+        else:
+            img_mask = False
         ##### Fusion Part
         self.fusion_transformer = TrimodalTransformerEncoder_MBT(
             batch_size = args.batch_size,
@@ -135,7 +139,7 @@ class TRI_MBT_V1(nn.Module):
             dropout = self.dropout,
             pe_maxlen = 2500,
             use_pe = [vslt_pe, False, True],
-            mask = [True, True, True],
+            mask = [True, img_mask, True],
         )
 
         ##### Classifier
@@ -242,6 +246,8 @@ class TRI_MBT_V1(nn.Module):
             img_time = torch.count_nonzero(img_time, dim=1)
             img_time = img_time * 49
             img_time = img_time.type(torch.IntTensor)
+        else:
+            img_time = img_embedding.size(1)
         outputs, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding, txt_embedding], 
                                         fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1), txt_embedding.size(1)],
                                         varying_lengths = [input_lengths, img_time, txt_lengths+2],
@@ -266,12 +272,11 @@ class TRI_MBT_V1(nn.Module):
         classInput = self.layer_norms_after_concat(output)
         if self.args.vslt_type != "QIE":
             classInput = torch.cat([classInput, demo_embedding], dim=1)
-        output = self.fc_list(classInput)
-            
         if "rmse" in self.args.auxiliary_loss_type:
             output2 = self.rmse_layer(classInput).squeeze()
         else:
             output2 = None
+        output1 = self.fc_list(classInput)
             
         if (flow_type == "train") and ("tdecoder" in self.args.auxiliary_loss_type):
             output3 = self.img_2_txt(reports_tokens, outputs[1][:,0,:].unsqueeze(1), encoder_output_lengths = self.encoder_output_lengths)
@@ -279,7 +284,7 @@ class TRI_MBT_V1(nn.Module):
         else:
             output3 = None
             
-        return output, output2, output3
+        return output1, output2, output3
     
     
     
