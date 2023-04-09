@@ -152,10 +152,12 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                     aux_tar = reports_tokens[exist_reports_idx][:,1:].contiguous().view(-1)
                     txt_loss = criterion_aux[0](aux_pred, aux_tar)
                     loss = loss + (args.auxiliary_loss_weight * txt_loss)
-                
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
+        
+        loss.backward()
+        optimizer.step()
+        # scaler.scale(loss).backward()
+        # scaler.step(optimizer)
+        # scaler.update()
         scheduler.step(iteration)
         logger.log_lr(scheduler.get_lr()[0], iteration)
     else:

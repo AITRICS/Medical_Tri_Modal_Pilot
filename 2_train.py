@@ -57,7 +57,8 @@ for k_indx, seed_num in enumerate(args.seed_list):
     if args.cross_fold_val != 1:
         args.seed = seed_num
         set_seeds(args)
-    scaler = torch.cuda.amp.GradScaler()
+    # scaler = torch.cuda.amp.GradScaler()
+    scaler = None
     # set device
     seed_num = 0
     device = set_devices(args)
