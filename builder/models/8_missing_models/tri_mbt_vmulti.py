@@ -12,14 +12,7 @@ class TRI_MBT_VMULTI(nn.Module):
         super().__init__()
         self.args = args
         ##### Configuration
-        self.img_size = args.image_size
-        self.patch_size = 16
-        self.img_num_heads = 4
-        self.pos_embed = "conv"
-        # if args.output_type =="intubation":
-        #     self.output_dim = 1#args.output_dim
-        # else:
-        self.output_dim = 2#args.output_dim
+        self.output_dim = 1
         self.num_layers = args.transformer_num_layers
         self.num_heads = args.transformer_num_head
         self.model_dim = args.transformer_dim
@@ -42,30 +35,20 @@ class TRI_MBT_VMULTI(nn.Module):
             ['leaky_relu', nn.LeakyReLU(0.2)],
             ['elu', nn.ELU()]
         ])
-        self.relu = self.activations[activation]
         
         ##### Encoders
-        if args.vslt_type == "carryforward":
-            self.vslt_enc = nn.Sequential(
-                                        nn.Linear(self.num_nodes, self.model_dim),
-                                        nn.LayerNorm(self.model_dim),
-                                        nn.ReLU(inplace=True),
-                    )
-            vslt_pe = True
-            
-        elif args.vslt_type == "TIE" or args.vslt_type == "QIE":
-            vslt_pe = False
-            self.ie_vslt = nn.Sequential(
-                                        nn.Linear(1, self.model_dim),
-                                        nn.LayerNorm(self.model_dim),
-                                        nn.ReLU(inplace=True),
-                    )
-            self.ie_time = nn.Sequential(
-                                        nn.Linear(1, self.model_dim),
-                                        nn.LayerNorm(self.model_dim),
-                                        nn.ReLU(inplace=True),
-                    )
-            self.ie_feat = nn.Embedding(20, self.model_dim)
+        vslt_pe = False
+        self.ie_vslt = nn.Sequential(
+                                    nn.Linear(1, self.model_dim),
+                                    nn.LayerNorm(self.model_dim),
+                                    nn.ReLU(inplace=True),
+                )
+        self.ie_time = nn.Sequential(
+                                    nn.Linear(1, self.model_dim),
+                                    nn.LayerNorm(self.model_dim),
+                                    nn.ReLU(inplace=True),
+                )
+        self.ie_feat = nn.Embedding(20, self.model_dim)
         self.ie_demo = nn.Sequential(
                                     nn.Linear(2, self.model_dim),
                                     nn.LayerNorm(self.model_dim),
@@ -96,15 +79,14 @@ class TRI_MBT_VMULTI(nn.Module):
                 self.img_encoder.load_state_dict(new_weights)
             else:
                 self.img_encoder = swin_t_m(weights = None)
-                
         else:
             self.patch_embedding = PatchEmbeddingBlock(
             in_channels=1,
-            img_size=self.img_size,
-            patch_size=self.patch_size,
+            img_size=args.image_size,
+            patch_size=16,
             hidden_size=self.model_dim,
-            num_heads=self.img_num_heads,
-            pos_embed=self.pos_embed,
+            num_heads=4,
+            pos_embed="conv",
             dropout_rate=0,
             spatial_dims=2,
             )           
@@ -135,64 +117,39 @@ class TRI_MBT_VMULTI(nn.Module):
         ##### Classifier
         classifier_dim = self.model_dim*2
         self.layer_norms_after_concat = nn.LayerNorm(self.model_dim)
+        self.rmse_layer = nn.Linear(in_features=classifier_dim, out_features= 1, bias=True)
         self.fc_lists = nn.ModuleList([nn.Sequential(
-        nn.Linear(in_features=classifier_dim, out_features= self.model_dim, bias=True),
-        # nn.BatchNorm1d(self.model_dim),
-        nn.LayerNorm(self.model_dim),
-        self.activations[activation],
-        nn.Linear(in_features=self.model_dim, out_features= self.output_dim,  bias=True)) for _ in range(4)])
+                            nn.Linear(in_features=classifier_dim, out_features= self.model_dim, bias=True),
+                            # nn.BatchNorm1d(self.model_dim),
+                            nn.LayerNorm(self.model_dim),
+                            self.activations[activation],
+                            nn.Linear(in_features=self.model_dim, out_features= self.output_dim,  bias=True)) for _ in range(4)])
 
-        self.relu = self.activations[activation]
         self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
         self.txt_feat = torch.Tensor([19]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
 
     def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths):
         demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1)
         demo_embedding = self.ie_demo(demographic)
-                                
-        if self.args.vslt_type == "carryforward":
-            demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1)
-            vslt_embedding = self.vslt_enc(x)
-            demo_embedding = self.ie_demo(demographic)
-        elif self.args.vslt_type == "TIE": # [seqlen x 3] 0: time, 1: value, 2: feature    
-            demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1)
-            value_embedding = self.ie_vslt(x[:,:,1].unsqueeze(2))
-            time_embedding = self.ie_time(x[:,:,0].unsqueeze(2))
-            feat = x[:,:,2].type(torch.IntTensor).to(self.device)
-            feat_embedding = self.ie_feat(feat)
-            vslt_embedding = value_embedding + time_embedding + feat_embedding
-            demo_embedding = self.ie_demo(demographic)
-        elif self.args.vslt_type == "QIE":
-            value_embedding = self.ie_vslt(x[:,:,1].unsqueeze(2))
-            time_embedding = self.ie_time(x[:,:,0].unsqueeze(2))
-            feat = x[:,:,2].type(torch.IntTensor).to(self.device)
-            feat_embedding = self.ie_feat(feat)
-            demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1).unsqueeze(1).repeat(1,x.size(1),1)
-            demo_embedding = self.ie_demo(demographic)
-            vslt_embedding = value_embedding + time_embedding + feat_embedding +demo_embedding
+
+        demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1)
+        value_embedding = self.ie_vslt(x[:,:,1].unsqueeze(2))
+        time_embedding = self.ie_time(x[:,:,0].unsqueeze(2))
+        feat = x[:,:,2].type(torch.IntTensor).to(self.device)
+        feat_embedding = self.ie_feat(feat)
+        vslt_embedding = value_embedding + time_embedding + feat_embedding
+        demo_embedding = self.ie_demo(demographic)
 
         txt_embedding = self.txt_embedding(txts)
-        
-        if self.img_model_type == "vit":
-            img_embedding = self.img_encoder(img)#[16, 1000] #ViT_B_16_Weights.IMAGENET1K_V1
-            img_embedding = self.linear(img_embedding)
-        elif self.img_model_type == "swin":
-            img_embedding = self.img_encoder(img)
-            img_embedding = self.flatten(img_embedding)
-            img_embedding = self.linear(img_embedding)     
-            img_time = img_time.reshape(-1).detach().clone()
-        else:
-            img_embedding = self.patch_embedding(img)
-            
+
+        img_embedding = self.img_encoder(img)
+        img_embedding = self.flatten(img_embedding)
+        img_embedding = self.linear(img_embedding)     
+        img_time = img_time.reshape(-1).detach().clone()
+
         if self.args.imgtxt_time == 1:
-            if self.args.vslt_type == "QIE":
-                demographic_it = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1).unsqueeze(1)
-                demo_embedding_it = self.ie_demo(demographic_it)
-                img_embedding = img_embedding + self.ie_time(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat) + demo_embedding_it
-                txt_embedding = txt_embedding + self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat) + demo_embedding_it               
-            else:
-                img_embedding = img_embedding + self.ie_time(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat)
-                txt_embedding = txt_embedding + self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat)
+            img_embedding = img_embedding + self.ie_time(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat)
+            txt_embedding = txt_embedding + self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat)
         
         outputs, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding, txt_embedding], 
                                       fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1), txt_embedding.size(1)],
@@ -214,11 +171,10 @@ class TRI_MBT_VMULTI(nn.Module):
         for i, fc_list in enumerate(self.fc_lists):
             outputs_stack_list.append(fc_list(classInput[i,:,:]))
         output = torch.stack(outputs_stack_list)
-        output2 = None
-
-        if (flow_type == "train") and ("tdecoder" in self.args.auxiliary_loss_type):
-            output3 = self.img_2_txt(reports_tokens, outputs[1][:,0,:].unsqueeze(1), encoder_output_lengths = self.encoder_output_lengths)
-            # exit(1)
+        
+        if "rmse" in self.args.auxiliary_loss_type:
+            output2 = self.rmse_layer(classInput).squeeze()
         else:
-            output3 = None
+            output2 = None
+        output3 = None
         return output, output2, output3

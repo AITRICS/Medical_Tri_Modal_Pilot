@@ -65,47 +65,16 @@ for k_indx, seed_num in enumerate(args.seed_list):
     
     # set logger
     logger = Logger(args)
-    if args.model_types == "classification" and args.loss_types == "rmse":
-        logger.evaluator.best_auc = float('inf')
-    else:
-        logger.evaluator.best_auc = 0
+    logger.evaluator.best_auc = 0
     
     print("########## Experiment Begins ##########")
     print(args.input_types)
     print(args.modality_inclusion)
     
     train_loader, val_loader, test_loader = get_data_loader(args, patient_dict, keys_list, k_indx)
-    # for train_batch in train_loader:
-    #     train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, txt_time, missing, f_indices, train_y2, train_reports_tokens, train_reports_lengths = train_batch
-    #     print(" train done ")
-    # for train_batch in val_loader:
-    #     train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, txt_time, missing, f_indices, train_y2, train_reports_tokens, train_reports_lengths = train_batch
-    #     print(" val_loader done ")
-    # for train_batch in test_loader:
-    #     train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, txt_time, missing, f_indices, train_y2, train_reports_tokens, train_reports_lengths = train_batch
-    #     print(" test_loader done ")
-    # exit(1)
-    # set loss function
-    if args.model_types == "classification":
-        if "softmax" == args.loss_types:
-            criterion = nn.CrossEntropyLoss(reduction='mean')
-            args.output_dim = 12
-        elif "bces" == args.loss_types: 
-            criterion = nn.BCEWithLogitsLoss(size_average=True, reduction='mean')    
-            args.output_dim = 12
-        elif "bceandsoftmax" == args.loss_types:
-            criterion = (nn.CrossEntropyLoss(reduction='mean'), nn.BCEWithLogitsLoss(size_average=True, reduction='mean'))    
-            args.output_dim = 12
-        elif "rmse" == args.loss_types: 
-            criterion = nn.MSELoss(reduction='none')
-            args.output_dim = 1 ###########################
-      
-    elif args.model_types == "detection":   
-        criterion = nn.BCEWithLogitsLoss(size_average=True, reduction='mean')
-        args.output_dim = 1
-        
+    criterion = nn.BCEWithLogitsLoss(size_average=True, reduction='mean')
     pad_id = 0
-    criterion_img_aux = nn.CrossEntropyLoss(ignore_index = pad_id).to(device, non_blocking=True)
+    criterion_img_aux = nn.CrossEntropyLoss(ignore_index = pad_id)
     criterion_vslt_aux = nn.MSELoss(reduction='none')
 
     # get model
@@ -140,31 +109,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
         start_epoch = 1
 
     # set optimizer
-    if args.optim == 'adam':
-        optimizer = optim.Adam(model.parameters(), lr=args.lr_init, weight_decay=args.weight_decay)
-    
-    elif args.optim == 'sgd':
-        optimizer = optim.SGD(model.parameters(), lr=args.lr_init, momentum=args.momentum, 
-                              weight_decay=args.weight_decay)
-    
-    elif args.optim == 'adamw':
-        optimizer = optim.AdamW(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
-    
-    elif args.optim == 'adam_lars':
-        optimizer = optim.Adam(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
-        optimizer = LARC(optimizer=optimizer, eps=1e-8, trust_coefficient=0.001)
-    
-    elif args.optim == 'sgd_lars':
-        optimizer = optim.SGD(model.parameters(), lr=args.lr_init, momentum=args.momentum, 
-                              weight_decay=args.weight_decay)
-        optimizer = LARC(optimizer=optimizer, eps=1e-8, trust_coefficient=0.001)
-    
-    elif args.optim == 'adamw_lars':
-        optimizer = optim.AdamW(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
-        optimizer = LARC(optimizer=optimizer, eps=1e-8, trust_coefficient=0.001)
-    
-    else:
-        raise ValueError('invalid optimizer: adam, sgd, adamw, adam_lars, sgd_lars, adamw_lars')
+    optimizer = optim.AdamW(model.parameters(), lr = args.lr_init, weight_decay=args.weight_decay)
 
     # get number of iteration
     iter_num_per_epoch  = len(train_loader)
