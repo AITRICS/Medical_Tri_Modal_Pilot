@@ -216,10 +216,8 @@ class TRI_MBT_V1(nn.Module):
             img_embedding = self.img_encoder(img)#[16, 1000] #ViT_B_16_Weights.IMAGENET1K_V1
             img_embedding = self.linear(img_embedding)
         elif self.img_model_type == "swin":
-            print("0: ", img.shape)
             if self.args.multiimages == 1:
                 img = img.reshape(-1, 1, 224, 224)
-            print("1: ", img.shape)
             img_embedding = self.img_encoder(img)
             img_embedding = self.flatten(img_embedding)
             img_embedding = self.linear(img_embedding)     
@@ -244,8 +242,6 @@ class TRI_MBT_V1(nn.Module):
             img_time = torch.count_nonzero(img_time, dim=1)
             img_time = img_time * 49
             img_time = img_time.type(torch.IntTensor)
-        print("2: ", img_embedding.shape)
-        print("3: ", img_time.shape)
         outputs, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding, txt_embedding], 
                                         fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1), txt_embedding.size(1)],
                                         varying_lengths = [input_lengths, img_time, txt_lengths+2],
@@ -283,7 +279,6 @@ class TRI_MBT_V1(nn.Module):
         else:
             output3 = None
             
-        exit(1)
         return output, output2, output3
     
     
