@@ -138,11 +138,10 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
 
             else:
                 if "multi" in args.model:
-                    final_target0 = final_target[0].repeat(4)
+                    final_target = final_target.repeat(4)
                     missing = missing.reshape(-1)   
                     output = output.reshape(-1)
-                    final_target0 = final_target0[missing == 0]
-                    loss = criterion(output[missing == 0], final_target0)
+                    loss = criterion(output[missing == 0], final_target[missing == 0])
                 else:
                     loss = criterion(output, final_target)
                 
@@ -186,7 +185,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                 if "multi" in args.model:
                     idx_order = torch.arange(0, args.batch_size).type(torch.LongTensor).cuda()
                     output = output[missing_num, idx_order]
-                    loss = criterion(output, final_target[0])
+                    loss = criterion(output, final_target)
                     
                 else:   
                     loss = criterion(output, final_target)
