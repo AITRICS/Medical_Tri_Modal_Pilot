@@ -24,7 +24,7 @@ class BI_VSLTTXT_MBT_V1(nn.Module):
         self.num_heads = args.transformer_num_head
         self.model_dim = args.transformer_dim
         self.dropout = args.dropout
-        self.idx_order = torch.range(0, args.batch_size-1).type(torch.LongTensor)
+        self.idx_order = torch.arange(0, args.batch_size).type(torch.LongTensor)
         self.num_nodes = len(args.vitalsign_labtest)
         self.t_len = args.window_size
 
@@ -105,7 +105,7 @@ class BI_VSLTTXT_MBT_V1(nn.Module):
         nn.Linear(in_features=classifier_dim, out_features= self.model_dim, bias=True),
         nn.BatchNorm1d(self.model_dim),
         self.activations[activation],
-        nn.Linear(in_features=self.model_dim, out_features= self.output_dim,  bias=True))
+        nn.Linear(in_features=self.model_dim, out_features= 1,  bias=True))
 
         self.relu = self.activations[activation]
         self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
@@ -122,6 +122,7 @@ class BI_VSLTTXT_MBT_V1(nn.Module):
         # age = age.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
         # gen = gen.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)    
         # x = torch.cat([x, age, gen], axis=2)
+        
         demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1)
         demo_embedding = self.ie_demo(demographic)
                                 
@@ -145,7 +146,8 @@ class BI_VSLTTXT_MBT_V1(nn.Module):
             demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1).unsqueeze(1).repeat(1,x.size(1),1)
             demo_embedding = self.ie_demo(demographic)
             vslt_embedding = value_embedding + time_embedding + feat_embedding +demo_embedding
-
+        if self.args.berttype == "bert":
+            txts = txts.type(torch.LongTensor).cuda()
         txt_embedding = self.txt_embedding(txts)
             
         if self.args.imgtxt_time == 1:
@@ -155,36 +157,27 @@ class BI_VSLTTXT_MBT_V1(nn.Module):
                 txt_embedding = txt_embedding + self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat) + demo_embedding_it               
             else:
                 txt_embedding = txt_embedding + self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat)
-             
+        
         outputs, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, txt_embedding], 
                                       fixed_lengths = [vslt_embedding.size(1), txt_embedding.size(1)],
                                       varying_lengths = [input_lengths, txt_lengths+2],
                                       fusion_idx = None,
                                       missing=missing
                                       )
+        outputs_stack = torch.stack([outputs[0][:, 0, :], outputs[1][:, 0, :]]) 
+        bi_mean = torch.mean(outputs_stack, dim=0) 
+        all_cls_stack = torch.stack([bi_mean, outputs[0][:, 0, :]])
+        output = all_cls_stack[missing, self.idx_order]
         
-        outputs_list = torch.stack([outputs[0][:, 0, :], outputs[1][:, 0, :]]) 
-        classInput = self.layer_norms_after_concat(outputs_list).reshape(-1, self.model_dim)
-
+        classInput = self.layer_norms_after_concat(output)
         if self.args.vslt_type != "QIE":
-            classInput = torch.cat([classInput, demo_embedding.repeat(2,1)], dim=1)
-        outputs_stack = self.fc_list(classInput).reshape(2, -1, self.output_dim)
+            classInput = torch.cat([classInput, demo_embedding], dim=1)
+        output = self.fc_list(classInput).squeeze()
         
         if "rmse" in self.args.auxiliary_loss_type:
-            output2_stack = self.rmse_layer(classInput).reshape(2, -1)
-            bi_mean2 = torch.mean(output2_stack, dim=0)
-            all_cls_stack2 = torch.stack([bi_mean2, output2_stack[0, :]])
-            output2 = all_cls_stack2[missing, self.idx_order]
+            output2 = self.rmse_layer(classInput).squeeze()
         else:
             output2 = None
-            
-        bi_mean = torch.mean(outputs_stack, dim=0) 
-        all_cls_stack = torch.stack([bi_mean, outputs_stack[0, :, :]])
-        output = all_cls_stack[missing, self.idx_order]
-        if (flow_type == "train") and ("tdecoder" in self.args.auxiliary_loss_type):
-            output3 = self.img_2_txt(reports_tokens, outputs[1][:,0,:].unsqueeze(1), encoder_output_lengths = self.encoder_output_lengths)
-            # exit(1)
-        else:
-            output3 = None
-            
+        
+        output3 = None
         return output, output2, output3

@@ -96,10 +96,11 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
     if args.input_types == "vslt_txt":
         missing_num[missing_num == 2] = 0
         missing_num[missing_num == 3] = 1
+        missing = missing[2:,:]
     elif args.input_types == "vslt_img":
         missing_num[missing_num == 1] = 0
         missing_num[missing_num == 3] = 1
-    
+
     if flow_type == "train":
         optimizer.zero_grad()
         with torch.cuda.amp.autocast():
@@ -127,6 +128,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                     rmse = rmse[final_target0 == 1]
                     rmse = torch.nan_to_num(rmse, nan=0.0)
                     rmse = torch.sqrt(torch.mean(rmse))
+                    rmse = torch.nan_to_num(rmse, nan=0.0)
                     loss = loss1 + rmse
                 else:        
                     loss1 = criterion(output, final_target[0])
@@ -134,6 +136,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                     rmse = rmse[final_target[0] == 1]
                     rmse = torch.nan_to_num(rmse, nan=0.0)
                     rmse = torch.sqrt(torch.mean(rmse))
+                    rmse = torch.nan_to_num(rmse, nan=0.0)
                     loss = loss1 + rmse
 
             else:
@@ -173,6 +176,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                     rmse = criterion_aux[1](rmse, final_target[1])                    
                     rmse = torch.nan_to_num(rmse, nan=0.0)
                     rmse = torch.sqrt(torch.mean(rmse))
+                    rmse = torch.nan_to_num(rmse, nan=0.0)
                     loss = criterion(output, final_target[0])
                     final_target = final_target[0]
                 else:
@@ -181,6 +185,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                     rmse = rmse[final_target[0] == 1]
                     rmse = torch.nan_to_num(rmse, nan=0.0)
                     rmse = torch.sqrt(torch.mean(rmse))
+                    rmse = torch.nan_to_num(rmse, nan=0.0)
                     final_target = final_target[0]
                     # loss = loss1 + rmse
             else:

@@ -312,7 +312,6 @@ class BimodalTransformerEncoder_MBT(nn.Module):
             bottleneck_outputs_stack = torch.stack(bottleneck_outputs)
             bottlenecks_bi_mean = torch.mean(bottleneck_outputs_stack, dim=0)
             all_bottleneck_stack = torch.stack([bottlenecks_bi_mean, bottleneck_outputs_stack[0,:,:,:]])
-
             bottlenecks = all_bottleneck_stack[missing, self.idx_order, :, :]
             
         return enc_outputs, 0
