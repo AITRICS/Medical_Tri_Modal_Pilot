@@ -110,8 +110,9 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
             # for i in final_target:
             #     print(i.shape)
             # print(output.shape)
-            # print(rmse.shape)
+            # # print(rmse.shape)
             # print(missing.shape)
+            # print("final_target: ", final_target.shape)
             # exit(1)
             
             if "rmse" in args.auxiliary_loss_type:
@@ -145,6 +146,9 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                     missing = missing.reshape(-1)   
                     output = output.reshape(-1)
                     loss = criterion(output[missing == 0], final_target[missing == 0])
+                elif "mbt_vnoshnoavgtr" in args.model:
+                    final_target = final_target.unsqueeze(0).repeat(3,1)
+                    loss = criterion(output, final_target)
                 else:
                     loss = criterion(output, final_target)
                 
@@ -194,7 +198,10 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                     output = output[missing_num, idx_order]
                     loss = criterion(output, final_target)
                     
-                else:   
+                elif "mbt_vnoshnoavgtr" in args.model:
+                    output = torch.mean(output, dim=0)
+                    loss = criterion(output, final_target)
+                else:
                     loss = criterion(output, final_target)
 
             output = torch.sigmoid(output)
@@ -204,6 +211,5 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
             logger.evaluator.add_batch(final_target, output, rmse)
         else:
             logger.evaluator.add_batch(final_target, output)
-
     return model, loss.item()
 

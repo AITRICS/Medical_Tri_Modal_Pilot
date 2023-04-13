@@ -35,7 +35,7 @@ def get_data_loader(args, patient_dict, keys_list, k_indx):
     val_data_list   = [item for sublist in val_data_list for item in sublist]
     train_data_list = [patient_dict[key] for key in train_keys]
     train_data_list = [item for sublist in train_data_list for item in sublist]
-
+    
     random.shuffle(train_data_list)
     
     # get test data

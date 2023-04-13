@@ -1572,21 +1572,21 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                     textLength = 0
                     missing.append(True)
                 else:
-                    prop=[args.missing_prop/100,(100-args.missing_prop)/100]
-                    txt_missing_prop = np.random.choice(2,1,replace=True, p=prop)
-                    if txt_missing_prop == 0:
-                        tokens = torch.zeros(self.token_max_length)
-                        textLength = 0
-                        missing.append(True)
-                    else:
-                        textLength = len(tokens)
-                        # UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
-                        # EX) 2 {Sentence Tokens} {1 Padding} 3
-                        # Add Beginnning of Sentence Token
-                        tokens.insert(0, 2)
-                        tokens = torch.Tensor(clinical_note_transform(tokens))
-                        tokens[tokens==1] = 0
-                        missing.append(False)
+                    # prop=[args.missing_prop/100,(100-args.missing_prop)/100]
+                    # txt_missing_prop = np.random.choice(2,1,replace=True, p=prop)
+                    # if txt_missing_prop == 0:
+                    #     tokens = torch.zeros(self.token_max_length)
+                    #     textLength = 0
+                    #     missing.append(True)
+                    # else:
+                    textLength = len(tokens)
+                    # UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
+                    # EX) 2 {Sentence Tokens} {1 Padding} 3
+                    # Add Beginnning of Sentence Token
+                    tokens.insert(0, 2)
+                    tokens = torch.Tensor(clinical_note_transform(tokens))
+                    tokens[tokens==1] = 0
+                    missing.append(False)
             else:    
                 tokens = torch.zeros(self.token_max_length)
                 textLength = 0
@@ -2996,21 +2996,21 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                     textLength = 0
                     missing.append(True)
                 else:
-                    prop=[args.missing_prop/100,(100-args.missing_prop)/100]
-                    txt_missing_prop = np.random.choice(2,1,replace=True, p=prop)
-                    if txt_missing_prop == 0:
-                        tokens = torch.zeros(self.token_max_length)
-                        textLength = 0
-                        missing.append(True)
-                    else:
-                        textLength = len(tokens)
-                        # UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
-                        # EX) 2 {Sentence Tokens} {1 Padding} 3
-                        # Add Beginnning of Sentence Token
-                        tokens.insert(0, 2)
-                        tokens = torch.Tensor(clinical_note_transform(tokens))
-                        tokens[tokens==1] = 0
-                        missing.append(False)
+                    # prop=[args.missing_prop/100,(100-args.missing_prop)/100]
+                    # txt_missing_prop = np.random.choice(2,1,replace=True, p=prop)
+                    # if txt_missing_prop == 0:
+                    #     tokens = torch.zeros(self.token_max_length)
+                    #     textLength = 0
+                    #     missing.append(True)
+                    # else:
+                    textLength = len(tokens)
+                    # UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
+                    # EX) 2 {Sentence Tokens} {1 Padding} 3
+                    # Add Beginnning of Sentence Token
+                    tokens.insert(0, 2)
+                    tokens = torch.Tensor(clinical_note_transform(tokens))
+                    tokens[tokens==1] = 0
+                    missing.append(False)
             else:    
                 tokens = torch.zeros(self.token_max_length)
                 textLength = 0

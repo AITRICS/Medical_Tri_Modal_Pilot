@@ -117,6 +117,7 @@ parser.add_argument('--image-norm-type', type=str, default="HE", choices=["HE", 
 parser.add_argument('--residual-bottlenecks', type=int, default=0, choices=[0,1])
 parser.add_argument('--mbt-bottlenecks-n', type=int, default=4)
 parser.add_argument('--mbt-fusion-startIdx', type=int, default=0)
+parser.add_argument('--mbt-only-vslt', type=int, default=0)
 
 # Model Parameters
 parser.add_argument('--model-types', type=str, default="detection", choices=["detection", "classification"])
