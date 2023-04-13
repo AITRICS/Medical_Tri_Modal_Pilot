@@ -269,14 +269,14 @@ class TRI_MBT_VNOSHAVGTR(nn.Module):
         outputs = []
         for idx, fc_list in enumerate(self.fc_lists):
             outputs.append(fc_list(classInput[idx,:,:]))
-        # outputs_stack = torch.stack([outputs[0][:, 0, :], outputs[1][:, 0, :], outputs[2][:, 0, :]]) # vslt, img, txt
-        # tri_mean = torch.mean(outputs_stack, dim=0) 
-        # vslttxt_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[2, :, :]]), dim=0)
-        # vsltimg_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[1, :, :]]), dim=0)
-        # all_cls_stack = torch.stack([tri_mean, vsltimg_mean, vslttxt_mean, outputs_stack[0, :, :]])
-        # output = all_cls_stack[missing, self.idx_order]
+        outputs_stack = torch.stack([outputs[0], outputs[1], outputs[2]]) # vslt, img, txt
+        tri_mean = torch.mean(outputs_stack, dim=0) 
+        vslttxt_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[2, :, :]]), dim=0)
+        vsltimg_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[1, :, :]]), dim=0)
+        all_cls_stack = torch.stack([tri_mean, vsltimg_mean, vslttxt_mean, outputs_stack[0, :, :]])
+        output1 = all_cls_stack[missing, self.idx_order]
 
-        output1 = torch.mean(torch.stack(outputs), dim=0)
+        # output1 = torch.mean(torch.stack(outputs), dim=0)
         
         output3 = None
         return output1, output2, output3

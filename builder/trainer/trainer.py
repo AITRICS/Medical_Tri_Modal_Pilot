@@ -21,7 +21,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                                             model, logger, device, scheduler=None, optimizer=None, criterion=None, 
                                             scaler=None, flow_type=None, output_lengths=None, 
                                             seq_lengths=None, x_img=None, x_txt=None, txt_lengths=None, imgtxt_time=None, missing=None, reports_tokens=None, reports_lengths=None, criterion_aux = None):
-    
+    original_missing = missing
     img_time, txt_time = imgtxt_time
     img_time = img_time.type(torch.HalfTensor).to(device, non_blocking=True)
     txt_time = txt_time.type(torch.HalfTensor).to(device, non_blocking=True)
@@ -147,7 +147,10 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                     output = output.reshape(-1)
                     loss = criterion(output[missing == 0], final_target[missing == 0])
                 elif "mbt_vnoshnoavgtr" in args.model:
+                    original_missing = original_missing.permute(1,0)
                     final_target = final_target.unsqueeze(0).repeat(3,1)
+                    output = output[original_missing==0]
+                    final_target = final_target[original_missing==0]
                     loss = criterion(output, final_target)
                 else:
                     loss = criterion(output, final_target)
@@ -199,7 +202,12 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
                     loss = criterion(output, final_target)
                     
                 elif "mbt_vnoshnoavgtr" in args.model:
-                    output = torch.mean(output, dim=0)
+                    tri_mean = torch.mean(output, dim=0) 
+                    vslttxt_mean = torch.mean(torch.stack([output[0, :], output[2, :]]), dim=0)
+                    vsltimg_mean = torch.mean(torch.stack([output[0, :], output[1, :]]), dim=0)
+                    all_cls_stack = torch.stack([tri_mean, vsltimg_mean, vslttxt_mean, output[0, :]])
+                    idx_order = torch.range(0, args.batch_size-1).type(torch.LongTensor)
+                    output = all_cls_stack[missing_num, idx_order]
                     loss = criterion(output, final_target)
                 else:
                     loss = criterion(output, final_target)
