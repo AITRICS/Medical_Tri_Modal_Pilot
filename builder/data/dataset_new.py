@@ -232,11 +232,19 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         
         exhaustive_dict_txt0_img1 = {3:9, 4:10, 5:11}
         exhaustive_dict2_txt1_img0 = {6:9, 7:10, 8:11}
+        
         exhaustive_dict3_txt1_img1_1 = {0:9, 1:10, 2:11}
         exhaustive_dict3_txt1_img1_2 = {0:6, 1:7, 2:8}
         exhaustive_dict3_txt1_img1_3 = {0:3, 1:4, 2:5}
+        
         class2dict_missing = {3:1, 6:2, 9:3, 2:4, 8:6, 11:7, 1:4, 4:5, 7:6, 10:7}
         class2dict_full = {2:0}
+        # Case1: (pp, nn)
+        # Case2: (pp, nn)     Case3: (wimgwtxt_pp: 0, wimgwtxt-nn: 2, wimgw/otxt_pp: 3, wimgw/otxt-nn: 5)
+        # Case3: (w/oimgwtxt_pp: 6, w/oimgwtxt-nn: 8, w/oimgw/otxt_pp: 9, w/oimgw/otxt-nn: 11)
+        # Case1: (pn)
+        # Case2: (pn)         Case3: (wimgwtxt-pn: 1, wimgw/otxt-pn: 4)
+        # Case3: (w/oimgwtxt-pn: 7, w/oimgw/otxt-pn: 10)
         
         if "tdecoder" in args.auxiliary_loss_type:
             with open("builder/data/text/real_final_reports_generate.pkl","rb") as f:
@@ -467,21 +475,25 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 # exhaustive
                 # 0 -> original, 1 -> only vslt, 2 -> vslt+txt, 3-> vslt+img
                 if args.missing_exhaustive == 1:
-                    if "_txt0_img1" in file_name:
+                    if len(self._type_list) == 0:
+                        continue
+                    type_last = self._type_list[-1]
+                    if type_last in exhaustive_dict_txt0_img1:
                         self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
-                        self._type_list.append(exhaustive_dict_txt0_img1[self._type_list[-1]])
-                    elif "_txt1_img0" in file_name:
-                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
-                        self._type_list.append(exhaustive_dict2_txt1_img0[self._type_list[-1]])
+                        self._type_list.append(exhaustive_dict_txt0_img1[type_last])
                         
-                    elif "_txt1_img1" in file_name:
+                    elif type_last in exhaustive_dict2_txt1_img0:
                         self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
-                        self._type_list.append(exhaustive_dict3_txt1_img1_1[self._type_list[-1]])
+                        self._type_list.append(exhaustive_dict2_txt1_img0[type_last])
+                        
+                    elif type_last in exhaustive_dict3_txt1_img1_1:
+                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
+                        self._type_list.append(exhaustive_dict3_txt1_img1_1[type_last])
                         self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 2])
-                        self._type_list.append(exhaustive_dict3_txt1_img1_2[self._type_list[-1]])
+                        self._type_list.append(exhaustive_dict3_txt1_img1_2[type_last])
                         self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 3])
-                        self._type_list.append(exhaustive_dict3_txt1_img1_3[self._type_list[-1]])
-                
+                        self._type_list.append(exhaustive_dict3_txt1_img1_3[type_last])
+                        
             ######################################################            
             if "train" in data_type:
                 pass
@@ -1821,20 +1833,24 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 # exhaustive
                 # 0 -> original, 1 -> only vslt, 2 -> vslt+txt, 3-> vslt+img
                 if args.missing_exhaustive == 1:
-                    if "_txt0_img1" in file_name:
+                    if len(self._type_list) == 0:
+                        continue
+                    type_last = self._type_list[-1]
+                    if type_last in exhaustive_dict_txt0_img1:
                         self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
-                        self._type_list.append(exhaustive_dict_txt0_img1[self._type_list[-1]])
-                    elif "_txt1_img0" in file_name:
-                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
-                        self._type_list.append(exhaustive_dict2_txt1_img0[self._type_list[-1]])
+                        self._type_list.append(exhaustive_dict_txt0_img1[type_last])
                         
-                    elif "_txt1_img1" in file_name:
+                    elif type_last in exhaustive_dict2_txt1_img0:
                         self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
-                        self._type_list.append(exhaustive_dict3_txt1_img1_1[self._type_list[-1]])
+                        self._type_list.append(exhaustive_dict2_txt1_img0[type_last])
+                        
+                    elif type_last in exhaustive_dict3_txt1_img1_1:
+                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
+                        self._type_list.append(exhaustive_dict3_txt1_img1_1[type_last])
                         self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 2])
-                        self._type_list.append(exhaustive_dict3_txt1_img1_2[self._type_list[-1]])
+                        self._type_list.append(exhaustive_dict3_txt1_img1_2[type_last])
                         self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 3])
-                        self._type_list.append(exhaustive_dict3_txt1_img1_3[self._type_list[-1]])
+                        self._type_list.append(exhaustive_dict3_txt1_img1_3[type_last])
             
             ######################################################
             if "train" in data_type:
@@ -1903,7 +1919,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         return len(self._data_list)
 
     def __getitem__(self, index):
-        pkl_path, possible_indices_keys, labels_by_dict, win_sizes, target, event_times = self._data_list[index]
+        pkl_path, possible_indices_keys, labels_by_dict, win_sizes, target, event_times, missing_comb = self._data_list[index]
         type_list = self._type_list[index]
         early_nones = 0
         late_nones = 0
