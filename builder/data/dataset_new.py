@@ -1785,7 +1785,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
             for keylist_type, possible_indices_keys in enumerate(possible_indices_keys_alltypes):
                 if keylist_type < 2:               
                     if len(possible_indices_keys) > 0 and possible_indices_keys is not None:# possible_indices_keys가 빈 리스트라면 실행 안됨
-                        self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time])
+                        self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time, 0])
                         if keylist_type == 0 and target_type == 1 and "txt1" in file_name:
                             self._type_list.append(0)
                         elif keylist_type == 0 and target_type == 0 and "txt1" in file_name:
@@ -1812,7 +1812,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                     if (args.model_types == "classification"):
                         continue                                 
                     if len(possible_indices_keys) > 0 and possible_indices_keys is not None:
-                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time])
+                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 0])
                         if keylist_type == 2 and "txt1" in file_name:
                             self._type_list.append(1)
                         elif keylist_type == 2 and "txt1" not in file_name:
