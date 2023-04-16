@@ -103,20 +103,20 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
         
         
         
-    print("train_x: ", train_x.shape)
-    print("static_x: ", static_x.shape)
-    print("input_lengths: ", input_lengths.shape)
-    print("train_y: ", train_y.shape)
-    print("x_img: ", x_img.shape)
-    print("x_txt: ", x_txt.shape)
-    print("txt_lengths: ", txt_lengths)
-    print("imgtxt_time: ", imgtxt_time)
-    print("missing: ", missing.shape)
-    print("missing: ", missing)
-    print("missing_num: ", missing_num.shape)
-    print("missing_num: ", missing_num)
+    # print("train_x: ", train_x.shape)
+    # print("static_x: ", static_x.shape)
+    # print("input_lengths: ", input_lengths.shape)
+    # print("train_y: ", train_y.shape)
+    # print("x_img: ", x_img.shape)
+    # print("x_txt: ", x_txt.shape)
+    # print("txt_lengths: ", txt_lengths)
+    # print("imgtxt_time: ", imgtxt_time)
+    # print("missing: ", missing.shape)
+    # print("missing: ", missing)
+    # print("missing_num: ", missing_num.shape)
+    # print("missing_num: ", missing_num)
     
-    exit(1)
+    # exit(1)
 
     if flow_type == "train":
         optimizer.zero_grad()

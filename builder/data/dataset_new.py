@@ -428,9 +428,11 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             possible_indices_keys_alltypes = list([i for idx, i in enumerate(possible_indices_keys_alltypes) if idx in [1, 2, 4, 5]])
             
             for keylist_type, possible_indices_keys in enumerate(possible_indices_keys_alltypes):
+                a = 0
                 if keylist_type < 2:               
                     if len(possible_indices_keys) > 0 and possible_indices_keys is not None:# possible_indices_keys가 빈 리스트라면 실행 안됨
                         self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time, 0])
+                        a = 1
                         if keylist_type == 0 and target_type == 1 and "txt1" in file_name:
                             self._type_list.append(0)
                         elif keylist_type == 0 and target_type == 0 and "txt1" in file_name:
@@ -458,6 +460,7 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                         continue                 
                     if len(possible_indices_keys) > 0 and possible_indices_keys is not None:
                         self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 0])
+                        a = 2
                         if keylist_type == 2 and "txt1" in file_name:
                             self._type_list.append(1)
                         elif keylist_type == 2 and "txt1" not in file_name:
@@ -479,21 +482,40 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                         continue
                     type_last = self._type_list[-1]
                     if type_last in exhaustive_dict_txt0_img1:
-                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
+                        if a == 1:
+                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time, 1])
+                        elif a == 2:
+                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
+                        else:
+                            continue
                         self._type_list.append(exhaustive_dict_txt0_img1[type_last])
                         
                     elif type_last in exhaustive_dict2_txt1_img0:
-                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
+                        if a == 1:
+                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time, 1])
+                        elif a == 2:
+                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
+                        else:
+                            continue
                         self._type_list.append(exhaustive_dict2_txt1_img0[type_last])
                         
                     elif type_last in exhaustive_dict3_txt1_img1_1:
-                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
-                        self._type_list.append(exhaustive_dict3_txt1_img1_1[type_last])
-                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 2])
-                        self._type_list.append(exhaustive_dict3_txt1_img1_2[type_last])
-                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 3])
-                        self._type_list.append(exhaustive_dict3_txt1_img1_3[type_last])
-                        
+                        if a == 1:
+                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time, 1])
+                            self._type_list.append(exhaustive_dict3_txt1_img1_1[type_last])
+                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time, 2])
+                            self._type_list.append(exhaustive_dict3_txt1_img1_2[type_last])
+                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time, 3])
+                            self._type_list.append(exhaustive_dict3_txt1_img1_3[type_last])
+                        elif a == 2:
+                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
+                            self._type_list.append(exhaustive_dict3_txt1_img1_1[type_last])
+                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 2])
+                            self._type_list.append(exhaustive_dict3_txt1_img1_2[type_last])
+                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 3])
+                            self._type_list.append(exhaustive_dict3_txt1_img1_3[type_last])
+                        else:
+                            continue
             ######################################################            
             if "train" in data_type:
                 pass
@@ -1783,9 +1805,11 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
             possible_indices_keys_alltypes = list([i for idx, i in enumerate(possible_indices_keys_alltypes) if idx in [1, 2, 4, 5]])
             
             for keylist_type, possible_indices_keys in enumerate(possible_indices_keys_alltypes):
+                a = 0
                 if keylist_type < 2:               
                     if len(possible_indices_keys) > 0 and possible_indices_keys is not None:# possible_indices_keys가 빈 리스트라면 실행 안됨
-                        self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time, 0])
+                        self._data_list.append([pkl_path, list(possible_indices_keys), possible_indices_dict, possibleWinSizes, target, event_time, 0])
+                        a = 1
                         if keylist_type == 0 and target_type == 1 and "txt1" in file_name:
                             self._type_list.append(0)
                         elif keylist_type == 0 and target_type == 0 and "txt1" in file_name:
@@ -1805,14 +1829,15 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                         else:
                             print("Missing modal error with keylist_type < 2")
                             exit(1)
-                        possible_tpoints = [True if i in possible_indices_dict else False for i in possible_indices_keys]
+                        possible_tpoints = [True if i in possible_indices_dict else False for i in list(possible_indices_keys)]
                         positive_tpoints += possible_tpoints.count(True)
                         negative_tpoints += possible_tpoints.count(False)
                 else:   
                     if (args.model_types == "classification"):
                         continue                                 
                     if len(possible_indices_keys) > 0 and possible_indices_keys is not None:
-                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 0])
+                        self._data_list.append([pkl_path, list(possible_indices_keys), {}, possibleWinSizes, 0, event_time, 0])
+                        a = 2
                         if keylist_type == 2 and "txt1" in file_name:
                             self._type_list.append(1)
                         elif keylist_type == 2 and "txt1" not in file_name:
@@ -1837,21 +1862,40 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                         continue
                     type_last = self._type_list[-1]
                     if type_last in exhaustive_dict_txt0_img1:
-                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
+                        if a == 1:
+                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time, 1])
+                        elif a == 2:
+                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
+                        else:
+                            continue
                         self._type_list.append(exhaustive_dict_txt0_img1[type_last])
                         
                     elif type_last in exhaustive_dict2_txt1_img0:
-                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
+                        if a == 1:
+                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time, 1])
+                        elif a == 2:
+                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
+                        else:
+                            continue
                         self._type_list.append(exhaustive_dict2_txt1_img0[type_last])
                         
                     elif type_last in exhaustive_dict3_txt1_img1_1:
-                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
-                        self._type_list.append(exhaustive_dict3_txt1_img1_1[type_last])
-                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 2])
-                        self._type_list.append(exhaustive_dict3_txt1_img1_2[type_last])
-                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 3])
-                        self._type_list.append(exhaustive_dict3_txt1_img1_3[type_last])
-            
+                        if a == 1:
+                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time, 1])
+                            self._type_list.append(exhaustive_dict3_txt1_img1_1[type_last])
+                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time, 2])
+                            self._type_list.append(exhaustive_dict3_txt1_img1_2[type_last])
+                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time, 3])
+                            self._type_list.append(exhaustive_dict3_txt1_img1_3[type_last])
+                        elif a == 2:
+                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
+                            self._type_list.append(exhaustive_dict3_txt1_img1_1[type_last])
+                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 2])
+                            self._type_list.append(exhaustive_dict3_txt1_img1_2[type_last])
+                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 3])
+                            self._type_list.append(exhaustive_dict3_txt1_img1_3[type_last])
+                        else:
+                            continue
             ######################################################
             if "train" in data_type:
                 pass
