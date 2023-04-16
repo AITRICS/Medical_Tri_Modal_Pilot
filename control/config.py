@@ -51,6 +51,7 @@ parser.add_argument('--val-data-ratio', type=float, default=0.1)
 parser.add_argument('--imgtxt-time', type=int, default=0, choices=[0,1])
 
 # Training Parameters
+parser.add_argument('--missing-exhaustive', type=int, default=0, choices=[0,1])
 parser.add_argument('--epochs', type=int, default=50)
 parser.add_argument('--batch-size', type=int, default=32)
 parser.add_argument('--l2-coeff', type=float, default=0.002)

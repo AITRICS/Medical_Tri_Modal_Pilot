@@ -20,7 +20,7 @@ from control.config import args
 def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y, 
                                             model, logger, device, scheduler=None, optimizer=None, criterion=None, 
                                             scaler=None, flow_type=None, output_lengths=None, 
-                                            seq_lengths=None, x_img=None, x_txt=None, txt_lengths=None, imgtxt_time=None, missing=None, reports_tokens=None, reports_lengths=None, criterion_aux = None):
+                                            seq_lengths=None, x_img=None, x_txt=None, txt_lengths=None, imgtxt_time=None, missing=None, reports_tokens=None, reports_lengths=None, criterion_aux = None):    
     original_missing = missing
     img_time, txt_time = imgtxt_time
     img_time = img_time.type(torch.HalfTensor).to(device, non_blocking=True)
@@ -100,6 +100,23 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
     elif args.input_types == "vslt_img":
         missing_num[missing_num == 1] = 0
         missing_num[missing_num == 3] = 1
+        
+        
+        
+    print("train_x: ", train_x.shape)
+    print("static_x: ", static_x.shape)
+    print("input_lengths: ", input_lengths.shape)
+    print("train_y: ", train_y.shape)
+    print("x_img: ", x_img.shape)
+    print("x_txt: ", x_txt.shape)
+    print("txt_lengths: ", txt_lengths)
+    print("imgtxt_time: ", imgtxt_time)
+    print("missing: ", missing.shape)
+    print("missing: ", missing)
+    print("missing_num: ", missing_num.shape)
+    print("missing_num: ", missing_num)
+    
+    exit(1)
 
     if flow_type == "train":
         optimizer.zero_grad()

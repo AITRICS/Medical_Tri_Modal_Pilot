@@ -230,10 +230,12 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         self.model_types = args.model_types
         self.loss_types = args.loss_types
         
-        if (args.model_types == "classification"):
-            class2dict_missing = {6:1, 9:2}
-        else: # detection
-            class2dict_missing = {3:1, 6:2, 9:3, 2:4, 8:6, 11:7, 1:4, 4:5, 7:6, 10:7}
+        exhaustive_dict_txt0_img1 = {3:9, 4:10, 5:11}
+        exhaustive_dict2_txt1_img0 = {6:9, 7:10, 8:11}
+        exhaustive_dict3_txt1_img1_1 = {0:9, 1:10, 2:11}
+        exhaustive_dict3_txt1_img1_2 = {0:6, 1:7, 2:8}
+        exhaustive_dict3_txt1_img1_3 = {0:3, 1:4, 2:5}
+        class2dict_missing = {3:1, 6:2, 9:3, 2:4, 8:6, 11:7, 1:4, 4:5, 7:6, 10:7}
         class2dict_full = {2:0}
         
         if "tdecoder" in args.auxiliary_loss_type:
@@ -414,87 +416,71 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             patient_list.append(target_type)
             
             ######################################################
-            if ('train-full' in args.modality_inclusion and "img1" not in args.fullmodal_definition): # (Case1: full_modal with img1 not in fullmodal_definition)
-                possible_indices_keys_alltypes = list([i for idx, i in enumerate(possible_indices_keys_alltypes) if idx in [0, 3]])
-                for keylist_type, possible_indices_keys in enumerate(possible_indices_keys_alltypes):
-                    if keylist_type == 0:               
-                        if len(possible_indices_keys) > 0 and possible_indices_keys is not None:# possible_indices_keys가 빈 리스트라면 실행 안됨
-                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time])
-                            self._type_list.append(target_type)
-                            
-                            possible_tpoints = [True if i in possible_indices_dict else False for i in possible_indices_keys]
-                            positive_tpoints += possible_tpoints.count(True)
-                            negative_tpoints += possible_tpoints.count(False)
-                    else:                    
-                        if target == 1 and len(possible_indices_keys) > 0 and possible_indices_keys is not None:
-                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time])
-                            self._type_list.append(2)
-                            negative_tpoints += len(possible_indices_keys)
-                                
-            elif ('train-full' in args.modality_inclusion and "img1" in args.fullmodal_definition): # (Case2: full_modal with img1 in fullmodal_definition)
-                possible_indices_keys_alltypes = list([i for idx, i in enumerate(possible_indices_keys_alltypes) if idx in [1, 4]])
-                for keylist_type, possible_indices_keys in enumerate(possible_indices_keys_alltypes):
-                    if keylist_type == 0:               
-                        if len(possible_indices_keys) > 0 and possible_indices_keys is not None:# possible_indices_keys가 빈 리스트라면 실행 안됨
-                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time])
-                            self._type_list.append(target_type)
-                            
-                            possible_tpoints = [True if i in possible_indices_dict else False for i in possible_indices_keys]
-                            positive_tpoints += possible_tpoints.count(True)
-                            negative_tpoints += possible_tpoints.count(False)
-                    else:                    
-                        if target == 1 and len(possible_indices_keys) > 0 and possible_indices_keys is not None:
-                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time])
-                            self._type_list.append(2)
-                            negative_tpoints += len(possible_indices_keys)
-                            
-            else: # (Case3: missing modal)
-                possible_indices_keys_alltypes = list([i for idx, i in enumerate(possible_indices_keys_alltypes) if idx in [1, 2, 4, 5]])
-                
-                for keylist_type, possible_indices_keys in enumerate(possible_indices_keys_alltypes):
-                    if keylist_type < 2:               
-                        if len(possible_indices_keys) > 0 and possible_indices_keys is not None:# possible_indices_keys가 빈 리스트라면 실행 안됨
-                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time])
-                            if keylist_type == 0 and target_type == 1 and "txt1" in file_name:
-                                self._type_list.append(0)
-                            elif keylist_type == 0 and target_type == 0 and "txt1" in file_name:
-                                self._type_list.append(2)
-                            elif keylist_type == 0 and target_type == 1 and "txt1" not in file_name:
-                                self._type_list.append(3)
-                            elif keylist_type == 0 and target_type == 0 and "txt1" not in file_name:
-                                self._type_list.append(5)
-                            elif keylist_type == 1 and target_type == 1 and "txt1" in file_name:
-                                self._type_list.append(6)
-                            elif keylist_type == 1 and target_type == 0 and "txt1" in file_name:
-                                self._type_list.append(8)
-                            elif keylist_type == 1 and target_type == 1 and "txt1" not in file_name:
-                                self._type_list.append(9)
-                            elif keylist_type == 1 and target_type == 0 and "txt1" not in file_name:
-                                self._type_list.append(11)
-                            else:
-                                print("Missing modal error with keylist_type < 2")
-                                exit(1)
-                            possible_tpoints = [True if i in possible_indices_dict else False for i in possible_indices_keys]
-                            positive_tpoints += possible_tpoints.count(True)
-                            negative_tpoints += possible_tpoints.count(False)
-                    else:   
-                        if (args.model_types == "classification"):
-                            continue                 
-                        if len(possible_indices_keys) > 0 and possible_indices_keys is not None:
-                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time])
-                            if keylist_type == 2 and "txt1" in file_name:
-                                self._type_list.append(1)
-                            elif keylist_type == 2 and "txt1" not in file_name:
-                                self._type_list.append(4)
-                            elif keylist_type == 3 and "txt1" in file_name:
-                                self._type_list.append(7)
-                            elif keylist_type == 3 and "txt1" not in file_name:
-                                self._type_list.append(10)
-                            else:
-                                print("Missing modal error with keylist_type >= 2")
-                                exit(1)
 
-                            negative_tpoints += len(possible_indices_keys)
+            possible_indices_keys_alltypes = list([i for idx, i in enumerate(possible_indices_keys_alltypes) if idx in [1, 2, 4, 5]])
+            
+            for keylist_type, possible_indices_keys in enumerate(possible_indices_keys_alltypes):
+                if keylist_type < 2:               
+                    if len(possible_indices_keys) > 0 and possible_indices_keys is not None:# possible_indices_keys가 빈 리스트라면 실행 안됨
+                        self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time, 0])
+                        if keylist_type == 0 and target_type == 1 and "txt1" in file_name:
+                            self._type_list.append(0)
+                        elif keylist_type == 0 and target_type == 0 and "txt1" in file_name:
+                            self._type_list.append(2)
+                        elif keylist_type == 0 and target_type == 1 and "txt1" not in file_name:
+                            self._type_list.append(3)
+                        elif keylist_type == 0 and target_type == 0 and "txt1" not in file_name:
+                            self._type_list.append(5)
+                        elif keylist_type == 1 and target_type == 1 and "txt1" in file_name:
+                            self._type_list.append(6)
+                        elif keylist_type == 1 and target_type == 0 and "txt1" in file_name:
+                            self._type_list.append(8)
+                        elif keylist_type == 1 and target_type == 1 and "txt1" not in file_name:
+                            self._type_list.append(9)
+                        elif keylist_type == 1 and target_type == 0 and "txt1" not in file_name:
+                            self._type_list.append(11)
+                        else:
+                            print("Missing modal error with keylist_type < 2")
+                            exit(1)
+                        possible_tpoints = [True if i in possible_indices_dict else False for i in possible_indices_keys]
+                        positive_tpoints += possible_tpoints.count(True)
+                        negative_tpoints += possible_tpoints.count(False)
+                else:   
+                    if (args.model_types == "classification"):
+                        continue                 
+                    if len(possible_indices_keys) > 0 and possible_indices_keys is not None:
+                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 0])
+                        if keylist_type == 2 and "txt1" in file_name:
+                            self._type_list.append(1)
+                        elif keylist_type == 2 and "txt1" not in file_name:
+                            self._type_list.append(4)
+                        elif keylist_type == 3 and "txt1" in file_name:
+                            self._type_list.append(7)
+                        elif keylist_type == 3 and "txt1" not in file_name:
+                            self._type_list.append(10)
+                        else:
+                            print("Missing modal error with keylist_type >= 2")
+                            exit(1)
+
+                        negative_tpoints += len(possible_indices_keys)
+                
+                # exhaustive
+                # 0 -> original, 1 -> only vslt, 2 -> vslt+txt, 3-> vslt+img
+                if args.missing_exhaustive == 1:
+                    if "_txt0_img1" in file_name:
+                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
+                        self._type_list.append(exhaustive_dict_txt0_img1[self._type_list[-1]])
+                    elif "_txt1_img0" in file_name:
+                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
+                        self._type_list.append(exhaustive_dict2_txt1_img0[self._type_list[-1]])
+                        
+                    elif "_txt1_img1" in file_name:
+                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
+                        self._type_list.append(exhaustive_dict3_txt1_img1_1[self._type_list[-1]])
+                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 2])
+                        self._type_list.append(exhaustive_dict3_txt1_img1_2[self._type_list[-1]])
+                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 3])
+                        self._type_list.append(exhaustive_dict3_txt1_img1_3[self._type_list[-1]])
                 
             ######################################################            
             if "train" in data_type:
@@ -533,30 +519,6 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         self.feature_means = FEATURE_MEANS
         
         print("No Dataset Error: ", len(self._type_list) == len(self._data_list))
-        # if ('train-full' in args.modality_inclusion):
-        #     print("Number of patient positive samples list for training: {}".format(str(patient_list.count(1))))
-        #     print("Number of patient negative samples list for training: {}".format(str(patient_list.count(2))))
-        #     print("Number of non-patient negative samples list for training: {}".format(str(patient_list.count(0))))        
-        #     print("Number of total negative samples list for training: {}".format(str(patient_list.count(0) + patient_list.count(2))))        
-        # else: # missing modality
-        #     print("[1]. Number of patients: ", patient_list.count(1))
-        #     print("1. Number of patient positive samples lists for training", self._type_list.count(0)+self._type_list.count(1)+self._type_list.count(2)+self._type_list.count(3))
-        #     print(" 1-1. wimg-wtxt_pp: ", self._type_list.count(0))
-        #     print(" 1-2. wimg-w/otxt_pp: ", self._type_list.count(1))
-        #     print(" 1-3. w/oimg-wtxt_pp: ", self._type_list.count(2))
-        #     print(" 1-4. w/oimg-w/otxt_pp: ", self._type_list.count(3))
-        #     print("[2]. Number of patients with negative signs: ", patient_list.count(2))
-        #     # print("2. Number of patient negative samples list for training", self._type_list.count(8)+self._type_list.count(9)+self._type_list.count(10)+self._type_list.count(11))
-        #     # print(" 2-1. wimg-wtxt-pn: ", self._type_list.count(8))
-        #     # print(" 2-2. wimg-w/otxt-pn: ", self._type_list.count(9))
-        #     # print(" 2-3. w/oimg-wtxt-pn: ", self._type_list.count(10))
-        #     # print(" 2-4. w/oimg-w/otxt-pn: ", self._type_list.count(11))
-        #     print("[3]. Number of non-patients: ", patient_list.count(0))
-        #     print("3. Number of non-patient negative samples lists for training", self._type_list.count(4)+self._type_list.count(5)+self._type_list.count(6)+self._type_list.count(7))
-        #     print(" 3-1. wimg-wtxt-nn: ", self._type_list.count(4))
-        #     print(" 3-2. wimg-w/otxt-nn: ", self._type_list.count(5))
-        #     print(" 3-3. w/oimg-wtxt-nn: ", self._type_list.count(6))
-        #     print(" 3-4. w/oimg-w/otxt-nn: ", self._type_list.count(7))
         print("########## Detail Data Info ##########")
         print("Positive time-points: ", positive_tpoints)
         print("Negative time-points: ", negative_tpoints)
@@ -587,7 +549,7 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         return len(p[0])
 
     def __getitem__(self, index):
-        pkl_path, possible_indices_keys, labels_by_dict, win_sizes, target, event_time = self._data_list[index]
+        pkl_path, possible_indices_keys, labels_by_dict, win_sizes, target, event_time, missing_comb = self._data_list[index]
         type_list = self._type_list[index]
         early_nones = 0
         late_nones = 0
@@ -669,50 +631,15 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             final_seqs[:time_data_tensor.shape[0], :time_data_tensor.shape[1]] = time_data_tensor
             inputLength = time_data_tensor.shape[0]
             f_indices = False
-    
-        if args.model_types == "classification":
-            target = labels_by_dict[oldselectedKey][0][-1] + late_nones
-            if target == 0:
-                print(labels_by_dict[oldselectedKey])
-                raise Exception('Target 0 error for Multi-Classification Problem')
-            elif target > 12:
-                target = 12
-            target -= 1
-            
-            if "bces" == self.loss_types:
-                multi_target = list(self.neg_multi_target)
-                multi_target[target] = 1
-                target = multi_target
-            
-            elif "bceandsoftmax" == self.loss_types:
-                multi_target = list(self.neg_multi_target)
-                multi_target[target] = 1
-                target_aux =multi_target 
                 
-            # rmse
-            elif "rmse" == self.loss_types:
-                target = event_time - selectedKey
+        if target != 0:
+            if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
+                target = 0
+                target_aux = 0.0
+            else:
+                target = 1
+                target_aux = event_time - selectedKey
             
-            # softmax
-        
-        # detection # bce or bce with rmse
-        else: 
-            # if target == 0:
-            #     target = self.neg_multi_target
-            #     target_aux = 0.0
-            # else:
-            #     pos_indices = list(set([ceil(oneItv[0] // self.intv_len) for oneItv in labels_by_dict[selectedKey]]))
-            #     target = [1 if indx in pos_indices else 0 for indx in range(12)]
-            #     target_aux = event_time - selectedKey
-                
-            if target != 0:
-                if labels_by_dict[oldselectedKey][0][-1] + late_nones > args.prediction_range:
-                    target = 0
-                    target_aux = 0.0
-                else:
-                    target = 1
-                    target_aux = event_time - selectedKey
-                
         target = torch.tensor(target)
         target_aux = torch.tensor(target_aux).type(torch.HalfTensor)
         missing = [False]   # Missing modality list: [vital/lab, img, txt]
@@ -726,7 +653,7 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
             if not cxr_li and ('train-full' in args.modality_inclusion): 
                 print("collate cxr error")
                 exit(1)
-            elif not cxr_li and ('train-missing' in args.modality_inclusion): 
+            elif (not cxr_li and ('train-missing' in args.modality_inclusion)) or missing_comb == 1 or missing_comb == 2: 
                 #1
                 if args.multiimages == 0:
                     img = torch.zeros(self.image_size).unsqueeze(0)
@@ -804,6 +731,8 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                         zero_padding = torch.zeros([128-textLength, 768])
                         tokens = torch.cat([tokens, zero_padding], dim=0)
                     txt_missing = False
+                if missing_comb == 1 or missing_comb == 3:
+                    txt_missing = True
             if txt_missing:
                 tokens = torch.zeros([self.txt_token_size, self.token_max_length]).squeeze()
                 textLength = 0
@@ -813,7 +742,7 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         else:
             if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'train-full' in args.modality_inclusion) or ('train-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
                 tokens = self.txtDict[(int(data_pkl['pat_id']), int(data_pkl['chid']))]
-                if len(tokens) == 0:
+                if (len(tokens) == 0) or missing_comb == 1 or missing_comb == 3:
                     tokens = torch.zeros(self.token_max_length)
                     textLength = 0
                     missing.append(True)
@@ -1646,10 +1575,12 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         else:
             self.token_max_length = args.bert_token_max_length
         
-        if (args.model_types == "classification"):
-            class2dict_missing = {6:1, 9:2}
-        else: # detection
-            class2dict_missing = {3:1, 6:2, 9:3, 2:4, 8:6, 11:7, 1:4, 4:5, 7:6, 10:7}
+        exhaustive_dict_txt0_img1 = {3:9, 4:10, 5:11}
+        exhaustive_dict2_txt1_img0 = {6:9, 7:10, 8:11}
+        exhaustive_dict3_txt1_img1_1 = {0:9, 1:10, 2:11}
+        exhaustive_dict3_txt1_img1_2 = {0:6, 1:7, 2:8}
+        exhaustive_dict3_txt1_img1_3 = {0:3, 1:4, 2:5}
+        class2dict_missing = {3:1, 6:2, 9:3, 2:4, 8:6, 11:7, 1:4, 4:5, 7:6, 10:7}
         class2dict_full = {2:0}
         
         if "tdecoder" in args.auxiliary_loss_type:
@@ -1837,90 +1768,73 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 continue
 
             ######################################################
-            if ('train-full' in args.modality_inclusion and "img1" not in args.fullmodal_definition): # (Case1: full_modal with img1 not in fullmodal_definition)
-                possible_indices_keys_alltypes = list([i for idx, i in enumerate(possible_indices_keys_alltypes) if idx in [0, 3]])
-                for keylist_type, possible_indices_keys in enumerate(possible_indices_keys_alltypes):
-                    if keylist_type == 0:               
-                        if len(possible_indices_keys) > 0 and possible_indices_keys is not None:# possible_indices_keys가 빈 리스트라면 실행 안됨
-                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time])
-                            self._type_list.append(target_type)
-                            
-                            possible_tpoints = [True if i in possible_indices_dict else False for i in possible_indices_keys]
-                            positive_tpoints += possible_tpoints.count(True)
-                            negative_tpoints += possible_tpoints.count(False)
-                    else:                    
-                        if target == 1 and len(possible_indices_keys) > 0 and possible_indices_keys is not None:
-                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time])
+            possible_indices_keys_alltypes = list([i for idx, i in enumerate(possible_indices_keys_alltypes) if idx in [1, 2, 4, 5]])
+            
+            for keylist_type, possible_indices_keys in enumerate(possible_indices_keys_alltypes):
+                if keylist_type < 2:               
+                    if len(possible_indices_keys) > 0 and possible_indices_keys is not None:# possible_indices_keys가 빈 리스트라면 실행 안됨
+                        self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time])
+                        if keylist_type == 0 and target_type == 1 and "txt1" in file_name:
+                            self._type_list.append(0)
+                        elif keylist_type == 0 and target_type == 0 and "txt1" in file_name:
                             self._type_list.append(2)
-                            negative_tpoints += len(possible_indices_keys)
-                                
-            elif ('train-full' in args.modality_inclusion and "img1" in args.fullmodal_definition): # (Case2: full_modal with img1 in fullmodal_definition)
-                possible_indices_keys_alltypes = list([i for idx, i in enumerate(possible_indices_keys_alltypes) if idx in [1, 4]])
-                for keylist_type, possible_indices_keys in enumerate(possible_indices_keys_alltypes):
-                    if keylist_type == 0:               
-                        if len(possible_indices_keys) > 0 and possible_indices_keys is not None:# possible_indices_keys가 빈 리스트라면 실행 안됨
-                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time])
-                            self._type_list.append(target_type)
-                            
-                            possible_tpoints = [True if i in possible_indices_dict else False for i in possible_indices_keys]
-                            positive_tpoints += possible_tpoints.count(True)
-                            negative_tpoints += possible_tpoints.count(False)
-                    else:                    
-                        if target == 1 and len(possible_indices_keys) > 0 and possible_indices_keys is not None:
-                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time])
-                            self._type_list.append(2)
-                            negative_tpoints += len(possible_indices_keys)
-                            
-            else: # (Case3: missing modal)
-                possible_indices_keys_alltypes = list([i for idx, i in enumerate(possible_indices_keys_alltypes) if idx in [1, 2, 4, 5]])
-                
-                for keylist_type, possible_indices_keys in enumerate(possible_indices_keys_alltypes):
-                    if keylist_type < 2:               
-                        if len(possible_indices_keys) > 0 and possible_indices_keys is not None:# possible_indices_keys가 빈 리스트라면 실행 안됨
-                            self._data_list.append([pkl_path, possible_indices_keys, possible_indices_dict, possibleWinSizes, target, event_time])
-                            if keylist_type == 0 and target_type == 1 and "txt1" in file_name:
-                                self._type_list.append(0)
-                            elif keylist_type == 0 and target_type == 0 and "txt1" in file_name:
-                                self._type_list.append(2)
-                            elif keylist_type == 0 and target_type == 1 and "txt1" not in file_name:
-                                self._type_list.append(3)
-                            elif keylist_type == 0 and target_type == 0 and "txt1" not in file_name:
-                                self._type_list.append(5)
-                            elif keylist_type == 1 and target_type == 1 and "txt1" in file_name:
-                                self._type_list.append(6)
-                            elif keylist_type == 1 and target_type == 0 and "txt1" in file_name:
-                                self._type_list.append(8)
-                            elif keylist_type == 1 and target_type == 1 and "txt1" not in file_name:
-                                self._type_list.append(9)
-                            elif keylist_type == 1 and target_type == 0 and "txt1" not in file_name:
-                                self._type_list.append(11)
-                            else:
-                                print("Missing modal error with keylist_type < 2")
-                                exit(1)
-                            possible_tpoints = [True if i in possible_indices_dict else False for i in possible_indices_keys]
-                            positive_tpoints += possible_tpoints.count(True)
-                            negative_tpoints += possible_tpoints.count(False)
-                    else:   
-                        if (args.model_types == "classification"):
-                            continue                                 
-                        if len(possible_indices_keys) > 0 and possible_indices_keys is not None:
-                            self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time])
-                            if keylist_type == 2 and "txt1" in file_name:
-                                self._type_list.append(1)
-                            elif keylist_type == 2 and "txt1" not in file_name:
-                                self._type_list.append(4)
-                            elif keylist_type == 3 and "txt1" in file_name:
-                                self._type_list.append(7)
-                            elif keylist_type == 3 and "txt1" not in file_name:
-                                self._type_list.append(10)
-                            else:
-                                print("Missing modal error with keylist_type >= 2")
-                                exit(1)
-                                # print("### 2 ###")
-                                # print("keylist_type: ", keylist_type)
-                                # print("file_name: ", file_name)
+                        elif keylist_type == 0 and target_type == 1 and "txt1" not in file_name:
+                            self._type_list.append(3)
+                        elif keylist_type == 0 and target_type == 0 and "txt1" not in file_name:
+                            self._type_list.append(5)
+                        elif keylist_type == 1 and target_type == 1 and "txt1" in file_name:
+                            self._type_list.append(6)
+                        elif keylist_type == 1 and target_type == 0 and "txt1" in file_name:
+                            self._type_list.append(8)
+                        elif keylist_type == 1 and target_type == 1 and "txt1" not in file_name:
+                            self._type_list.append(9)
+                        elif keylist_type == 1 and target_type == 0 and "txt1" not in file_name:
+                            self._type_list.append(11)
+                        else:
+                            print("Missing modal error with keylist_type < 2")
+                            exit(1)
+                        possible_tpoints = [True if i in possible_indices_dict else False for i in possible_indices_keys]
+                        positive_tpoints += possible_tpoints.count(True)
+                        negative_tpoints += possible_tpoints.count(False)
+                else:   
+                    if (args.model_types == "classification"):
+                        continue                                 
+                    if len(possible_indices_keys) > 0 and possible_indices_keys is not None:
+                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time])
+                        if keylist_type == 2 and "txt1" in file_name:
+                            self._type_list.append(1)
+                        elif keylist_type == 2 and "txt1" not in file_name:
+                            self._type_list.append(4)
+                        elif keylist_type == 3 and "txt1" in file_name:
+                            self._type_list.append(7)
+                        elif keylist_type == 3 and "txt1" not in file_name:
+                            self._type_list.append(10)
+                        else:
+                            print("Missing modal error with keylist_type >= 2")
+                            exit(1)
+                            # print("### 2 ###")
+                            # print("keylist_type: ", keylist_type)
+                            # print("file_name: ", file_name)
 
-                            negative_tpoints += len(possible_indices_keys)
+                        negative_tpoints += len(possible_indices_keys)
+                        
+                # exhaustive
+                # 0 -> original, 1 -> only vslt, 2 -> vslt+txt, 3-> vslt+img
+                if args.missing_exhaustive == 1:
+                    if "_txt0_img1" in file_name:
+                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
+                        self._type_list.append(exhaustive_dict_txt0_img1[self._type_list[-1]])
+                    elif "_txt1_img0" in file_name:
+                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
+                        self._type_list.append(exhaustive_dict2_txt1_img0[self._type_list[-1]])
+                        
+                    elif "_txt1_img1" in file_name:
+                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 1])
+                        self._type_list.append(exhaustive_dict3_txt1_img1_1[self._type_list[-1]])
+                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 2])
+                        self._type_list.append(exhaustive_dict3_txt1_img1_2[self._type_list[-1]])
+                        self._data_list.append([pkl_path, possible_indices_keys, {}, possibleWinSizes, 0, event_time, 3])
+                        self._type_list.append(exhaustive_dict3_txt1_img1_3[self._type_list[-1]])
             
             ######################################################
             if "train" in data_type:
@@ -1962,51 +1876,6 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         self.feature_means = FEATURE_MEANS
         
         print("No Dataset Error: ", len(self._type_list) == len(self._data_list))
-        # if "train" in data_type:
-        #     self.train_min = np.min(np.array(self.train_min), axis=0)
-        #     self.train_max = np.max(np.array(self.train_max), axis=0)
-        # if ('train-full' in args.modality_inclusion):
-        #     print("Number of patient positive samples list for training: {}".format(str(patient_list.count(1))))
-        #     print("Number of patient negative samples list for training: {}".format(str(patient_list.count(2))))
-        #     print("Number of non-patient negative samples list for training: {}".format(str(patient_list.count(0))))        
-        #     print("Number of total negative samples list for training: {}".format(str(patient_list.count(0) + patient_list.count(2))))        
-        # else: # missing modality
-        #     print("[1]. Number of patients: ", patient_list.count(1))
-        #     print("1. Number of patient positive samples lists for training", self._type_list.count(0)+self._type_list.count(1)+self._type_list.count(2)+self._type_list.count(3))
-        #     print(" 1-1. wimg-wtxt_pp: ", self._type_list.count(0))
-        #     print(" 1-2. wimg-w/otxt_pp: ", self._type_list.count(1))
-        #     print(" 1-3. w/oimg-wtxt_pp: ", self._type_list.count(2))
-        #     print(" 1-4. w/oimg-w/otxt_pp: ", self._type_list.count(3))
-        #     print("[2]. Number of patients with negative signs: ", patient_list.count(2))
-        #     # print("2. Number of patient negative samples list for training", self._type_list.count(8)+self._type_list.count(9)+self._type_list.count(10)+self._type_list.count(11))
-        #     # print(" 2-1. wimg-wtxt-pn: ", self._type_list.count(8))
-        #     # print(" 2-2. wimg-w/otxt-pn: ", self._type_list.count(9))
-        #     # print(" 2-3. w/oimg-wtxt-pn: ", self._type_list.count(10))
-        #     # print(" 2-4. w/oimg-w/otxt-pn: ", self._type_list.count(11))
-        #     print("[3]. Number of non-patients: ", patient_list.count(0))
-        #     print("3. Number of non-patient negative samples lists for training", self._type_list.count(4)+self._type_list.count(5)+self._type_list.count(6)+self._type_list.count(7))
-        #     print(" 3-1. wimg-wtxt-nn: ", self._type_list.count(4))
-        #     print(" 3-2. wimg-w/otxt-nn: ", self._type_list.count(5))
-        #     print(" 3-3. w/oimg-wtxt-nn: ", self._type_list.count(6))
-        #     print(" 3-4. w/oimg-w/otxt-nn: ", self._type_list.count(7))
-        #     # print("[1]. Number of patients: ", patient_list.count(1))
-        #     # print("1. Number of patient positive samples list for training", self._type_list.count(0)+self._type_list.count(3)+self._type_list.count(6)+self._type_list.count(9))
-        #     # print(" 1-1. wimg-wtxt_pp: ", self._type_list.count(0))
-        #     # print(" 1-2. wimg-w/otxt_pp: ", self._type_list.count(3))
-        #     # print(" 1-3. w/oimg-wtxt_pp: ", self._type_list.count(6))
-        #     # print(" 1-4. w/oimg-w/otxt_pp: ", self._type_list.count(9))
-        #     # print("[2]. Number of patients with negative signs: ", patient_list.count(2))
-        #     # # print("2. Number of patient negative samples list for training", self._type_list.count(1)+self._type_list.count(4)+self._type_list.count(7)+self._type_list.count(10))
-        #     # # print(" 2-1. wimg-wtxt-pn: ", self._type_list.count(1))
-        #     # # print(" 2-2. wimg-w/otxt-pn: ", self._type_list.count(4))
-        #     # # print(" 2-3. w/oimg-wtxt-pn: ", self._type_list.count(7))
-        #     # # print(" 2-4. w/oimg-w/otxt-pn: ", self._type_list.count(10))
-        #     # print("[3]. Number of non-patients: ", patient_list.count(0))
-        #     # print("3. Number of non-patient negative samples list for training", self._type_list.count(2)+self._type_list.count(5)+self._type_list.count(8)+self._type_list.count(11))
-        #     # print(" 3-1. wimg-wtxt-nn: ", self._type_list.count(2))
-        #     # print(" 3-2. wimg-w/otxt-nn: ", self._type_list.count(5))
-        #     # print(" 3-3. w/oimg-wtxt-nn: ", self._type_list.count(8))
-        #     # print(" 3-4. w/oimg-w/otxt-nn: ", self._type_list.count(11))
         print("########## Detail Data Info ##########")
         print("Positive time-points: ", positive_tpoints)
         print("Negative time-points: ", negative_tpoints)
@@ -2167,7 +2036,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
             if not cxr_li and ('train-full' in args.modality_inclusion): 
                 print("collate cxr error")
                 exit(1)
-            elif not cxr_li and ('train-missing' in args.modality_inclusion): 
+            elif (not cxr_li and ('train-missing' in args.modality_inclusion)) or missing_comb == 1 or missing_comb == 2: 
                 #1
                 if args.multiimages == 0:
                     img = torch.zeros(self.image_size).unsqueeze(0)
@@ -2244,6 +2113,8 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                         zero_padding = torch.zeros([128-textLength, 768])
                         tokens = torch.cat([tokens, zero_padding], dim=0)
                     txt_missing = False
+                if missing_comb == 1 or missing_comb == 3:
+                    txt_missing = True
             if txt_missing:
                 tokens = torch.zeros([self.txt_token_size, self.token_max_length]).squeeze()
                 textLength = 0
@@ -2253,7 +2124,7 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         else:
             if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
                 tokens = self.txtDict[(int(data_pkl['pat_id']), int(data_pkl['chid']))]
-                if len(tokens) == 0:
+                if (len(tokens) == 0) or missing_comb == 1 or missing_comb == 3:
                     tokens = torch.zeros(self.token_max_length)
                     textLength = 0
                     missing.append(True)
