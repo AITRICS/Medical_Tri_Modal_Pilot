@@ -63,12 +63,13 @@ class TRI_MBT_V1(nn.Module):
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
                     )
-            self.ie_time = nn.Sequential(
+            
+        self.ie_feat = nn.Embedding(20, self.model_dim)
+        self.ie_time = nn.Sequential(
                                         nn.Linear(1, self.model_dim),
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
                     )
-            self.ie_feat = nn.Embedding(20, self.model_dim)
         self.ie_demo = nn.Sequential(
                                     nn.Linear(2, self.model_dim),
                                     nn.LayerNorm(self.model_dim),
