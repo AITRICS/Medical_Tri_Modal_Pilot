@@ -163,23 +163,23 @@ class TRI_MBT_V1(nn.Module):
         self.txt_feat = torch.Tensor([19]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
 
         ##### Reports Genertaion
-        if ("tdecoder" == self.args.auxiliary_loss_type):
-            # self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-            # self.vocab_size = self.tokenizer.vocab_size
-            self.vocab_size = 30522
-            self.img_2_txt = TransformerDecoder(self.vocab_size,
-                                                    d_model = self.model_dim,
-                                                    d_ff = self.model_dim * 4,
-                                                    num_layers = 2,
-                                                    num_heads = self.num_heads,
-                                                    sos_id = 101,
-                                                    eos_id = 102,
-                                                    max_length = 1024
-                                                    )
-            self.encoder_output_lengths = torch.tensor([1 for i in range(self.args.batch_size)]).to(self.device)
+        # if ("tdecoder" == self.args.auxiliary_loss_type):
+        #     # self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+        #     # self.vocab_size = self.tokenizer.vocab_size
+        #     self.vocab_size = 30522
+        #     self.img_2_txt = TransformerDecoder(self.vocab_size,
+        #                                             d_model = self.model_dim,
+        #                                             d_ff = self.model_dim * 4,
+        #                                             num_layers = 2,
+        #                                             num_heads = self.num_heads,
+        #                                             sos_id = 101,
+        #                                             eos_id = 102,
+        #                                             max_length = 1024
+        #                                             )
+        #     self.encoder_output_lengths = torch.tensor([1 for i in range(self.args.batch_size)]).to(self.device)
         
-        if "rmse" in self.args.auxiliary_loss_type:
-            self.rmse_layer = nn.Linear(in_features=classifier_dim, out_features= 1, bias=True)
+        # if "rmse" in self.args.auxiliary_loss_type:
+        #     self.rmse_layer = nn.Linear(in_features=classifier_dim, out_features= 1, bias=True)
         
     def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths):
         # x-TIE:  torch.Size([bs, vslt_len, 3])
@@ -272,17 +272,17 @@ class TRI_MBT_V1(nn.Module):
         classInput = self.layer_norms_after_concat(output)
         if self.args.vslt_type != "QIE":
             classInput = torch.cat([classInput, demo_embedding], dim=1)
-        if "rmse" in self.args.auxiliary_loss_type:
-            output2 = self.rmse_layer(classInput).squeeze()
-        else:
-            output2 = None
+        # if "rmse" in self.args.auxiliary_loss_type:
+        #     output2 = self.rmse_layer(classInput).squeeze()
+        # else:
+        output2 = None
         output1 = self.fc_list(classInput)
             
-        if (flow_type == "train") and ("tdecoder" in self.args.auxiliary_loss_type):
-            output3 = self.img_2_txt(reports_tokens, outputs[1][:,0,:].unsqueeze(1), encoder_output_lengths = self.encoder_output_lengths)
-            # exit(1)
-        else:
-            output3 = None
+        # if (flow_type == "train") and ("tdecoder" in self.args.auxiliary_loss_type):
+        #     output3 = self.img_2_txt(reports_tokens, outputs[1][:,0,:].unsqueeze(1), encoder_output_lengths = self.encoder_output_lengths)
+        #     # exit(1)
+        # else:
+        output3 = None
             
         return output1, output2, output3
     

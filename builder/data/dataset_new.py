@@ -246,10 +246,6 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         # Case2: (pn)         Case3: (wimgwtxt-pn: 1, wimgw/otxt-pn: 4)
         # Case3: (w/oimgwtxt-pn: 7, w/oimgw/otxt-pn: 10)
         
-        if "tdecoder" in args.auxiliary_loss_type:
-            with open("builder/data/text/real_final_reports_generate.pkl","rb") as f:
-                self.text_report = pickle.load(f) 
-        
         self.txtDict = txtDictLoad("train")
         self.txtDict.update(txtDictLoad("test"))
         self.featureidx = np.array(list(range(18)))
@@ -696,9 +692,6 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                     img = img_zero.repeat(3,1,1).unsqueeze(1)
                     cxr_time = torch.Tensor([10,10,10])
                 #
-                if "tdecoder" in args.auxiliary_loss_type:
-                    reports_tokens = torch.zeros(1024, dtype=torch.long)
-                    reports_lengths = torch.tensor(0)
                 missing.append(True)
             else:
                 #2
@@ -731,10 +724,7 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                         cxr_times.append(10)
                     img = torch.stack(img)
                     cxr_time = torch.tensor(cxr_times)
-                #
-                if "tdecoder" in args.auxiliary_loss_type:
-                    reports_tokens = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][0])
-                    reports_lengths = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][1]) 
+                
                 missing.append(False)
                 
         else:
@@ -745,10 +735,6 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
                 img_zero = torch.zeros(self.image_size).unsqueeze(0)
                 img = img_zero.repeat(3,1,1).unsqueeze(1)
                 cxr_time = torch.Tensor([10,10,10])
-            #
-            if "tdecoder" in args.auxiliary_loss_type:
-                reports_tokens = torch.zeros(1024, dtype=torch.long)
-                reports_lengths = torch.tensor(0)
             missing.append(True)
         
         if args.berttype == "biobert" and args.txt_tokenization == "bert":
@@ -797,9 +783,9 @@ class Onetime_Outbreak_Training_Dataset(torch.utils.data.Dataset):
         missing = torch.Tensor(missing)
         
         if args.realtime == 1:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
+            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux
         else:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, 0, missing, f_indices, target_aux, reports_tokens, reports_lengths
+            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, 0, missing, f_indices, target_aux
 
 class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
 
@@ -843,10 +829,6 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
         else: # detection
             class2dict_missing = {3:1, 6:2, 9:3, 2:4, 8:6, 11:7, 1:4, 4:5, 7:6, 10:7}
         class2dict_full = {2:0}
-        
-        if "tdecoder" in args.auxiliary_loss_type:
-            with open("builder/data/text/real_final_reports_generate.pkl","rb") as f:
-                self.text_report = pickle.load(f) 
         
         load_flag = False
         test_index_file = "./data/testIndexes/testIndexes__" + args.test_data_path.split("/")[-2] + "__" + args.modality_inclusion.split("_")[-1] + "__fullmodaldefinition" + str(args.fullmodal_definition) + "__winsize" + str(args.window_size) + "__minlen" + str(args.min_inputlen) + "__" + args.output_type + "__PW" + str(args.prediction_range) + ".pkl"
@@ -1453,9 +1435,6 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                     img = img_zero.repeat(3,1,1).unsqueeze(1)
                     cxr_time = torch.Tensor([10,10,10])
                 #
-                if "tdecoder" in args.auxiliary_loss_type:
-                    reports_tokens = torch.zeros(1024, dtype=torch.long)
-                    reports_lengths = torch.tensor(0)
                 missing.append(True)
             else:
                 #2
@@ -1489,9 +1468,6 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                     img = torch.stack(img)
                     cxr_time = torch.tensor(cxr_times)
                 #
-                if "tdecoder" in args.auxiliary_loss_type:
-                    reports_tokens = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][0])
-                    reports_lengths = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][1]) 
                 missing.append(False)
                 
         else:
@@ -1503,9 +1479,6 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                 img = img_zero.repeat(3,1,1).unsqueeze(1)
                 cxr_time = torch.Tensor([10,10,10])
             #
-            if "tdecoder" in args.auxiliary_loss_type:
-                reports_tokens = torch.zeros(1024, dtype=torch.long)
-                reports_lengths = torch.tensor(0)
             missing.append(True)
         
         if args.berttype == "biobert" and args.txt_tokenization == "bert":
@@ -1557,9 +1530,9 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                 
         missing = torch.Tensor(missing)
         if args.realtime == 1:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
+            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux
         else:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, 0, missing, f_indices, target_aux, reports_tokens, reports_lengths
+            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, 0, missing, f_indices, target_aux
 
 class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
 
@@ -1617,10 +1590,6 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
         class2dict_missing = {3:1, 6:2, 9:3, 2:4, 8:6, 11:7, 1:4, 4:5, 7:6, 10:7}
         class2dict_full = {2:0}
         
-        if "tdecoder" in args.auxiliary_loss_type:
-            with open("builder/data/text/real_final_reports_generate.pkl","rb") as f:
-                self.text_report = pickle.load(f) 
-
         lengths = []
         tmpTasks = ['vasso', 'intubation', 'cpr']
         tmpYN = ['vasso_yn', 'intubation_yn', 'cpr_yn']
@@ -2105,9 +2074,6 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                     img = img_zero.repeat(3,1,1).unsqueeze(1)
                     cxr_time = torch.Tensor([10,10,10])
                 #
-                if "tdecoder" in args.auxiliary_loss_type:
-                    reports_tokens = torch.zeros(1024, dtype=torch.long)
-                    reports_lengths = torch.tensor(0)
                 missing.append(True)
             else:
                 #2
@@ -2141,9 +2107,6 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                     img = torch.stack(img)
                     cxr_time = torch.tensor(cxr_times)
                 #
-                if "tdecoder" in args.auxiliary_loss_type:
-                    reports_tokens = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][0])
-                    reports_lengths = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][1]) 
                 missing.append(False)
                 
         else:
@@ -2155,9 +2118,6 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 img = img_zero.repeat(3,1,1).unsqueeze(1)
                 cxr_time = torch.Tensor([10,10,10])
             #
-            if "tdecoder" in args.auxiliary_loss_type:
-                reports_tokens = torch.zeros(1024, dtype=torch.long)
-                reports_lengths = torch.tensor(0)
             missing.append(True)
         
         if args.berttype == "biobert" and args.txt_tokenization == "bert":
@@ -2204,9 +2164,9 @@ class Multiple_Outbreaks_Training_Dataset(torch.utils.data.Dataset):
                 
         missing = torch.Tensor(missing)  
         if args.realtime == 1:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
+            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux
         else:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, 0, missing, f_indices, target_aux, reports_tokens, reports_lengths
+            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, 0, missing, f_indices, target_aux
 
 class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
 
@@ -2251,10 +2211,6 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
         else: # detection
             class2dict_missing = {3:1, 6:2, 9:3, 2:4, 8:6, 11:7, 1:4, 4:5, 7:6, 10:7}
         class2dict_full = {2:0}
-        
-        if "tdecoder" in args.auxiliary_loss_type:
-            with open("builder/data/text/real_final_reports_generate.pkl","rb") as f:
-                self.text_report = pickle.load(f) 
         
         load_flag = False
         tmpTasks = ['vasso', 'intubation', 'cpr']
@@ -2845,9 +2801,6 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                     img = img_zero.repeat(3,1,1).unsqueeze(1)
                     cxr_time = torch.Tensor([10,10,10])
                 #
-                if "tdecoder" in args.auxiliary_loss_type:
-                    reports_tokens = torch.zeros(1024, dtype=torch.long)
-                    reports_lengths = torch.tensor(0)
                 missing.append(True)
             else:
                 #2
@@ -2881,9 +2834,6 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                     img = torch.stack(img)
                     cxr_time = torch.tensor(cxr_times)
                 #
-                if "tdecoder" in args.auxiliary_loss_type:
-                    reports_tokens = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][0])
-                    reports_lengths = torch.tensor(self.text_report[cxr_path.split("/")[-3] + "/" +cxr_path.split("/")[-2]][1]) 
                 missing.append(False)
                 
         else:
@@ -2895,9 +2845,6 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 img = img_zero.repeat(3,1,1).unsqueeze(1)
                 cxr_time = torch.Tensor([10,10,10])
             #
-            if "tdecoder" in args.auxiliary_loss_type:
-                    reports_tokens = torch.zeros(1024, dtype=torch.long)
-                    reports_lengths = torch.tensor(0)
             missing.append(True)
         
         if args.berttype == "biobert" and args.txt_tokenization == "bert":
@@ -2949,9 +2896,9 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                 
         missing = torch.Tensor(missing)
         if args.realtime == 1:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux, reports_tokens, reports_lengths
+            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, -selectedKey, missing, f_indices, target_aux
         else:
-            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, 0, missing, f_indices, target_aux, reports_tokens, reports_lengths
+            return final_seqs, static_inputs, target, inputLength, img, cxr_time, tokens, textLength, 0, missing, f_indices, target_aux
 
 
         # imgs = []

@@ -75,8 +75,8 @@ for k_indx, seed_num in enumerate(args.seed_list):
     train_loader, val_loader, test_loader = get_data_loader(args, patient_dict, keys_list, k_indx)
     criterion = nn.BCEWithLogitsLoss(size_average=True, reduction='mean')
     pad_id = 0
-    criterion_img_aux = nn.CrossEntropyLoss(ignore_index = pad_id)
-    criterion_vslt_aux = nn.MSELoss(reduction='none')
+    # criterion_img_aux = nn.CrossEntropyLoss(ignore_index = pad_id)
+    # criterion_vslt_aux = nn.MSELoss(reduction='none')
 
     # get model
     model = get_model(args) 
@@ -103,10 +103,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
     
     # no model checkpoint: train model from scratch
     else:
-        if args.model_types == "classification" and args.loss_types == "rmse":
-            logger.best_auc = float('inf')
-        else:
-            logger.best_auc = 0
+        logger.best_auc = 0
         start_epoch = 1
 
     # set optimizer
@@ -143,7 +140,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
 
         for train_batch in train_loader:
             # get X, y, input_lengths, ...
-            train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, txt_time, missing, f_indices, train_y2, train_reports_tokens, train_reports_lengths = train_batch
+            train_x, static_x, train_y, input_lengths, train_img, img_time, train_txt, txt_lengths, txt_time, missing, f_indices, train_y2 = train_batch
             
             if "vslt" in args.input_types:
                 input_lengths = input_lengths.to(device, non_blocking=True)
@@ -160,9 +157,9 @@ for k_indx, seed_num in enumerate(args.seed_list):
                 
             if "img" in args.input_types:
                 train_img     = train_img.to(device, non_blocking=True)
-                if "tdecoder" in args.auxiliary_loss_type:
-                    train_reports_tokens = train_reports_tokens.to(device, non_blocking=True)
-                    train_reports_lengths = train_reports_lengths.to(device, non_blocking=True)
+                # if "tdecoder" in args.auxiliary_loss_type:
+                #     train_reports_tokens = train_reports_tokens.to(device, non_blocking=True)
+                #     train_reports_lengths = train_reports_lengths.to(device, non_blocking=True)
             # set vars to selected device
             train_x         = train_x.type(torch.HalfTensor).to(device, non_blocking=True)
             
@@ -197,9 +194,9 @@ for k_indx, seed_num in enumerate(args.seed_list):
                                             scaler           = scaler,
                                             missing          = missing,
                                             flow_type        = "train",
-                                            reports_tokens   = train_reports_tokens,
-                                            reports_lengths   = train_reports_lengths,
-                                            criterion_aux    = (criterion_img_aux, criterion_vslt_aux)
+                                            reports_tokens   = None,
+                                            reports_lengths   = None,
+                                            criterion_aux    = (None, None)
                                             )
             
 
@@ -223,7 +220,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
                 with torch.no_grad():
                     for idx, val_batch in enumerate(tqdm(val_loader)):
                         # get X, y, input_lengths, ...
-                        val_x, val_static_x, val_y, input_lengths, val_img, img_time, val_txt, txt_lengths, txt_time, missing, f_indices, val_y2, val_reports_tokens, val_reports_lengths = val_batch
+                        val_x, val_static_x, val_y, input_lengths, val_img, img_time, val_txt, txt_lengths, txt_time, missing, f_indices, val_y2 = val_batch
                         if "vslt" in args.input_types:
                             input_lengths = input_lengths.to(device, non_blocking=True)
                             val_static_x  = val_static_x.to(device, non_blocking=True)
@@ -239,9 +236,9 @@ for k_indx, seed_num in enumerate(args.seed_list):
                             
                         if "img" in args.input_types:
                             val_img       = val_img.to(device, non_blocking=True)
-                            if "tdecoder" in args.auxiliary_loss_type:
-                                val_reports_tokens = val_reports_tokens.to(device, non_blocking=True)
-                                val_reports_lengths =val_reports_lengths.to(device, non_blocking=True)
+                            # if "tdecoder" in args.auxiliary_loss_type:
+                            #     val_reports_tokens = val_reports_tokens.to(device, non_blocking=True)
+                            #     val_reports_lengths =val_reports_lengths.to(device, non_blocking=True)
                     
                         # set vars to selected device
                         val_x             = val_x.type(torch.HalfTensor).to(device, non_blocking=True)
@@ -273,9 +270,9 @@ for k_indx, seed_num in enumerate(args.seed_list):
                                             scaler           = scaler,
                                             missing          = missing,
                                             flow_type        = "test",
-                                            reports_tokens   = val_reports_tokens,
-                                            reports_lengths  = val_reports_lengths,
-                                            criterion_aux    = (criterion_img_aux, criterion_vslt_aux)
+                                            reports_tokens   = None,
+                                            reports_lengths  = None,
+                                            criterion_aux    = (None, None)
                                             )
                         
                     
@@ -324,7 +321,7 @@ for k_indx, seed_num in enumerate(args.seed_list):
         for test_batch in tqdm(test_loader, total=len(test_loader), 
                                bar_format="{desc:<5}{percentage:3.0f}%|{bar:10}{r_bar}"):
             # get X, y, input_lengths, ...
-            test_x, test_static_x, test_y, input_lengths, test_img, img_time, test_txt, txt_lengths, txt_time, missing, f_indices, test_y2, test_reports_tokens, test_reports_lengths = test_batch
+            test_x, test_static_x, test_y, input_lengths, test_img, img_time, test_txt, txt_lengths, txt_time, missing, f_indices, test_y2 = test_batch
             if "vslt" in args.input_types:
                 input_lengths = input_lengths.to(device)
                 test_static_x = test_static_x.to(device)
@@ -340,9 +337,9 @@ for k_indx, seed_num in enumerate(args.seed_list):
                 
             if "img" in args.input_types:
                 test_img      = test_img.to(device)
-                if "tdecoder" in args.auxiliary_loss_type:
-                    test_reports_tokens = test_reports_tokens.to(device)
-                    test_reports_lengths = test_reports_lengths.to(device)
+                # if "tdecoder" in args.auxiliary_loss_type:
+                #     test_reports_tokens = test_reports_tokens.to(device)
+                #     test_reports_lengths = test_reports_lengths.to(device)
         
             # set vars to selected device
             test_x            = test_x.type(torch.HalfTensor).to(device)
@@ -373,9 +370,9 @@ for k_indx, seed_num in enumerate(args.seed_list):
                                     scaler           = scaler,
                                     missing          = missing,
                                     flow_type        = "test",
-                                    reports_tokens   = test_reports_tokens,
-                                    reports_lengths  = test_reports_lengths,
-                                    criterion_aux    = (criterion_img_aux, criterion_vslt_aux)
+                                    reports_tokens   = None,
+                                    reports_lengths  = None,
+                                    criterion_aux    = (None, None)
                                     )
 
     # update logger - end of test step

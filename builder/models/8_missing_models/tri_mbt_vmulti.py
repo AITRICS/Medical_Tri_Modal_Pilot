@@ -172,9 +172,9 @@ class TRI_MBT_VMULTI(nn.Module):
             outputs_stack_list.append(fc_list(classInput[i,:,:]))
         output = torch.stack(outputs_stack_list)
         
-        if "rmse" in self.args.auxiliary_loss_type:
-            output2 = self.rmse_layer(classInput).squeeze()
-        else:
-            output2 = None
+        # if "rmse" in self.args.auxiliary_loss_type:
+        #     output2 = self.rmse_layer(classInput).squeeze()
+        # else:
+        output2 = None
         output3 = None
         return output, output2, output3
