@@ -36,6 +36,7 @@ class ScaledDotProductAttention(nn.Module):
 
         if mask is not None:
             score.masked_fill_(mask, -65504)
+            # score.masked_fill_(mask, -1e9)
         
         # attn = torch.nan_to_num(F.softmax(score, -1), nan=0.0, posinf=1.0)
         attn = F.softmax(score, -1)
