@@ -101,6 +101,7 @@ class TRI_MT_V1(nn.Module):
                 self.img_encoder.load_state_dict(new_weights)
             else:
                 self.img_encoder = swin_t_m(weights = None)
+            self.img_encoder.eval()
                 
         else:
             self.patch_embedding = PatchEmbeddingBlock(
@@ -152,22 +153,6 @@ class TRI_MT_V1(nn.Module):
         self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
         self.txt_feat = torch.Tensor([19]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
         
-        ##### Reports Generation
-        if ("tdecoder" == self.args.auxiliary_loss_type):
-            # self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-            # self.vocab_size = self.tokenizer.vocab_size
-            self.vocab_size = 30522
-            self.img_2_txt = TransformerDecoder(self.vocab_size,
-                                                    d_model = self.model_dim,
-                                                    d_ff = self.model_dim * 4,
-                                                    num_layers = 2,
-                                                    num_heads = self.num_heads,
-                                                    sos_id = 101,
-                                                    eos_id = 102,
-                                                    max_length = 1024
-                                                    )
-            self.encoder_output_lengths = torch.tensor([1 for i in range(self.args.batch_size)]).to(self.device)### 되나?
-        
     def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths):
                                 
         if self.args.vslt_type == "carryforward":
@@ -197,7 +182,8 @@ class TRI_MT_V1(nn.Module):
             img_embedding = self.img_encoder(img)#[16, 1000] #ViT_B_16_Weights.IMAGENET1K_V1
             img_embedding = self.linear(img_embedding)
         elif self.img_model_type == "swin":
-            img_embedding = self.img_encoder(img)
+            with torch.no_grad():
+                img_embedding = self.img_encoder(img)
             img_embedding = self.flatten(img_embedding)
             img_embedding = self.linear(img_embedding)     
         else:
@@ -225,19 +211,7 @@ class TRI_MT_V1(nn.Module):
         if self.args.vslt_type != "QIE":
             classInput = torch.cat([classInput, demo_embedding], dim=1)
         output = self.fc_list(classInput)
-        
-        if "rmse" in self.args.auxiliary_loss_type:
-            output2 = output[:,1]#self.rmse_layer(classInput)
-        else:
-            output2 = None
-        
-        
-        if (flow_type == "train") and ("tdecoder" in self.args.auxiliary_loss_type):
-            # unsqueeze를 한 이유: transformer decoder,의 enc_output, seq_lengths를 1로 주기 위해서 
-            output3 = self.img_2_txt(reports_tokens, context_vector[:,-178,:].unsqueeze(1), encoder_output_lengths = self.encoder_output_lengths) 
-            # exit(1)
-        else:
-            output3 = None
-        
+        output2 = None
+        output3 = None
  
         return output[:,0], output2, output3

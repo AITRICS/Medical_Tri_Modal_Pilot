@@ -14,7 +14,7 @@ from builder.models.src.swin_transformer import swin_t_m, Swin_T_Weights
 from builder.models.src.reports_transformer_decoder import TransformerDecoder
 from transformers import AutoTokenizer
 
-class TRI_MBT_V1(nn.Module):
+class TRI_MBT_VFLEXIBLE(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
@@ -145,6 +145,9 @@ class TRI_MBT_V1(nn.Module):
         )
 
         ##### Classifier
+        self.flexibleavg = nn.Parameter(torch.zeros(3,1,1))
+        self.flexsoft = nn.Softmax(dim=0)
+        
         if self.args.vslt_type == "QIE":
             classifier_dim = self.model_dim
         else:
@@ -164,25 +167,6 @@ class TRI_MBT_V1(nn.Module):
             self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
         self.txt_feat = torch.Tensor([19]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
 
-        ##### Reports Genertaion
-        if ("tdecoder" == self.args.auxiliary_loss_type):
-            # self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-            # self.vocab_size = self.tokenizer.vocab_size
-            self.vocab_size = 30522
-            self.img_2_txt = TransformerDecoder(self.vocab_size,
-                                                    d_model = self.model_dim,
-                                                    d_ff = self.model_dim * 4,
-                                                    num_layers = 2,
-                                                    num_heads = self.num_heads,
-                                                    sos_id = 101,
-                                                    eos_id = 102,
-                                                    max_length = 1024
-                                                    )
-            self.encoder_output_lengths = torch.tensor([1 for i in range(self.args.batch_size)]).to(self.device)
-        
-        if "rmse" in self.args.auxiliary_loss_type:
-            self.rmse_layer = nn.Linear(in_features=classifier_dim, out_features= 1, bias=True)
-        
     def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths):
         # x-TIE:  torch.Size([bs, vslt_len, 3])
         # x-Carryforward:  torch.Size([bs, 24, 16])
@@ -267,6 +251,8 @@ class TRI_MBT_V1(nn.Module):
         
         outputs_stack = torch.stack([outputs[0][:, 0, :], outputs[1][:, 0, :], outputs[2][:, 0, :]]) # vslt, img, txt
         outputs_stack = self.layer_norms_after_concat(outputs_stack)
+        outputs_stack = outputs_stack * self.flexsoft(self.flexibleavg)
+        
         tri_mean = torch.mean(outputs_stack, dim=0) 
         vslttxt_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[2, :, :]]), dim=0)
         vsltimg_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[1, :, :]]), dim=0)

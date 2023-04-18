@@ -101,6 +101,7 @@ class TRI_MBT_VSLTCLS(nn.Module):
             else:
                 # self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
                 self.img_encoder = swin_t_m(weights = None)
+            self.img_encoder.eval()
                 
         else:
             self.patch_embedding = PatchEmbeddingBlock(
@@ -163,23 +164,6 @@ class TRI_MBT_VSLTCLS(nn.Module):
             self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
         self.txt_feat = torch.Tensor([19]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
 
-        ##### Reports Genertaion
-        if ("tdecoder" == self.args.auxiliary_loss_type):
-            self.vocab_size = 30522
-            self.img_2_txt = TransformerDecoder(self.vocab_size,
-                                                    d_model = self.model_dim,
-                                                    d_ff = self.model_dim * 4,
-                                                    num_layers = 2,
-                                                    num_heads = self.num_heads,
-                                                    sos_id = 101,
-                                                    eos_id = 102,
-                                                    max_length = 1024
-                                                    )
-            self.encoder_output_lengths = torch.tensor([1 for i in range(self.args.batch_size)]).to(self.device)
-        
-        if "rmse" in self.args.auxiliary_loss_type:
-            self.rmse_layer = nn.Linear(in_features=classifier_dim, out_features= 1, bias=True)
-        
     def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths):
         # x-TIE:  torch.Size([bs, vslt_len, 3])
         # x-Carryforward:  torch.Size([bs, 24, 16])
@@ -221,7 +205,8 @@ class TRI_MBT_VSLTCLS(nn.Module):
         elif self.img_model_type == "swin":
             if self.args.multiimages == 1:
                 img = img.reshape(-1, 1, 224, 224)
-            img_embedding = self.img_encoder(img)
+            with torch.no_grad():
+                img_embedding = self.img_encoder(img)
             img_embedding = self.flatten(img_embedding)
             img_embedding = self.linear(img_embedding)     
             img_time = img_time.reshape(-1).clone().detach()
