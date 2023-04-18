@@ -250,7 +250,6 @@ class TRI_MBT_VFLEXIBLE(nn.Module):
         #                               )
         
         outputs_stack = torch.stack([outputs[0][:, 0, :], outputs[1][:, 0, :], outputs[2][:, 0, :]]) # vslt, img, txt
-        outputs_stack = self.layer_norms_after_concat(outputs_stack)
         outputs_stack = outputs_stack * self.flexsoft(self.flexibleavg)
         
         tri_mean = torch.mean(outputs_stack, dim=0) 
@@ -258,6 +257,7 @@ class TRI_MBT_VFLEXIBLE(nn.Module):
         vsltimg_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[1, :, :]]), dim=0)
         all_cls_stack = torch.stack([tri_mean, vsltimg_mean, vslttxt_mean, outputs_stack[0, :, :]])
         classInput = all_cls_stack[missing, self.idx_order]
+        classInput = self.layer_norms_after_concat(classInput)
         
         if self.args.vslt_type != "QIE":
             classInput = torch.cat([classInput, demo_embedding], dim=1)
