@@ -153,7 +153,8 @@ class TRI_MBT_V1(nn.Module):
         self.layer_norms_after_concat = nn.LayerNorm(self.model_dim)
         self.fc_list = nn.Sequential(
         nn.Linear(in_features=classifier_dim, out_features= self.model_dim, bias=True),
-        nn.BatchNorm1d(self.model_dim),
+        # nn.BatchNorm1d(self.model_dim),
+        nn.LayerNorm(self.model_dim),
         self.activations[activation],
         nn.Linear(in_features=self.model_dim, out_features= self.output_dim,  bias=True))
 
@@ -267,16 +268,16 @@ class TRI_MBT_V1(nn.Module):
         
         outputs_stack = torch.stack([outputs[0][:, 0, :], outputs[1][:, 0, :], outputs[2][:, 0, :]]) # vslt, img, txt
         outputs_stack = self.layer_norms_after_concat(outputs_stack)
-        tri_mean = torch.mean(outputs_stack, dim=0) 
-        vslttxt_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[2, :, :]]), dim=0)
-        vsltimg_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[1, :, :]]), dim=0)
-        all_cls_stack = torch.stack([tri_mean, vsltimg_mean, vslttxt_mean, outputs_stack[0, :, :]])
-        classInput = all_cls_stack[missing, self.idx_order]
         
+        demo_embedding = demo_embedding.unsqueeze(0).repeat(3,1,1)
         if self.args.vslt_type != "QIE":
-            classInput = torch.cat([classInput, demo_embedding], dim=1)
-        
-        output1 = self.fc_list(classInput)  
+            outputs_stack = torch.cat([outputs_stack, demo_embedding], dim=2)
+        outputs_stack = self.fc_list(outputs_stack).squeeze()
+        tri_mean = torch.mean(outputs_stack, dim=0) 
+        vslttxt_mean = torch.mean(torch.stack([outputs_stack[0, :], outputs_stack[2, :]]), dim=0)
+        vsltimg_mean = torch.mean(torch.stack([outputs_stack[0, :], outputs_stack[1, :]]), dim=0)
+        all_cls_stack = torch.stack([tri_mean, vsltimg_mean, vslttxt_mean, outputs_stack[0, :]])
+        output1 = all_cls_stack[missing, self.idx_order]
         output2 = None
         output3 = None
         return output1, output2, output3
