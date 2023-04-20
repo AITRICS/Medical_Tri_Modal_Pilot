@@ -7,17 +7,21 @@ from monai.networks.blocks.patchembedding import PatchEmbeddingBlock
 from builder.models.src.vision_transformer import vit_b_16_m, ViT_B_16_Weights
 from builder.models.src.swin_transformer import swin_t_m, Swin_T_Weights
 
-class TRI_MBT_VMULTI2(nn.Module):
+class TRI_MBT_VMULTIVSLT(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
         ##### Configuration
+        self.img_size = args.image_size
+        self.patch_size = 16
+        self.img_num_heads = 4
+        self.pos_embed = "conv"
         self.output_dim = 1
         self.num_layers = args.transformer_num_layers
         self.num_heads = args.transformer_num_head
         self.model_dim = args.transformer_dim
         self.dropout = args.dropout
-        self.idx_order = torch.arange(0, args.batch_size).type(torch.LongTensor)
+        self.idx_order = torch.range(0, args.batch_size-1).type(torch.LongTensor)
         self.num_nodes = len(args.vitalsign_labtest)
         self.t_len = args.window_size
 
@@ -37,12 +41,21 @@ class TRI_MBT_VMULTI2(nn.Module):
         ])
         
         ##### Encoders
-        vslt_pe = False
-        self.ie_vslt = nn.Sequential(
-                                    nn.Linear(1, self.model_dim),
-                                    nn.LayerNorm(self.model_dim),
-                                    nn.ReLU(inplace=True),
-                )
+        if args.vslt_type == "carryforward":
+            self.vslt_enc = nn.Sequential(
+                                        nn.Linear(self.num_nodes, self.model_dim),
+                                        nn.LayerNorm(self.model_dim),
+                                        nn.ReLU(inplace=True),
+                    )
+            vslt_pe = True
+            
+        elif args.vslt_type == "TIE" or args.vslt_type == "QIE":
+            vslt_pe = False
+            self.ie_vslt = nn.Sequential(
+                                        nn.Linear(1, self.model_dim),
+                                        nn.LayerNorm(self.model_dim),
+                                        nn.ReLU(inplace=True),
+                    )
         self.ie_time = nn.Sequential(
                                     nn.Linear(1, self.model_dim),
                                     nn.LayerNorm(self.model_dim),
@@ -69,6 +82,7 @@ class TRI_MBT_VMULTI2(nn.Module):
                 self.img_encoder = vit_b_16_m(weights = None)
         elif self.img_model_type == "swin":
             if self.img_pretrain =="Yes":
+                # self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
                 self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
                 model_dict = self.img_encoder.state_dict()
                 old_weights=torch.load("/nfs/thena/shared/multi_modal/mlhc/chx_ckpts/image_reports_swin_1e-6_resize_affine_crop-resize_crop_0323_best_fold0_seed0.pth")['model']
@@ -78,15 +92,18 @@ class TRI_MBT_VMULTI2(nn.Module):
                 model_dict.update(new_weights)
                 self.img_encoder.load_state_dict(new_weights)
             else:
+                # self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
                 self.img_encoder = swin_t_m(weights = None)
+            self.img_encoder.eval()
+                
         else:
             self.patch_embedding = PatchEmbeddingBlock(
             in_channels=1,
-            img_size=args.image_size,
-            patch_size=16,
+            img_size=self.img_size,
+            patch_size=self.patch_size,
             hidden_size=self.model_dim,
-            num_heads=4,
-            pos_embed="conv",
+            num_heads=self.img_num_heads,
+            pos_embed=self.pos_embed,
             dropout_rate=0,
             spatial_dims=2,
             )           
@@ -96,6 +113,11 @@ class TRI_MBT_VMULTI2(nn.Module):
             residual_bottlenecks = True
         else:
             residual_bottlenecks = False
+
+        if self.args.multiimages == 1:
+            img_mask = True
+        else:
+            img_mask = False
         ##### Fusion Part
         self.fusion_transformer = TrimodalTransformerEncoder_Multitokens_MBTVSLTMAIN(
             batch_size = args.batch_size,
@@ -111,16 +133,14 @@ class TRI_MBT_VMULTI2(nn.Module):
             pe_maxlen = 2500,
             resbottle = residual_bottlenecks,
             use_pe = [vslt_pe, False, True],
-            mask = [True, True, True],
+            mask = [True, img_mask, True],
         )
 
         ##### Classifier
         classifier_dim = self.model_dim*2
         self.layer_norms_after_concat = nn.LayerNorm(self.model_dim)
-        self.rmse_layer = nn.Linear(in_features=classifier_dim, out_features= 1, bias=True)
         self.fc_lists = nn.ModuleList([nn.Sequential(
                             nn.Linear(in_features=classifier_dim, out_features= self.model_dim, bias=True),
-                            # nn.BatchNorm1d(self.model_dim),
                             nn.LayerNorm(self.model_dim),
                             self.activations[activation],
                             nn.Linear(in_features=self.model_dim, out_features= self.output_dim,  bias=True)) for _ in range(4)])
@@ -142,10 +162,11 @@ class TRI_MBT_VMULTI2(nn.Module):
 
         txt_embedding = self.txt_embedding(txts)
 
-        img_embedding = self.img_encoder(img)
+        with torch.no_grad():
+            img_embedding = self.img_encoder(img)
         img_embedding = self.flatten(img_embedding)
         img_embedding = self.linear(img_embedding)     
-        img_time = img_time.reshape(-1).detach().clone()
+        img_time = img_time.reshape(-1).clone().detach()
 
         if self.args.imgtxt_time == 1:
             img_embedding = img_embedding + self.ie_time(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat)
@@ -157,24 +178,19 @@ class TRI_MBT_VMULTI2(nn.Module):
                                       fusion_idx = None,
                                       missing=missing
                                       )
-        
-        outputs_stack = torch.stack([outputs[i][:, 0, :] for i in range(self.n_modality)])
-        tri_mean = torch.mean(outputs_stack, dim=0)
-        vsltimg_mean = torch.mean(torch.stack([outputs[0][:, 1, :], outputs[1][:, 1, :]]), dim=0)
-        vslttxt_mean = torch.mean(torch.stack([outputs[0][:, 2, :], outputs[2][:, 1, :]]), dim=0)
-        final_output = torch.stack([tri_mean, vsltimg_mean, vslttxt_mean, outputs[0][:, 3, :]])
-        classInput = self.layer_norms_after_concat(final_output)
-        
-        classInput = torch.cat([classInput, demo_embedding.unsqueeze(0).repeat(4,1,1)], dim=2)
-        
+        outputs_stack = torch.stack([outputs[0][:, i, :] for i in range(4)])
+        outputs_stack = self.layer_norms_after_concat(outputs_stack)    
+        outputs_stack = torch.cat([outputs_stack, demo_embedding.unsqueeze(0).repeat(4,1,1)], dim=2)
         outputs_stack_list = []
         for i, fc_list in enumerate(self.fc_lists):
-            outputs_stack_list.append(fc_list(classInput[i,:,:]))
-        output = torch.stack(outputs_stack_list)
+            outputs_stack_list.append(fc_list(outputs_stack[i,:,:]))
+        outputs_stack = torch.stack(outputs_stack_list).squeeze()
         
-        if "rmse" in self.args.auxiliary_loss_type:
-            output2 = self.rmse_layer(classInput).squeeze()
-        else:
-            output2 = None
+        # tri_mean = torch.mean(outputs_stack, dim=0)
+        # vsltimg_mean = torch.mean(torch.stack([outputs_stack[1,:], outputs_stack[1][:, 1]]), dim=0)
+        # vslttxt_mean = torch.mean(torch.stack([outputs_stack[2,:], outputs_stack[2][:, 1]]), dim=0)
+        output = torch.stack([outputs_stack[0,:], outputs_stack[1,:], outputs_stack[2,:] ,outputs_stack[3,:]])
+        
+        output2 = None
         output3 = None
         return output, output2, output3

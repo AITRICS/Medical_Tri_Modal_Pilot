@@ -179,6 +179,11 @@ class TrimodalTransformerEncoder_Multitokens_MBTVSLTMAIN(nn.Module):
                         bottleneck_outputs[self.bottlenecks_map[modal_idx][i]].append(enc_output[:, self.bottlenecks_n*i : self.bottlenecks_n*(i+1), :])
                     enc_output = enc_output[:, self.bottlenecks_n*3:, :]
                     enc_outputs.append(enc_output)
+                    if self.n_layers == idx + 1:
+                        break
+                        
+                if self.n_layers == idx + 1:
+                    break
                 
                 bottlenecks_list = []
                 for b_idx, b_output in enumerate(bottleneck_outputs):                
