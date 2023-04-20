@@ -145,9 +145,25 @@ class TRI_MBT_VFLEXIBLE(nn.Module):
         )
 
         ##### Classifier
-        self.flexibleavg = nn.Parameter(torch.zeros(3,1,1))
+        self.flexibleavg = nn.Parameter(torch.zeros(3,1))
         self.flexsoft = nn.Softmax(dim=0)
-        
+        flexsoft_vit = torch.zeros(3).cuda() 
+        flexsoft_vit[:] = 1
+        flexsoft_vit = flexsoft_vit.le(0.5)
+        flexsoft_vi = torch.zeros(3).cuda() 
+        flexsoft_vi[:] = 1
+        flexsoft_vi[2] = 0
+        flexsoft_vi = flexsoft_vi.le(0.5)
+        flexsoft_vt = torch.zeros(3).cuda() 
+        flexsoft_vt[:] = 1
+        flexsoft_vt[1] = 0
+        flexsoft_vt = flexsoft_vt.le(0.5)
+        flexsoft_v = torch.zeros(3).cuda() 
+        flexsoft_v[:] = 1
+        flexsoft_v[1:] = 0
+        flexsoft_v = flexsoft_v.le(0.5)
+        self.flexsoft_masks = torch.stack([flexsoft_vit, flexsoft_vi, flexsoft_vt, flexsoft_v])
+                
         if self.args.vslt_type == "QIE":
             classifier_dim = self.model_dim
         else:
@@ -156,7 +172,7 @@ class TRI_MBT_VFLEXIBLE(nn.Module):
         self.layer_norms_after_concat = nn.LayerNorm(self.model_dim)
         self.fc_list = nn.Sequential(
         nn.Linear(in_features=classifier_dim, out_features= self.model_dim, bias=True),
-        nn.BatchNorm1d(self.model_dim),
+        nn.LayerNorm(self.model_dim),
         self.activations[activation],
         nn.Linear(in_features=self.model_dim, out_features= self.output_dim,  bias=True))
 
@@ -250,19 +266,28 @@ class TRI_MBT_VFLEXIBLE(nn.Module):
         #                               )
         
         outputs_stack = torch.stack([outputs[0][:, 0, :], outputs[1][:, 0, :], outputs[2][:, 0, :]]) # vslt, img, txt
-        outputs_stack = outputs_stack * self.flexsoft(self.flexibleavg)
+        outputs_stack = self.layer_norms_after_concat(outputs_stack)
         
-        tri_mean = torch.mean(outputs_stack, dim=0) 
-        vslttxt_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[2, :, :]]), dim=0)
-        vsltimg_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[1, :, :]]), dim=0)
-        all_cls_stack = torch.stack([tri_mean, vsltimg_mean, vslttxt_mean, outputs_stack[0, :, :]])
-        classInput = all_cls_stack[missing, self.idx_order]
-        classInput = self.layer_norms_after_concat(classInput)
-        
+        demo_embedding = demo_embedding.unsqueeze(0).repeat(3,1,1)
         if self.args.vslt_type != "QIE":
-            classInput = torch.cat([classInput, demo_embedding], dim=1)
+            outputs_stack = torch.cat([outputs_stack, demo_embedding], dim=2)
+        outputs_stack = self.fc_list(outputs_stack)
         
-        output1 = self.fc_list(classInput)  
+        flexibleavg = self.flexibleavg.repeat(1,outputs_stack.size(1)) 
+        flexsoft_masks = self.flexsoft_masks[missing, :]
+        flexibleavg.masked_fill_(flexsoft_masks.permute(1,0), -1e9)
+        cls_weight = self.flexsoft(flexibleavg).unsqueeze(2)
+        outputs_stack = outputs_stack * cls_weight
+        
+        tri_mean = torch.sum(outputs_stack, dim=0) 
+        vslttxt_mean = torch.sum(torch.stack([outputs_stack[0, :, :], outputs_stack[2, :, :]]), dim=0)
+        vsltimg_mean = torch.sum(torch.stack([outputs_stack[0, :, :], outputs_stack[1, :, :]]), dim=0)
+        all_cls_stack = torch.stack([tri_mean, vsltimg_mean, vslttxt_mean, outputs_stack[0, :, :]])
+        output1 = all_cls_stack[missing, self.idx_order]
+        # if self.args.vslt_type != "QIE":
+        #     classInput = torch.cat([classInput, demo_embedding], dim=1)
+        
+        # output1 = self.fc_list(classInput)  
         output2 = None
         output3 = None
         return output1, output2, output3
