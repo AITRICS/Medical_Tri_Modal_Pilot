@@ -40,10 +40,10 @@ parser.add_argument('--modality-inclusion', type=str, default="train-full_test-f
 parser.add_argument('--fullmodal-definition', type=str, default="txt1_img1", choices=["txt1_img1", "img1", "txt1"])
 
 # Data path setting
-parser.add_argument('--train-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/train")
-parser.add_argument('--test-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/test")
-parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/destin/multimodal/mlhc_final_models")
-parser.add_argument('--image-data-path', type=str, default="/home/destin/")
+parser.add_argument('--train-data-path', type=str, default="/home/claire/training_data_0320/mimic_cf_icu_size24/train")
+parser.add_argument('--test-data-path', type=str, default="/home/claire/training_data_0320/mimic_cf_icu_size24/test")
+parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/claire/multimodal/mlhc_final_models_0420")
+parser.add_argument('--image-data-path', type=str, default="/home/claire/")
 
 # Data Parameters
 parser.add_argument('--cross-fold-val', type=int, default=0, choices=[1, 0], help="1: k-fold, 0: seed-average")
@@ -147,7 +147,8 @@ parser.add_argument('--fusion-type', type=str, default='fused_ehr', help='train 
 
 # For test.py
 # val,test 시 발생
-parser.add_argument('--missing-prop', type=int, default=0, choices=[0,20,40,60,80, 100])
+parser.add_argument('--image-observed-prop', type=int, default=0, choices=[10,30,50,70,90,100])
+parser.add_argument('--text-observed-prop', type=int, default=0, choices=[10,30,50,70,90,100])
 
 args = parser.parse_args()
 args.dir_root = os.getcwd()

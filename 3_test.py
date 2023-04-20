@@ -222,3 +222,9 @@ for model_numm, ckpt in enumerate(result_dir):
 
     # update logger - end of test step
     logger.test_result_only()
+    logger.writer.close()
+    del model
+    # save test results
+    save_test_results.results_all_seeds(logger.test_results)
+    
+save_test_results.results_per_cross_fold()

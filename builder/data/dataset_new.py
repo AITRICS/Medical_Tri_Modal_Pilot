@@ -1439,14 +1439,21 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
             else:
                 #2
                 if args.multiimages == 0:
-                    cxr_time, cxr_path = sorted(cxr_li)[-1]
-                    image = Image.open(self.image_data_path + cxr_path)
-                    image = F_t.equalize(image)
-                    img = self.transform(image)
-                    if args.realtime == 1:
-                        cxr_time -= selectedKey
+                    image_prop = [(100-args.image_observed_prop)/100, args.image_observed_prop/100]
+                    img_observed_prop = np.random.choice(2,1,replace=True, p=image_prop)
+                    if img_observed_prop == 0:
+                        img = torch.zeros(self.image_size).unsqueeze(0)
+                        missing.append(True)
                     else:
-                        cxr_time -= min_time
+                        cxr_time, cxr_path = sorted(cxr_li)[-1]
+                        image = Image.open(self.image_data_path + cxr_path)
+                        image = F_t.equalize(image)
+                        img = self.transform(image)
+                        if args.realtime == 1:
+                            cxr_time -= selectedKey
+                        else:
+                            cxr_time -= min_time
+                        missing.append(False)
                 else:
                     img = []
                     cxr_times = []
@@ -1468,7 +1475,7 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
                     img = torch.stack(img)
                     cxr_time = torch.tensor(cxr_times)
                 #
-                missing.append(False)
+                    missing.append(False)
                 
         else:
             #1
@@ -1486,14 +1493,19 @@ class Onetime_Outbreak_Test_Dataset(torch.utils.data.Dataset):
             if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
                 text_data = data_pkl['txt_input'][0].strip()
                 if len(text_data) != 0:
-                    tokens = torch.Tensor(self.bioemb[text_data]['embedding'][:])
-                    if len(tokens.shape) == 1:
-                        textLength = 1 # single cls token
+                    text_prop=[(100-args.text_observed_prop)/100, args.text_observed_prop/100]
+                    txt_observed_prop = np.random.choice(2,1,replace=True, p=text_prop)
+                    if txt_observed_prop == 0:
+                        txt_missing = True
                     else:
-                        textLength = tokens.size(0) # embedding
-                        zero_padding = torch.zeros([128-textLength, 768])
-                        tokens = torch.cat([tokens, zero_padding], dim=0)
-                    txt_missing = False
+                        tokens = torch.Tensor(self.bioemb[text_data]['embedding'][:])
+                        if len(tokens.shape) == 1:
+                            textLength = 1 # single cls token
+                        else:
+                            textLength = tokens.size(0) # embedding
+                            zero_padding = torch.zeros([128-textLength, 768])
+                            tokens = torch.cat([tokens, zero_padding], dim=0)
+                        txt_missing = False
             if txt_missing:
                 tokens = torch.zeros([self.txt_token_size, self.token_max_length]).squeeze()
                 textLength = 0
@@ -2805,14 +2817,21 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             else:
                 #2
                 if args.multiimages == 0:
-                    cxr_time, cxr_path = sorted(cxr_li)[-1]
-                    image = Image.open(self.image_data_path + cxr_path)
-                    image = F_t.equalize(image)
-                    img = self.transform(image)
-                    if args.realtime == 1:
-                        cxr_time -= selectedKey
+                    image_prop = [(100-args.image_observed_prop)/100, args.image_observed_prop/100]
+                    img_observed_prop = np.random.choice(2,1,replace=True, p=image_prop)
+                    if img_observed_prop == 0:
+                        img = torch.zeros(self.image_size).unsqueeze(0)
+                        missing.append(True)
                     else:
-                        cxr_time -= min_time
+                        cxr_time, cxr_path = sorted(cxr_li)[-1]
+                        image = Image.open(self.image_data_path + cxr_path)
+                        image = F_t.equalize(image)
+                        img = self.transform(image)
+                        if args.realtime == 1:
+                            cxr_time -= selectedKey
+                        else:
+                            cxr_time -= min_time
+                        missing.append(False)
                 else:
                     img = []
                     cxr_times = []
@@ -2834,7 +2853,7 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
                     img = torch.stack(img)
                     cxr_time = torch.tensor(cxr_times)
                 #
-                missing.append(False)
+                    missing.append(False)
                 
         else:
             #1
@@ -2852,14 +2871,19 @@ class Multiple_Outbreaks_Test_Dataset(torch.utils.data.Dataset):
             if (("txt" in args.input_types and "txt1" in args.fullmodal_definition and 'test-full' in args.modality_inclusion) or ('test-missing' in args.modality_inclusion and "txt" in args.input_types)) and ("txt1" in file_name):
                 text_data = data_pkl['txt_input'][0].strip()
                 if len(text_data) != 0:
-                    tokens = torch.Tensor(self.bioemb[text_data]['embedding'][:])
-                    if len(tokens.shape) == 1:
-                        textLength = 1 # single cls token
+                    text_prop=[(100-args.text_observed_prop)/100,args.text_observed_prop/100]
+                    txt_observed_prop = np.random.choice(2,1,replace=True, p=text_prop)
+                    if txt_observed_prop == 0:
+                        txt_missing = True
                     else:
-                        textLength = tokens.size(0) # embedding
-                        zero_padding = torch.zeros([128-textLength, 768])
-                        tokens = torch.cat([tokens, zero_padding], dim=0)
-                    txt_missing = False
+                        tokens = torch.Tensor(self.bioemb[text_data]['embedding'][:])
+                        if len(tokens.shape) == 1:
+                            textLength = 1 # single cls token
+                        else:
+                            textLength = tokens.size(0) # embedding
+                            zero_padding = torch.zeros([128-textLength, 768])
+                            tokens = torch.cat([tokens, zero_padding], dim=0)
+                        txt_missing = False
             if txt_missing:
                 tokens = torch.zeros([self.txt_token_size, self.token_max_length]).squeeze()
                 textLength = 0
