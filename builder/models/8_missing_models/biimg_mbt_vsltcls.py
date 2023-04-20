@@ -14,7 +14,7 @@ from builder.models.src.swin_transformer import swin_t_m, Swin_T_Weights
 from builder.models.src.reports_transformer_decoder import TransformerDecoder
 from transformers import AutoTokenizer
 
-class TRI_MBT_VSLTCLS(nn.Module):
+class BIIMG_MBT_VSLTCLS(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
@@ -172,6 +172,7 @@ class TRI_MBT_VSLTCLS(nn.Module):
         # age = age.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
         # gen = gen.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)    
         # x = torch.cat([x, age, gen], axis=2)
+        print("missing: ", missing)
 
         demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1)
         demo_embedding = self.ie_demo(demographic)
@@ -259,6 +260,7 @@ class TRI_MBT_VSLTCLS(nn.Module):
         #     # exit(1)
         # else:
         output3 = None
+        exit(1)
 
         return output1, output2, output3
     

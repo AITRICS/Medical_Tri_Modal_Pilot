@@ -25,6 +25,9 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
     img_time, txt_time = imgtxt_time
     img_time = img_time.type(torch.HalfTensor).to(device, non_blocking=True)
     txt_time = txt_time.type(torch.HalfTensor).to(device, non_blocking=True)
+    
+    if args.berttype == "bert":
+        txt_time = txt_time.type(torch.LongTensor)
 
     if args.vslt_type == "carryforward":
         train_x = train_x.permute(1, 0, 2, 3)
