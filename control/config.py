@@ -147,8 +147,8 @@ parser.add_argument('--fusion-type', type=str, default='fused_ehr', help='train 
 
 # For test.py
 # val,test 시 발생
-parser.add_argument('--image-observed-prop', type=int, default=0, choices=[10,30,50,70,90,100])
-parser.add_argument('--text-observed-prop', type=int, default=0, choices=[10,30,50,70,90,100])
+parser.add_argument('--image-observed-prop', type=int, default=100, choices=[10,30,50,70,90,100])
+parser.add_argument('--text-observed-prop', type=int, default=100, choices=[10,30,50,70,90,100])
 
 args = parser.parse_args()
 args.dir_root = os.getcwd()
