@@ -135,7 +135,9 @@ for model_numm, ckpt in enumerate(result_dir):
     model.eval()
 
     print('Model for Seed ' + ckpt.split("seed")[-1].split(".pth")[0] + " Loaded...")
-
+    print("flexibleavg: ", model.flexibleavg)
+    
+    continue
     logger.evaluator.reset()
     result_list = []
     # set loss function
@@ -226,5 +228,5 @@ for model_numm, ckpt in enumerate(result_dir):
     del model
     # save test results
     save_test_results.results_all_seeds(logger.test_results)
-    
+exit(1)
 save_test_results.results_per_cross_fold()

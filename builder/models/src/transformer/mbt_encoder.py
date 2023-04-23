@@ -155,7 +155,7 @@ class TrimodalTransformerEncoder_Multitokens_MBTVSLTMAIN(nn.Module):
                 #     res_bottles = list(bottlenecks_list)
 
                 for modal_idx, enc_layer in enumerate(enc_layers):
-                    if idx == 0:
+                    if idx == self.fusion_idx:
                         bottlenecks = bottlenecks_first.repeat(1,3,1)
                     else:
                         # bottlenecks = torch.cat([bottlenecks_first for i in self.bottlenecks_map[modal_idx]], axis=1)
