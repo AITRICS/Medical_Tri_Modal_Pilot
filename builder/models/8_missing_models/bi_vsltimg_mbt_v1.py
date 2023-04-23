@@ -98,7 +98,7 @@ class BI_VSLTIMG_MBT_V1(nn.Module):
                 self.img_encoder.load_state_dict(new_weights)
             else:
                 self.img_encoder = swin_t_m(weights = None)
-                
+            self.img_encoder.eval()
         else:
             self.patch_embedding = PatchEmbeddingBlock(
             in_channels=1,
@@ -146,25 +146,6 @@ class BI_VSLTIMG_MBT_V1(nn.Module):
         self.relu = self.activations[activation]
         self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
         self.txt_feat = torch.Tensor([19]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
-
-        ##### Reports Genertaion
-        if ("tdecoder" == self.args.auxiliary_loss_type):
-            # self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-            # self.vocab_size = self.tokenizer.vocab_size
-            self.vocab_size = 30522
-            self.img_2_txt = TransformerDecoder(self.vocab_size,
-                                                    d_model = self.model_dim,
-                                                    d_ff = self.model_dim * 4,
-                                                    num_layers = 2,
-                                                    num_heads = self.num_heads,
-                                                    sos_id = 101,
-                                                    eos_id = 102,
-                                                    max_length = 1024
-                                                    )
-            self.encoder_output_lengths = torch.tensor([1 for i in range(self.args.batch_size)]).to(self.device)
-        
-        if "rmse" in self.args.auxiliary_loss_type:
-            self.rmse_layer = nn.Linear(in_features=classifier_dim, out_features= 1, bias=True)
         
     def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths):
         # x-TIE:  torch.Size([bs, vslt_len, 3])
@@ -203,7 +184,8 @@ class BI_VSLTIMG_MBT_V1(nn.Module):
             img_embedding = self.img_encoder(img)#[16, 1000] #ViT_B_16_Weights.IMAGENET1K_V1
             img_embedding = self.linear(img_embedding)
         elif self.img_model_type == "swin":
-            img_embedding = self.img_encoder(img)
+            with torch.no_grad():
+                img_embedding = self.img_encoder(img)
             img_embedding = self.flatten(img_embedding)
             img_embedding = self.linear(img_embedding)     
         else:
@@ -233,22 +215,13 @@ class BI_VSLTIMG_MBT_V1(nn.Module):
         if self.args.vslt_type != "QIE":
             classInput = torch.cat([classInput, demo_embedding.repeat(2,1)], dim=1)
         outputs_stack = self.fc_list(classInput).reshape(2, -1, self.output_dim)
-        
-        if "rmse" in self.args.auxiliary_loss_type:
-            output2_stack = self.rmse_layer(classInput).reshape(2, -1)
-            bi_mean2 = torch.mean(output2_stack, dim=0)
-            all_cls_stack2 = torch.stack([bi_mean2, output2_stack[0, :]])
-            output2 = all_cls_stack2[missing, self.idx_order]
-        else:
-            output2 = None
+  
+        output2 = None
+        output3 = None
             
         bi_mean = torch.mean(outputs_stack, dim=0) 
         all_cls_stack = torch.stack([bi_mean, outputs_stack[0, :, :]])
         output = all_cls_stack[missing, self.idx_order]
-        if (flow_type == "train") and ("tdecoder" in self.args.auxiliary_loss_type):
-            output3 = self.img_2_txt(reports_tokens, outputs[1][:,0,:].unsqueeze(1), encoder_output_lengths = self.encoder_output_lengths)
-            # exit(1)
-        else:
-            output3 = None
+
             
         return output, output2, output3
