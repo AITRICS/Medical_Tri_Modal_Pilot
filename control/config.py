@@ -17,11 +17,12 @@ parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--seed-list', type=list, default=[412, 1004, 2023]) #[0, 1004, 2022, 9209, 119]
 parser.add_argument('--device', type=int, default=1, nargs='+')
 parser.add_argument('--cpu', type=int, default=0)
-parser.add_argument('--num-workers', type=int, default=2)
+parser.add_argument('--num-workers', type=int, default=5)
 parser.add_argument('--gpus', type=int, default=1)
 parser.add_argument('--reset', default=False, action='store_true')
 parser.add_argument('--project-name', type=str, default="small1")
 parser.add_argument('--checkpoint', '-cp', type=bool, default=False)
+parser.add_argument('--flexconst', type=float, default=1)
 
 parser.add_argument('--prediction-range', type=int, default=12)
 parser.add_argument('--min-inputlen', type=int, default=3)
@@ -42,7 +43,7 @@ parser.add_argument('--fullmodal-definition', type=str, default="txt1_img1", cho
 # Data path setting
 parser.add_argument('--train-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/train")
 parser.add_argument('--test-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/test")
-parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/destin/multimodal/mlhc_final_models_0420")
+parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/destin/multimodal/mlhc_final_models_0420/nonorm")
 parser.add_argument('--image-data-path', type=str, default="/home/destin/")
 
 # Data Parameters

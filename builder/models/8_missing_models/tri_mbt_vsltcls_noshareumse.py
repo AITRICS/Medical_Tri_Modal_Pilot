@@ -6,7 +6,7 @@ from torch import Tensor
 import math
 from builder.models.src.transformer.utils import *
 from builder.models.src.transformer import *
-from builder.models.src.transformer.mbt_encoder import BimodalTransformerEncoder_MBT
+from builder.models.src.transformer.mbt_encoder import TrimodalTransformerEncoder_MBT
 from builder.models.src.transformer.module import LayerNorm
 from monai.networks.blocks.patchembedding import PatchEmbeddingBlock
 from builder.models.src.vision_transformer import vit_b_16_m, ViT_B_16_Weights
@@ -14,11 +14,15 @@ from builder.models.src.swin_transformer import swin_t_m, Swin_T_Weights
 from builder.models.src.reports_transformer_decoder import TransformerDecoder
 from transformers import AutoTokenizer
 
-class BITXT_MBT_VSLTCLS(nn.Module):
+class TRI_MBT_VSLTCLS_NOSHAREUMSE(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
         ##### Configuration
+        self.img_size = args.image_size
+        self.patch_size = 16
+        self.img_num_heads = 4
+        self.pos_embed = "conv"
         self.output_dim = 1
         self.num_layers = args.transformer_num_layers
         self.num_heads = args.transformer_num_head
@@ -30,7 +34,7 @@ class BITXT_MBT_VSLTCLS(nn.Module):
 
         self.device = args.device
         self.vslt_input_size = len(args.vitalsign_labtest)
-        self.n_modality = 2
+        self.n_modality = len(args.input_types.split("_"))
         self.bottlenecks_n = 4
         activation = 'relu'
         self.activations = nn.ModuleDict([
@@ -64,6 +68,16 @@ class BITXT_MBT_VSLTCLS(nn.Module):
                                     nn.ReLU(inplace=True),
                                     nn.Linear(self.model_dim, self.model_dim, bias=False),
                 )
+        self.ie_time_txt = nn.Sequential(
+                                    nn.Linear(1, self.model_dim),
+                                    nn.ReLU(inplace=True),
+                                    nn.Linear(self.model_dim, self.model_dim, bias=False),
+                )
+        self.ie_time_img = nn.Sequential(
+                                    nn.Linear(1, self.model_dim),
+                                    nn.ReLU(inplace=True),
+                                    nn.Linear(self.model_dim, self.model_dim, bias=False),
+                )
         self.ie_feat = nn.Embedding(20, self.model_dim)
         self.ie_demo = nn.Sequential(
                                     nn.Linear(2, self.model_dim),
@@ -75,26 +89,68 @@ class BITXT_MBT_VSLTCLS(nn.Module):
         elif args.berttype == "biobert": # BIOBERT
             self.txt_embedding = nn.Linear(768, self.model_dim)
         
+        self.img_model_type = args.img_model_type
+        self.img_pretrain = args.img_pretrain
+        if self.img_model_type == "vit":
+            if self.img_pretrain == "Yes":
+                self.img_encoder = vit_b_16_m(weights = ViT_B_16_Weights.IMAGENET1K_V1)#vit_b_16
+            else:
+                self.img_encoder = vit_b_16_m(weights = None)
+        elif self.img_model_type == "swin":
+            if self.img_pretrain =="Yes":
+                # self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
+                self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
+                model_dict = self.img_encoder.state_dict()
+                old_weights=torch.load("/nfs/thena/shared/multi_modal/mlhc/chx_ckpts/image_reports_swin_1e-6_resize_affine_crop-resize_crop_0323_best_fold0_seed0.pth")['model']
+                new_weights=torch.load("/nfs/thena/shared/multi_modal/mlhc/chx_ckpts/image_reports_swin_1e-6_resize_affine_crop-resize_crop_0323_best_fold0_seed0.pth")['model']
+                new_weights = {key.replace('img_encoder.', ''): new_weights.pop(key) for key in old_weights.keys()}
+                new_weights = {k: v for k, v in new_weights.items() if k in model_dict}
+                model_dict.update(new_weights)
+                self.img_encoder.load_state_dict(new_weights)
+            else:
+                # self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
+                self.img_encoder = swin_t_m(weights = None)
+            self.img_encoder.eval()
+                
+        else:
+            self.patch_embedding = PatchEmbeddingBlock(
+            in_channels=1,
+            img_size=self.img_size,
+            patch_size=self.patch_size,
+            hidden_size=self.model_dim,
+            num_heads=self.img_num_heads,
+            pos_embed=self.pos_embed,
+            dropout_rate=0,
+            spatial_dims=2,
+            )           
+        self.linear = nn.Linear(768,256)     
+        self.flatten = nn.Flatten(1,2)
         if self.args.residual_bottlenecks == 1:
             residual_bottlenecks = True
         else:
             residual_bottlenecks = False
 
-        self.fusion_transformer = BimodalTransformerEncoder_MBT(
+        if self.args.multiimages == 1:
+            img_mask = True
+        else:
+            img_mask = False
+        ##### Fusion Part
+        self.fusion_transformer = TrimodalTransformerEncoder_MBT(
             batch_size = args.batch_size,
-            n_modality = 2,
-            bottlenecks_n = 4,      # https://arxiv.org/pdf/2107.00135.pdf # according to section 4.2 implementation details
+            n_modality = self.n_modality,
+            bottlenecks_n = self.bottlenecks_n,      # https://arxiv.org/pdf/2107.00135.pdf # according to section 4.2 implementation details
             fusion_startidx = args.mbt_fusion_startIdx,
             d_input = self.model_dim,
+            resbottle = residual_bottlenecks,
             n_layers = self.num_layers,
             n_head = self.num_heads,
             d_model = self.model_dim,
             d_ff = self.model_dim * 4,
             dropout = self.dropout,
-            txt_idx = 1,
+            vsltonly = self.args.mbt_only_vslt,
             pe_maxlen = 2500,
-            use_pe = [vslt_pe, True],
-            mask = [True, True],
+            use_pe = [vslt_pe, False, True],
+            mask = [True, img_mask, True],
         )
 
         ##### Classifier
@@ -151,13 +207,37 @@ class BITXT_MBT_VSLTCLS(nn.Module):
             vslt_embedding = value_embedding + time_embedding + feat_embedding +demo_embedding
 
         txt_embedding = self.txt_embedding(txts)
+        
+        if self.img_model_type == "vit":
+            img_embedding = self.img_encoder(img)#[16, 1000] #ViT_B_16_Weights.IMAGENET1K_V1
+            img_embedding = self.linear(img_embedding)
+        elif self.img_model_type == "swin":
+            if self.args.multiimages == 1:
+                img = img.reshape(-1, 1, 224, 224)
+            with torch.no_grad():
+                img_embedding = self.img_encoder(img)
+            img_embedding = self.flatten(img_embedding)
+            img_embedding = self.linear(img_embedding)     
+            img_time = img_time.reshape(-1).clone().detach()
+        else:
+            img_embedding = self.patch_embedding(img)
             
         if self.args.imgtxt_time == 1:
-            txt_embedding = txt_embedding + self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat)
+            img_embedding = img_embedding + self.ie_time_img(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat)
+            txt_embedding = txt_embedding + self.ie_time_txt(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat)
         
-        outputs, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, txt_embedding], 
-                                        fixed_lengths = [vslt_embedding.size(1), txt_embedding.size(1)],
-                                        varying_lengths = [input_lengths, txt_lengths+2],
+        if self.args.multiimages == 1:
+            img_embedding = img_embedding.reshape(-1, 3, 49, 256)   
+            img_embedding = img_embedding.reshape(-1, 147, 256)
+            img_time = img_time.reshape(-1, 3) - 10
+            img_time = torch.count_nonzero(img_time, dim=1)
+            img_time = img_time * 49
+            img_time = img_time.type(torch.IntTensor)
+        else:
+            img_time = img_embedding.size(1)
+        outputs, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding, txt_embedding], 
+                                        fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1), txt_embedding.size(1)],
+                                        varying_lengths = [input_lengths, img_time, txt_lengths+2],
                                         fusion_idx = None,
                                         missing=missing
                                         )
@@ -182,7 +262,7 @@ class BITXT_MBT_VSLTCLS(nn.Module):
         #     # exit(1)
         # else:
         output3 = None
-        
+
         return output1, output2, output3
     
     
