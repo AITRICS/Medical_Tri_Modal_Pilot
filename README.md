@@ -1,4 +1,4 @@
-# Learning Missing Modal Electronic Health Records with Unified Multi-modal Data Embedding and Modality-Aware Attention (AITRICS)
+# Learning Missing Modal Electronic Health Records with Unified Multi-modal Data Embedding and Modality-Aware Attention (from AITRICS)
 
 This is the repository for MLHC 2023 Paper ["Learning Missing Modal Electronic Health Records with Unified Multi-modal Data Embedding and Modality-Aware Attention"](https://arxiv.org/abs/2305.02504). 
 
