@@ -48,8 +48,8 @@ class BI_VSLTTXT_MBT_V1(nn.Module):
         if args.vslt_type == "carryforward":
             self.vslt_enc = nn.Sequential(
                                         nn.Linear(self.num_nodes, self.model_dim),
+                                        nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
-                                        nn.Linear(self.model_dim, self.model_dim, bias=False),
                     )
             vslt_pe = True
             
@@ -57,17 +57,18 @@ class BI_VSLTTXT_MBT_V1(nn.Module):
             vslt_pe = False
             self.ie_vslt = nn.Sequential(
                                         nn.Linear(1, self.model_dim),
+                                        nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
-                                        nn.Linear(self.model_dim, self.model_dim, bias=False),
                     )
-        self.ie_time = nn.Sequential(
-                                    nn.Linear(1, self.model_dim),
-                                    nn.ReLU(inplace=True),
-                                    nn.Linear(self.model_dim, self.model_dim, bias=False),
-                )
-        self.ie_feat = nn.Embedding(20, self.model_dim)
+            self.ie_time = nn.Sequential(
+                                        nn.Linear(1, self.model_dim),
+                                        nn.LayerNorm(self.model_dim),
+                                        nn.ReLU(inplace=True),
+                    )
+            self.ie_feat = nn.Embedding(20, self.model_dim)
         self.ie_demo = nn.Sequential(
                                     nn.Linear(2, self.model_dim),
+                                    nn.LayerNorm(self.model_dim),
                                     nn.ReLU(inplace=True),
                 )
         
@@ -109,6 +110,9 @@ class BI_VSLTTXT_MBT_V1(nn.Module):
         self.relu = self.activations[activation]
         self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
         self.txt_feat = torch.Tensor([19]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
+        
+        if "rmse" in self.args.auxiliary_loss_type:
+            self.rmse_layer = nn.Linear(in_features=classifier_dim, out_features= 1, bias=True)
         
     def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths):
         # x-TIE:  torch.Size([bs, vslt_len, 3])
@@ -160,15 +164,20 @@ class BI_VSLTTXT_MBT_V1(nn.Module):
                                       fusion_idx = None,
                                       missing=missing
                                       )
-        outputs_list = torch.stack([outputs[0][:, 0, :], outputs[1][:, 0, :]]) 
-        classInput = self.layer_norms_after_concat(outputs_list).reshape(-1, self.model_dim)
-
-        classInput = torch.cat([classInput, demo_embedding.repeat(2,1)], dim=1)
-        outputs_stack = self.fc_list(classInput).reshape(2, -1, self.output_dim)
+        outputs_stack = torch.stack([outputs[0][:, 0, :], outputs[1][:, 0, :]]) 
         bi_mean = torch.mean(outputs_stack, dim=0) 
-        all_cls_stack = torch.stack([bi_mean, outputs_stack[0, :, :]])
+        all_cls_stack = torch.stack([bi_mean, outputs[0][:, 0, :]])
         output = all_cls_stack[missing, self.idx_order]
         
-        output2 = None
+        classInput = self.layer_norms_after_concat(output)
+        if self.args.vslt_type != "QIE":
+            classInput = torch.cat([classInput, demo_embedding], dim=1)
+        output = self.fc_list(classInput).squeeze()
+        
+        if "rmse" in self.args.auxiliary_loss_type:
+            output2 = self.rmse_layer(classInput).squeeze()
+        else:
+            output2 = None
+        
         output3 = None
         return output, output2, output3

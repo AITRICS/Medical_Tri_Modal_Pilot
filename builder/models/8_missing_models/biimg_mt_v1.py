@@ -52,13 +52,8 @@ class BIIMG_MT_V1(nn.Module):
         if args.vslt_type == "carryforward":
             self.vslt_enc = nn.Sequential(
                                         nn.Linear(self.num_nodes, self.model_dim),
-<<<<<<< HEAD
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
-=======
-                                        nn.ReLU(inplace=True),
-                                        nn.Linear(self.model_dim, self.model_dim, bias=False),
->>>>>>> refs/remotes/origin/main
                     )
             vslt_pe = True
             
@@ -66,7 +61,6 @@ class BIIMG_MT_V1(nn.Module):
             vslt_pe = False
             self.ie_vslt = nn.Sequential(
                                         nn.Linear(1, self.model_dim),
-<<<<<<< HEAD
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
                     )
@@ -82,22 +76,6 @@ class BIIMG_MT_V1(nn.Module):
                                     nn.ReLU(inplace=True),
                 )
             
-=======
-                                        nn.ReLU(inplace=True),
-                                        nn.Linear(self.model_dim, self.model_dim, bias=False),
-                    )
-        self.ie_time = nn.Sequential(
-                                    nn.Linear(1, self.model_dim),
-                                    nn.ReLU(inplace=True),
-                                    nn.Linear(self.model_dim, self.model_dim, bias=False),
-                )
-        self.ie_feat = nn.Embedding(20, self.model_dim)
-        self.ie_demo = nn.Sequential(
-                                    nn.Linear(2, self.model_dim),
-                                    nn.ReLU(inplace=True),
-                )
-        
->>>>>>> refs/remotes/origin/main
         self.img_model_type = args.img_model_type
         self.img_pretrain = args.img_pretrain
         if self.img_model_type == "vit":

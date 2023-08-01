@@ -6,11 +6,7 @@ from torch import Tensor
 import math
 from builder.models.src.transformer.utils import *
 from builder.models.src.transformer import *
-<<<<<<< HEAD
 from builder.models.src.transformer.mbt_encoder import TrimodalTransformerEncoder_MBT
-=======
-from builder.models.src.transformer.mbt_encoder import BimodalTransformerEncoder_MBT
->>>>>>> refs/remotes/origin/main
 from builder.models.src.transformer.module import LayerNorm
 from monai.networks.blocks.patchembedding import PatchEmbeddingBlock
 from builder.models.src.vision_transformer import vit_b_16_m, ViT_B_16_Weights
@@ -55,13 +51,8 @@ class BIIMG_MBT_VSLTCLS(nn.Module):
         if args.vslt_type == "carryforward":
             self.vslt_enc = nn.Sequential(
                                         nn.Linear(self.num_nodes, self.model_dim),
-<<<<<<< HEAD
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
-=======
-                                        nn.ReLU(inplace=True),
-                                        nn.Linear(self.model_dim, self.model_dim, bias=False),
->>>>>>> refs/remotes/origin/main
                     )
             vslt_pe = True
             
@@ -69,7 +60,6 @@ class BIIMG_MBT_VSLTCLS(nn.Module):
             vslt_pe = False
             self.ie_vslt = nn.Sequential(
                                         nn.Linear(1, self.model_dim),
-<<<<<<< HEAD
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
                     )
@@ -77,20 +67,10 @@ class BIIMG_MBT_VSLTCLS(nn.Module):
                                     nn.Linear(1, self.model_dim),
                                     nn.LayerNorm(self.model_dim),
                                     nn.ReLU(inplace=True),
-=======
-                                        nn.ReLU(inplace=True),
-                                        nn.Linear(self.model_dim, self.model_dim, bias=False),
-                    )
-        self.ie_time = nn.Sequential(
-                                    nn.Linear(1, self.model_dim),
-                                    nn.ReLU(inplace=True),
-                                    nn.Linear(self.model_dim, self.model_dim, bias=False),
->>>>>>> refs/remotes/origin/main
                 )
         self.ie_feat = nn.Embedding(20, self.model_dim)
         self.ie_demo = nn.Sequential(
                                     nn.Linear(2, self.model_dim),
-<<<<<<< HEAD
                                     nn.LayerNorm(self.model_dim),
                                     nn.ReLU(inplace=True),
                 )
@@ -99,11 +79,6 @@ class BIIMG_MBT_VSLTCLS(nn.Module):
             self.txt_embedding = nn.Embedding(30000, self.model_dim)
         elif args.berttype == "biobert": # BIOBERT
             self.txt_embedding = nn.Linear(768, self.model_dim)
-=======
-                                    nn.ReLU(inplace=True),
-                )
-        
->>>>>>> refs/remotes/origin/main
         
         self.img_model_type = args.img_model_type
         self.img_pretrain = args.img_pretrain
@@ -141,20 +116,16 @@ class BIIMG_MBT_VSLTCLS(nn.Module):
             )           
         self.linear = nn.Linear(768,256)     
         self.flatten = nn.Flatten(1,2)
-<<<<<<< HEAD
         if self.args.residual_bottlenecks == 1:
             residual_bottlenecks = True
         else:
             residual_bottlenecks = False
 
-=======
->>>>>>> refs/remotes/origin/main
         if self.args.multiimages == 1:
             img_mask = True
         else:
             img_mask = False
         ##### Fusion Part
-<<<<<<< HEAD
         self.fusion_transformer = TrimodalTransformerEncoder_MBT(
             batch_size = args.batch_size,
             n_modality = self.n_modality,
@@ -162,30 +133,15 @@ class BIIMG_MBT_VSLTCLS(nn.Module):
             fusion_startidx = args.mbt_fusion_startIdx,
             d_input = self.model_dim,
             resbottle = residual_bottlenecks,
-=======
-        self.fusion_transformer = BimodalTransformerEncoder_MBT(
-            batch_size = args.batch_size,
-            n_modality = 2,
-            bottlenecks_n = 4,      # https://arxiv.org/pdf/2107.00135.pdf # according to section 4.2 implementation details
-            fusion_startidx = args.mbt_fusion_startIdx,
-            d_input = self.model_dim,
->>>>>>> refs/remotes/origin/main
             n_layers = self.num_layers,
             n_head = self.num_heads,
             d_model = self.model_dim,
             d_ff = self.model_dim * 4,
             dropout = self.dropout,
-<<<<<<< HEAD
             vsltonly = self.args.mbt_only_vslt,
             pe_maxlen = 2500,
             use_pe = [vslt_pe, False, True],
             mask = [True, img_mask, True],
-=======
-            txt_idx = 3000,
-            pe_maxlen = 2500,
-            use_pe = [vslt_pe, True],
-            mask = [True, False],
->>>>>>> refs/remotes/origin/main
         )
 
         ##### Classifier
@@ -216,10 +172,7 @@ class BIIMG_MBT_VSLTCLS(nn.Module):
         # age = age.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
         # gen = gen.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)    
         # x = torch.cat([x, age, gen], axis=2)
-<<<<<<< HEAD
         print("missing: ", missing)
-=======
->>>>>>> refs/remotes/origin/main
 
         demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1)
         demo_embedding = self.ie_demo(demographic)
@@ -245,11 +198,8 @@ class BIIMG_MBT_VSLTCLS(nn.Module):
             demo_embedding = self.ie_demo(demographic)
             vslt_embedding = value_embedding + time_embedding + feat_embedding +demo_embedding
 
-<<<<<<< HEAD
         txt_embedding = self.txt_embedding(txts)
         
-=======
->>>>>>> refs/remotes/origin/main
         if self.img_model_type == "vit":
             img_embedding = self.img_encoder(img)#[16, 1000] #ViT_B_16_Weights.IMAGENET1K_V1
             img_embedding = self.linear(img_embedding)
@@ -269,15 +219,10 @@ class BIIMG_MBT_VSLTCLS(nn.Module):
                 demographic_it = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1).unsqueeze(1)
                 demo_embedding_it = self.ie_demo(demographic_it)
                 img_embedding = img_embedding + self.ie_time(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat) + demo_embedding_it
-<<<<<<< HEAD
                 txt_embedding = txt_embedding + self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat) + demo_embedding_it               
             else:
                 img_embedding = img_embedding + self.ie_time(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat)
                 txt_embedding = txt_embedding + self.ie_time(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat)
-=======
-            else:
-                img_embedding = img_embedding + self.ie_time(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat)
->>>>>>> refs/remotes/origin/main
         
         if self.args.multiimages == 1:
             img_embedding = img_embedding.reshape(-1, 3, 49, 256)   
@@ -288,21 +233,12 @@ class BIIMG_MBT_VSLTCLS(nn.Module):
             img_time = img_time.type(torch.IntTensor)
         else:
             img_time = img_embedding.size(1)
-<<<<<<< HEAD
         outputs, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding, txt_embedding], 
                                         fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1), txt_embedding.size(1)],
                                         varying_lengths = [input_lengths, img_time, txt_lengths+2],
                                         fusion_idx = None,
                                         missing=missing
                                         )
-=======
-        outputs, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding], 
-                                      fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1)],
-                                      varying_lengths = [input_lengths, img_embedding.size(1)],
-                                      fusion_idx = None,
-                                      missing=missing
-                                      )
->>>>>>> refs/remotes/origin/main
         # outputs_stack = torch.stack([outputs[0][:, 0, :], outputs[1][:, 0, :], outputs[2][:, 0, :]]) # vslt, img, txt
         # tri_mean = torch.mean(outputs_stack, dim=0) 
         # vslttxt_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[2, :, :]]), dim=0)
@@ -324,10 +260,7 @@ class BIIMG_MBT_VSLTCLS(nn.Module):
         #     # exit(1)
         # else:
         output3 = None
-<<<<<<< HEAD
         exit(1)
-=======
->>>>>>> refs/remotes/origin/main
 
         return output1, output2, output3
     

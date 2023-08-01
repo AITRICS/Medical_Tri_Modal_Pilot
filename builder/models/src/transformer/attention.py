@@ -33,11 +33,9 @@ class ScaledDotProductAttention(nn.Module):
         # print(" ")
         # score = ((torch.nan_to_num(torch.bmm(query, key.transpose(1, 2)), nan=0.0, posinf=1.0)) / self.sqrt_dim)  # + 2e-10
         score = ((torch.bmm(query, key.transpose(1, 2))) / self.sqrt_dim)  # + 2e-10
-        # print("mask: ", mask.shape)
-        # print("mask: ", mask[0])
+
         if mask is not None:
             score.masked_fill_(mask, -65504)
-            # score.masked_fill_(mask, -1e9)
         
         # attn = torch.nan_to_num(F.softmax(score, -1), nan=0.0, posinf=1.0)
         attn = F.softmax(score, -1)
