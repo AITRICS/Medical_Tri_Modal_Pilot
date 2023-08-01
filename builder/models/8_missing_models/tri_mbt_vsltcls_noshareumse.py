@@ -6,7 +6,7 @@ from torch import Tensor
 import math
 from builder.models.src.transformer.utils import *
 from builder.models.src.transformer import *
-from builder.models.src.transformer.encoder import TrimodalTransformerEncoder_MT
+from builder.models.src.transformer.mbt_encoder import TrimodalTransformerEncoder_MBT
 from builder.models.src.transformer.module import LayerNorm
 from monai.networks.blocks.patchembedding import PatchEmbeddingBlock
 from builder.models.src.vision_transformer import vit_b_16_m, ViT_B_16_Weights
@@ -14,28 +14,28 @@ from builder.models.src.swin_transformer import swin_t_m, Swin_T_Weights
 from builder.models.src.reports_transformer_decoder import TransformerDecoder
 from transformers import AutoTokenizer
 
-# early fusion
-
-class BIIMG_MT_V1(nn.Module):
+class TRI_MBT_VSLTCLS_NOSHAREUMSE(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
         ##### Configuration
+        self.img_size = args.image_size
+        self.patch_size = 16
+        self.img_num_heads = 4
+        self.pos_embed = "conv"
+        self.output_dim = 1
         self.num_layers = args.transformer_num_layers
         self.num_heads = args.transformer_num_head
         self.model_dim = args.transformer_dim
         self.dropout = args.dropout
-        if args.output_type =="intubation":
-            self.output_dim = 1#args.output_dim
-        else:
-            self.output_dim = 2#args.output_dim
-
+        self.idx_order = torch.range(0, args.batch_size-1).type(torch.LongTensor)
         self.num_nodes = len(args.vitalsign_labtest)
         self.t_len = args.window_size
 
         self.device = args.device
         self.vslt_input_size = len(args.vitalsign_labtest)
         self.n_modality = len(args.input_types.split("_"))
+        self.bottlenecks_n = 4
         activation = 'relu'
         self.activations = nn.ModuleDict([
             ['lrelu', nn.LeakyReLU()],
@@ -46,19 +46,13 @@ class BIIMG_MT_V1(nn.Module):
             ['leaky_relu', nn.LeakyReLU(0.2)],
             ['elu', nn.ELU()]
         ])
-        self.relu = self.activations[activation]
         
         ##### Encoders
         if args.vslt_type == "carryforward":
             self.vslt_enc = nn.Sequential(
                                         nn.Linear(self.num_nodes, self.model_dim),
-<<<<<<< HEAD
-                                        nn.LayerNorm(self.model_dim),
-                                        nn.ReLU(inplace=True),
-=======
                                         nn.ReLU(inplace=True),
                                         nn.Linear(self.model_dim, self.model_dim, bias=False),
->>>>>>> refs/remotes/origin/main
                     )
             vslt_pe = True
             
@@ -66,27 +60,20 @@ class BIIMG_MT_V1(nn.Module):
             vslt_pe = False
             self.ie_vslt = nn.Sequential(
                                         nn.Linear(1, self.model_dim),
-<<<<<<< HEAD
-                                        nn.LayerNorm(self.model_dim),
-                                        nn.ReLU(inplace=True),
-                    )
-            self.ie_time = nn.Sequential(
-                                        nn.Linear(1, self.model_dim),
-                                        nn.LayerNorm(self.model_dim),
-                                        nn.ReLU(inplace=True),
-                    )
-            self.ie_feat = nn.Embedding(20, self.model_dim)
-        self.ie_demo = nn.Sequential(
-                                    nn.Linear(2, self.model_dim),
-                                    nn.LayerNorm(self.model_dim),
-                                    nn.ReLU(inplace=True),
-                )
-            
-=======
                                         nn.ReLU(inplace=True),
                                         nn.Linear(self.model_dim, self.model_dim, bias=False),
                     )
         self.ie_time = nn.Sequential(
+                                    nn.Linear(1, self.model_dim),
+                                    nn.ReLU(inplace=True),
+                                    nn.Linear(self.model_dim, self.model_dim, bias=False),
+                )
+        self.ie_time_txt = nn.Sequential(
+                                    nn.Linear(1, self.model_dim),
+                                    nn.ReLU(inplace=True),
+                                    nn.Linear(self.model_dim, self.model_dim, bias=False),
+                )
+        self.ie_time_img = nn.Sequential(
                                     nn.Linear(1, self.model_dim),
                                     nn.ReLU(inplace=True),
                                     nn.Linear(self.model_dim, self.model_dim, bias=False),
@@ -97,7 +84,11 @@ class BIIMG_MT_V1(nn.Module):
                                     nn.ReLU(inplace=True),
                 )
         
->>>>>>> refs/remotes/origin/main
+        if args.berttype == "bert": # BERT
+            self.txt_embedding = nn.Embedding(30000, self.model_dim)
+        elif args.berttype == "biobert": # BIOBERT
+            self.txt_embedding = nn.Linear(768, self.model_dim)
+        
         self.img_model_type = args.img_model_type
         self.img_pretrain = args.img_pretrain
         if self.img_model_type == "vit":
@@ -117,6 +108,7 @@ class BIIMG_MT_V1(nn.Module):
                 model_dict.update(new_weights)
                 self.img_encoder.load_state_dict(new_weights)
             else:
+                # self.img_encoder = swin_t_m(weights = Swin_T_Weights.IMAGENET1K_V1)#Swin_T_Weights.IMAGENET1K_V1
                 self.img_encoder = swin_t_m(weights = None)
             self.img_encoder.eval()
                 
@@ -133,22 +125,32 @@ class BIIMG_MT_V1(nn.Module):
             )           
         self.linear = nn.Linear(768,256)     
         self.flatten = nn.Flatten(1,2)
-        
+        if self.args.residual_bottlenecks == 1:
+            residual_bottlenecks = True
+        else:
+            residual_bottlenecks = False
+
+        if self.args.multiimages == 1:
+            img_mask = True
+        else:
+            img_mask = False
         ##### Fusion Part
-        self.fusion_transformer = TrimodalTransformerEncoder_MT(
+        self.fusion_transformer = TrimodalTransformerEncoder_MBT(
             batch_size = args.batch_size,
+            n_modality = self.n_modality,
+            bottlenecks_n = self.bottlenecks_n,      # https://arxiv.org/pdf/2107.00135.pdf # according to section 4.2 implementation details
+            fusion_startidx = args.mbt_fusion_startIdx,
             d_input = self.model_dim,
+            resbottle = residual_bottlenecks,
             n_layers = self.num_layers,
             n_head = self.num_heads,
             d_model = self.model_dim,
-            fusion_startidx = args.mbt_fusion_startIdx,
             d_ff = self.model_dim * 4,
-            n_modality = 2,
             dropout = self.dropout,
+            vsltonly = self.args.mbt_only_vslt,
             pe_maxlen = 2500,
-            use_pe = [vslt_pe, False],
-            mask = [True, False],
-            txt_idx = 2,
+            use_pe = [vslt_pe, False, True],
+            mask = [True, img_mask, True],
         )
 
         ##### Classifier
@@ -156,20 +158,32 @@ class BIIMG_MT_V1(nn.Module):
             classifier_dim = self.model_dim
         else:
             classifier_dim = self.model_dim*2
-        self.layer_norm_final = nn.LayerNorm(self.model_dim)
+        self.rmse_layer = nn.Linear(in_features=classifier_dim, out_features= 1, bias=True)
+        self.layer_norms_after_concat = nn.LayerNorm(self.model_dim)
         self.fc_list = nn.Sequential(
         nn.Linear(in_features=classifier_dim, out_features= self.model_dim, bias=True),
         nn.BatchNorm1d(self.model_dim),
         self.activations[activation],
         nn.Linear(in_features=self.model_dim, out_features= self.output_dim,  bias=True))
-        
-        # if "rmse" in self.args.auxiliary_loss_type:
-        #     self.rmse_layer = nn.Linear(in_features=classifier_dim, out_features= 1, bias=True)
-        
-        self.fixed_lengths = [0, 25]
-        self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
-        
+
+        # self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
+        if self.args.multiimages == 1:
+            self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size * 3).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
+        else:
+            self.img_feat = torch.Tensor([18]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
+        self.txt_feat = torch.Tensor([19]).repeat(self.args.batch_size).unsqueeze(1).type(torch.LongTensor).to(self.device, non_blocking=True)
+
     def forward(self, x, h, m, d, x_m, age, gen, input_lengths, txts, txt_lengths, img, missing, f_indices, img_time, txt_time, flow_type, reports_tokens, reports_lengths):
+        # x-TIE:  torch.Size([bs, vslt_len, 3])
+        # x-Carryforward:  torch.Size([bs, 24, 16])
+        # txts:  torch.Size([bs, 128, 768])         --> ([bs, 128, 256])
+        # img:  torch.Size([bs, 1, 224, 224])       --> ([bs, 49, 256])
+        # age = age.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)
+        # gen = gen.unsqueeze(1).unsqueeze(2).repeat(1, x.size(1), 1)    
+        # x = torch.cat([x, age, gen], axis=2)
+
+        demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1)
+        demo_embedding = self.ie_demo(demographic)
                                 
         if self.args.vslt_type == "carryforward":
             demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1)
@@ -190,34 +204,67 @@ class BIIMG_MT_V1(nn.Module):
             feat_embedding = self.ie_feat(feat)
             demographic = torch.cat([age.unsqueeze(1), gen.unsqueeze(1)], dim=1).unsqueeze(1).repeat(1,x.size(1),1)
             demo_embedding = self.ie_demo(demographic)
-            vslt_embedding = value_embedding + time_embedding + feat_embedding + demo_embedding
+            vslt_embedding = value_embedding + time_embedding + feat_embedding +demo_embedding
 
+        txt_embedding = self.txt_embedding(txts)
+        
         if self.img_model_type == "vit":
             img_embedding = self.img_encoder(img)#[16, 1000] #ViT_B_16_Weights.IMAGENET1K_V1
             img_embedding = self.linear(img_embedding)
         elif self.img_model_type == "swin":
+            if self.args.multiimages == 1:
+                img = img.reshape(-1, 1, 224, 224)
             with torch.no_grad():
                 img_embedding = self.img_encoder(img)
             img_embedding = self.flatten(img_embedding)
             img_embedding = self.linear(img_embedding)     
+            img_time = img_time.reshape(-1).clone().detach()
         else:
             img_embedding = self.patch_embedding(img)
             
-        img_embedding = img_embedding + self.ie_time(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat)
-            
-        context_vector, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding], 
-            fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1)],
-            varying_lengths = [input_lengths, torch.tensor(img_embedding.size(1)).repeat(img_embedding.size(0))],
-            fusion_idx = None,
-            missing=missing
-        )
-        final_cls_output = context_vector[:,0,:]
-            
-        classInput = self.layer_norm_final(final_cls_output)
+        if self.args.imgtxt_time == 1:
+            img_embedding = img_embedding + self.ie_time_img(img_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.img_feat)
+            txt_embedding = txt_embedding + self.ie_time_txt(txt_time.unsqueeze(1)).unsqueeze(1) + self.ie_feat(self.txt_feat)
+        
+        if self.args.multiimages == 1:
+            img_embedding = img_embedding.reshape(-1, 3, 49, 256)   
+            img_embedding = img_embedding.reshape(-1, 147, 256)
+            img_time = img_time.reshape(-1, 3) - 10
+            img_time = torch.count_nonzero(img_time, dim=1)
+            img_time = img_time * 49
+            img_time = img_time.type(torch.IntTensor)
+        else:
+            img_time = img_embedding.size(1)
+        outputs, _ = self.fusion_transformer(enc_outputs = [vslt_embedding, img_embedding, txt_embedding], 
+                                        fixed_lengths = [vslt_embedding.size(1), img_embedding.size(1), txt_embedding.size(1)],
+                                        varying_lengths = [input_lengths, img_time, txt_lengths+2],
+                                        fusion_idx = None,
+                                        missing=missing
+                                        )
+        # outputs_stack = torch.stack([outputs[0][:, 0, :], outputs[1][:, 0, :], outputs[2][:, 0, :]]) # vslt, img, txt
+        # tri_mean = torch.mean(outputs_stack, dim=0) 
+        # vslttxt_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[2, :, :]]), dim=0)
+        # vsltimg_mean = torch.mean(torch.stack([outputs_stack[0, :, :], outputs_stack[1, :, :]]), dim=0)
+        # all_cls_stack = torch.stack([tri_mean, vsltimg_mean, vslttxt_mean, outputs_stack[0, :, :]])
+        # output = all_cls_stack[missing, self.idx_order]
+        
+        classInput = self.layer_norms_after_concat(outputs[0][:,0,:])
         if self.args.vslt_type != "QIE":
             classInput = torch.cat([classInput, demo_embedding], dim=1)
-        output = self.fc_list(classInput)
-        output2 = None
+        if "rmse" in self.args.auxiliary_loss_type:
+            output2 = self.rmse_layer(classInput).squeeze()
+        else:
+            output2 = None
+        output1 = self.fc_list(classInput)
+            
+        # if (flow_type == "train") and ("tdecoder" in self.args.auxiliary_loss_type):
+        #     output3 = self.img_2_txt(reports_tokens, outputs[1][:,0,:].unsqueeze(1), encoder_output_lengths = self.encoder_output_lengths)
+        #     # exit(1)
+        # else:
         output3 = None
- 
-        return output[:,0], output2, output3
+
+        return output1, output2, output3
+    
+    
+    
+    

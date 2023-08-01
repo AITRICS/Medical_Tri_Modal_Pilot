@@ -31,7 +31,7 @@ class TRI_MBT_VFLEXIBLE(nn.Module):
         self.idx_order = torch.range(0, args.batch_size-1).type(torch.LongTensor)
         self.num_nodes = len(args.vitalsign_labtest)
         self.t_len = args.window_size
-
+        self.flexconst = args.flexconst
         self.device = args.device
         self.vslt_input_size = len(args.vitalsign_labtest)
         self.n_modality = len(args.input_types.split("_"))
@@ -51,8 +51,8 @@ class TRI_MBT_VFLEXIBLE(nn.Module):
         if args.vslt_type == "carryforward":
             self.vslt_enc = nn.Sequential(
                                         nn.Linear(self.num_nodes, self.model_dim),
-                                        nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
+                                        nn.Linear(self.model_dim, self.model_dim, bias=False),
                     )
             vslt_pe = True
             
@@ -60,21 +60,20 @@ class TRI_MBT_VFLEXIBLE(nn.Module):
             vslt_pe = False
             self.ie_vslt = nn.Sequential(
                                         nn.Linear(1, self.model_dim),
-                                        nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
+                                        nn.Linear(self.model_dim, self.model_dim, bias=False),
                     )
             self.ie_time = nn.Sequential(
                                         nn.Linear(1, self.model_dim),
-                                        nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
+                                        nn.Linear(self.model_dim, self.model_dim, bias=False),
                     )
             self.ie_feat = nn.Embedding(20, self.model_dim)
         self.ie_demo = nn.Sequential(
                                     nn.Linear(2, self.model_dim),
-                                    nn.LayerNorm(self.model_dim),
                                     nn.ReLU(inplace=True),
                 )
-        
+            
         if args.berttype == "bert": # BERT
             self.txt_embedding = nn.Embedding(30000, self.model_dim)
         elif args.berttype == "biobert": # BIOBERT
@@ -276,7 +275,11 @@ class TRI_MBT_VFLEXIBLE(nn.Module):
         flexibleavg = self.flexibleavg.repeat(1,outputs_stack.size(1)) 
         flexsoft_masks = self.flexsoft_masks[missing, :]
         flexibleavg.masked_fill_(flexsoft_masks.permute(1,0), -1e9)
+<<<<<<< HEAD
         cls_weight = self.flexsoft(flexibleavg).unsqueeze(2)
+=======
+        cls_weight = self.flexsoft(flexibleavg*self.flexconst).unsqueeze(2)
+>>>>>>> refs/remotes/origin/main
         outputs_stack = outputs_stack * cls_weight
         
         tri_mean = torch.sum(outputs_stack, dim=0) 

@@ -6,7 +6,11 @@ from torch import Tensor
 import math
 from builder.models.src.transformer.utils import *
 from builder.models.src.transformer import *
+<<<<<<< HEAD
 from builder.models.src.transformer.mbt_encoder import TrimodalTransformerEncoder_MBT
+=======
+from builder.models.src.transformer.mbt_encoder import BimodalTransformerEncoder_MBT
+>>>>>>> refs/remotes/origin/main
 from builder.models.src.transformer.module import LayerNorm
 from monai.networks.blocks.patchembedding import PatchEmbeddingBlock
 from builder.models.src.vision_transformer import vit_b_16_m, ViT_B_16_Weights
@@ -47,8 +51,13 @@ class BITXT_MBT_VSLTCLS(nn.Module):
         if args.vslt_type == "carryforward":
             self.vslt_enc = nn.Sequential(
                                         nn.Linear(self.num_nodes, self.model_dim),
+<<<<<<< HEAD
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
+=======
+                                        nn.ReLU(inplace=True),
+                                        nn.Linear(self.model_dim, self.model_dim, bias=False),
+>>>>>>> refs/remotes/origin/main
                     )
             vslt_pe = True
             
@@ -56,6 +65,7 @@ class BITXT_MBT_VSLTCLS(nn.Module):
             vslt_pe = False
             self.ie_vslt = nn.Sequential(
                                         nn.Linear(1, self.model_dim),
+<<<<<<< HEAD
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
                     )
@@ -63,11 +73,23 @@ class BITXT_MBT_VSLTCLS(nn.Module):
                                     nn.Linear(1, self.model_dim),
                                     nn.LayerNorm(self.model_dim),
                                     nn.ReLU(inplace=True),
+=======
+                                        nn.ReLU(inplace=True),
+                                        nn.Linear(self.model_dim, self.model_dim, bias=False),
+                    )
+        self.ie_time = nn.Sequential(
+                                    nn.Linear(1, self.model_dim),
+                                    nn.ReLU(inplace=True),
+                                    nn.Linear(self.model_dim, self.model_dim, bias=False),
+>>>>>>> refs/remotes/origin/main
                 )
         self.ie_feat = nn.Embedding(20, self.model_dim)
         self.ie_demo = nn.Sequential(
                                     nn.Linear(2, self.model_dim),
+<<<<<<< HEAD
                                     nn.LayerNorm(self.model_dim),
+=======
+>>>>>>> refs/remotes/origin/main
                                     nn.ReLU(inplace=True),
                 )
         
@@ -81,6 +103,7 @@ class BITXT_MBT_VSLTCLS(nn.Module):
         else:
             residual_bottlenecks = False
 
+<<<<<<< HEAD
         self.fusion_transformer = TrimodalTransformerEncoder_MBT(
             batch_size = args.batch_size,
             n_modality = self.n_modality,
@@ -88,12 +111,24 @@ class BITXT_MBT_VSLTCLS(nn.Module):
             fusion_startidx = args.mbt_fusion_startIdx,
             d_input = self.model_dim,
             resbottle = residual_bottlenecks,
+=======
+        self.fusion_transformer = BimodalTransformerEncoder_MBT(
+            batch_size = args.batch_size,
+            n_modality = 2,
+            bottlenecks_n = 4,      # https://arxiv.org/pdf/2107.00135.pdf # according to section 4.2 implementation details
+            fusion_startidx = args.mbt_fusion_startIdx,
+            d_input = self.model_dim,
+>>>>>>> refs/remotes/origin/main
             n_layers = self.num_layers,
             n_head = self.num_heads,
             d_model = self.model_dim,
             d_ff = self.model_dim * 4,
             dropout = self.dropout,
+<<<<<<< HEAD
             vsltonly = self.args.mbt_only_vslt,
+=======
+            txt_idx = 1,
+>>>>>>> refs/remotes/origin/main
             pe_maxlen = 2500,
             use_pe = [vslt_pe, True],
             mask = [True, True],
@@ -185,9 +220,12 @@ class BITXT_MBT_VSLTCLS(nn.Module):
         # else:
         output3 = None
         
+<<<<<<< HEAD
         print("output1: ", output1.shape)
         exit(1)
 
+=======
+>>>>>>> refs/remotes/origin/main
         return output1, output2, output3
     
     

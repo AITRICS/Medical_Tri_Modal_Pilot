@@ -162,7 +162,7 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
 
             # else:
             if "multi" in args.model:
-                final_target = final_target.repeat(4)
+                final_target = final_target.unsqueeze(0).repeat(4,1).reshape(-1)
                 missing = missing.reshape(-1)   
                 output = output.reshape(-1)
                 loss = criterion(output[missing == 0], final_target[missing == 0])
@@ -182,7 +182,6 @@ def missing_trainer(args, iteration, train_x, static_x, input_lengths, train_y,
             #         aux_tar = reports_tokens[exist_reports_idx][:,1:].contiguous().view(-1)
             #         txt_loss = criterion_aux[0](aux_pred, aux_tar)
             #         loss = loss + (args.auxiliary_loss_weight * txt_loss)
-        
         loss.backward()
         optimizer.step()
         # scaler.scale(loss).backward()

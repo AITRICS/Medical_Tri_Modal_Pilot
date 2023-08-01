@@ -51,8 +51,13 @@ class BITXT_MBT_VFLEXIBLE1(nn.Module):
         if args.vslt_type == "carryforward":
             self.vslt_enc = nn.Sequential(
                                         nn.Linear(self.num_nodes, self.model_dim),
+<<<<<<< HEAD
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
+=======
+                                        nn.ReLU(inplace=True),
+                                        nn.Linear(self.model_dim, self.model_dim, bias=False),
+>>>>>>> refs/remotes/origin/main
                     )
             vslt_pe = True
             
@@ -60,6 +65,7 @@ class BITXT_MBT_VFLEXIBLE1(nn.Module):
             vslt_pe = False
             self.ie_vslt = nn.Sequential(
                                         nn.Linear(1, self.model_dim),
+<<<<<<< HEAD
                                         nn.LayerNorm(self.model_dim),
                                         nn.ReLU(inplace=True),
                     )
@@ -72,6 +78,19 @@ class BITXT_MBT_VFLEXIBLE1(nn.Module):
         self.ie_demo = nn.Sequential(
                                     nn.Linear(2, self.model_dim),
                                     nn.LayerNorm(self.model_dim),
+=======
+                                        nn.ReLU(inplace=True),
+                                        nn.Linear(self.model_dim, self.model_dim, bias=False),
+                    )
+        self.ie_time = nn.Sequential(
+                                    nn.Linear(1, self.model_dim),
+                                    nn.ReLU(inplace=True),
+                                    nn.Linear(self.model_dim, self.model_dim, bias=False),
+                )
+        self.ie_feat = nn.Embedding(20, self.model_dim)
+        self.ie_demo = nn.Sequential(
+                                    nn.Linear(2, self.model_dim),
+>>>>>>> refs/remotes/origin/main
                                     nn.ReLU(inplace=True),
                 )
         
