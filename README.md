@@ -24,7 +24,7 @@ pip install -r requirements.txt
 ```
 
 ## Preprocessing
-As the data preprocessing phase of mimicMIMIC-IV + MIMIC-CXR + MIMIC-ED + (MIMIC-IV-Note) is considered our private company resource, the preprocessing code cannot be shared. However, for the convenience of readers, we have made available sample preprocessed data in the data folder, which can be used to reproduce and execute the code.
+Here we release the subset of our preprocessed data in the $data$ folder as a sample dataset. Note that the preprocessing code is exclusive and cannot be released.
 
 ## Model Training
 
