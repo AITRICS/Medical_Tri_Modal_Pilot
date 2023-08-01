@@ -48,6 +48,11 @@ Other arguments you can add :
 1. multiimages: number of images you want to consider at each prediction
 2. realtime: offer time information based on time distance from admission time or time distance from prediction time
 3. TIE-len: maximum number of time-series data for each prediction (default: 1000)
+4. dir-result: path where saved models will exist
+5. image-data-path: path where cxr image data exist
+6. prediction-range: how far to predict the clinical task
+7. min-inputlen: minimum time series data length
+8. window-size: maximum time series data length
 Please refer to **/control/config.py** for other arguments and brief explanations. 
 
 ## Model Evaluation

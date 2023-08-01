@@ -27,7 +27,7 @@ parser.add_argument('--flexconst', type=float, default=1)
 parser.add_argument('--prediction-range', type=int, default=12)
 parser.add_argument('--min-inputlen', type=int, default=3)
 parser.add_argument('--window-size', type=int, default=24)
-parser.add_argument('--vslt-type', type=str, default="carryforward", choices=["carryforward", "TIE", "QIE"])
+parser.add_argument('--vslt-type', type=str, default="TIE", choices=["carryforward", "TIE", "QIE"])
 parser.add_argument('--realtime', type=int, default=1, choices=[0, 1])
 parser.add_argument('--multiimages', type=int, default=0, choices=[0, 1])
 parser.add_argument('--TIE-len', type=int, default=1000)
@@ -41,15 +41,10 @@ parser.add_argument('--modality-inclusion', type=str, default="train-full_test-f
 parser.add_argument('--fullmodal-definition', type=str, default="txt1_img1", choices=["txt1_img1", "img1", "txt1"])
 
 # Data path setting
-parser.add_argument('--train-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/train")
-parser.add_argument('--test-data-path', type=str, default="/home/destin/training_data_0320/mimic_cf_icu_size24/test")
-<<<<<<< HEAD
+parser.add_argument('--train-data-path', type=str, default="./data/sample_data/train")
+parser.add_argument('--test-data-path', type=str, default="./data/sample_data/test")
 parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/destin/multimodal/mlhc_final_models")
 parser.add_argument('--image-data-path', type=str, default="/home/claire/")
-=======
-parser.add_argument('--dir-result', type=str, default="/mnt/aitrics_ext/ext01/destin/multimodal/mlhc_final_models_0420/nonorm")
-parser.add_argument('--image-data-path', type=str, default="/home/destin/")
->>>>>>> refs/remotes/origin/main
 
 # Data Parameters
 parser.add_argument('--cross-fold-val', type=int, default=0, choices=[1, 0], help="1: k-fold, 0: seed-average")
