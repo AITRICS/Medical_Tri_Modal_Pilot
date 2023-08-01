@@ -3,15 +3,15 @@
 This is the repository for MLHC 2023 Paper ["Learning Missing Modal Electronic Health Records with Unified Multi-modal Data Embedding and Modality-Aware Attention"](https://arxiv.org/abs/2305.02504). 
 
 - If you have used our code or referred to our result in your research, please cite: 
-...
+```
 @article{lee2023learning,
   title={Learning Missing Modal Electronic Health Records with Unified Multi-modal Data Embedding and Modality-Aware Attention},
   author={Lee, Kwanhyung and Lee, Soojeong and Hahn, Sangchul and Hyun, Heejung and Choi, Edward and Ahn, Byungeun and Lee, Joohyung},
   journal={arXiv preprint arXiv:2305.02504},
   year={2023}
 }
-...
-
+```
+  
 ## 
 ![concpet](./images/Concept.jpg)
 
